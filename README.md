@@ -26,7 +26,7 @@ vercel dev
 ```
 
 실행 후 안내되는 로컬 주소(보통 http://localhost:3000)로 접속하면 `/api/interpret`까지 함께 동작합니다.
-이때도 `.env.local` 파일에 `ANTHROPIC_API_KEY`를 넣어둬야 합니다 (아래 3번 참고).
+이때도 `.env.local` 파일에 `OPENAI_API_KEY`를 넣어둬야 합니다 (아래 3번 참고).
 
 ## 2. 배포하기 (Vercel 기준)
 
@@ -43,8 +43,8 @@ Vercel 프로젝트 > Settings > Environment Variables 에 아래를 추가합�
 
 | 이름 | 값 | 필수 |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | https://console.anthropic.com 에서 발급받은 키 (`sk-ant-...`) | 예 |
-| `ANTHROPIC_MODEL` | 사용할 모델 ID (비워두면 기본값 사용) | 아니오 |
+| `OPENAI_API_KEY` | https://platform.openai.com/api-keys 에서 발급받은 키 (`sk-...`) | 예 |
+| `OPENAI_MODEL` | 사용할 모델 ID (비워두면 `gpt-4o-mini` 사용) | 아니오 |
 
 환경변수를 추가한 뒤에는 **다시 배포(Redeploy)**해야 반영됩니다.
 
@@ -68,7 +68,7 @@ API 키는 절대 `index.html`이나 프론트엔드 코드에 직접 넣지 마
 ## 5. 비용 관련 참고
 
 - Vercel: 개인/소규모 트래픽은 무료 티어로 충분합니다.
-- Anthropic API: 사용한 토큰만큼 과금됩니다. 해석 1건당 비용은 대략 수백~1,000자 응답 기준 소액이지만, 트래픽이 늘면 누적되니 건당 결제 가격 책정 시 감안하세요.
+- OpenAI API: 사용한 토큰만큼 과금됩니다. `gpt-4o-mini` 기준 해석 1건당 비용은 매우 저렴한 편(1건에 몇 원~수십 원 수준)이지만, 트래픽이 늘면 누적되니 건당 결제 가격 책정 시 감안하세요. 더 높은 품질이 필요하면 `gpt-4o`로 바꿀 수 있지만 비용이 올라갑니다.
 - 같은 생년월일시로 반복 요청이 들어올 걸 대비해, 필요하면 결과를 DB(예: Supabase)에 캐싱해서 같은 사주는 API를 다시 부르지 않도록 최적화할 수 있습니다 (아직 미구현).
 
 ## 6. 지금 상태 요약

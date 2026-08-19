@@ -1,13 +1,14 @@
-// Vercel 서버리스 함수: 사주/자미두수 데이터를 받아 Claude API로 해석 텍스트를 생성합니다.
+// Vercel 서버리스 함수: 사주/자미두수 데이터를 받아 OpenAI API로 해석 텍스트를 생성합니다.
 // 배포 시 Vercel 프로젝트의 환경변수(Settings > Environment Variables)에
-//   ANTHROPIC_API_KEY = sk-ant-...
-// 를 반드시 설정해야 동작합니다. (https://console.anthropic.com 에서 발급)
+//   OPENAI_API_KEY = sk-...
+// 를 반드시 설정해야 동작합니다. (https://platform.openai.com/api-keys 에서 발급)
 //
 // 이 파일은 Node.js 런타임의 Vercel 서버리스 함수 형식(module.exports = async (req,res)=>{...})입니다.
 
-const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
-// 필요 시 환경변수로 모델을 바꿀 수 있게 해둠 (Anthropic 문서에서 최신 모델 ID 확인 권장)
-const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5-20250929';
+const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
+// 필요 시 환경변수로 모델을 바꿀 수 있게 해둠. gpt-4o-mini는 저렴하면서 이런 글쓰기 작업엔 충분합니다.
+// 더 높은 품질을 원하면 Vercel 환경변수에 OPENAI_MODEL=gpt-4o 등으로 지정하세요.
+const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
 function buildPrompt(payload) {
   const { name, gender, birth, saju, ziwei } = payload;
@@ -53,9 +54,9 @@ module.exports = async (req, res) => {
     return;
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    res.status(500).json({ error: '서버에 ANTHROPIC_API_KEY 환경변수가 설정되어 있지 않습니다.' });
+    res.status(500).json({ error: '서버에 OPENAI_API_KEY 환경변수가 설정되어 있지 않습니다.' });
     return;
   }
 
@@ -75,34 +76,31 @@ module.exports = async (req, res) => {
   const userPrompt = buildPrompt(payload);
 
   try {
-    const anthropicRes = await fetch(ANTHROPIC_API_URL, {
+    const openaiRes = await fetch(OPENAI_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         model: MODEL,
         max_tokens: 1500,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: userPrompt }],
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: userPrompt },
+        ],
       }),
     });
 
-    if (!anthropicRes.ok) {
-      const errText = await anthropicRes.text();
-      console.error('Anthropic API error:', anthropicRes.status, errText);
-      res.status(502).json({ error: `AI 서버 응답 오류 (${anthropicRes.status})` });
+    if (!openaiRes.ok) {
+      const errText = await openaiRes.text();
+      console.error('OpenAI API error:', openaiRes.status, errText);
+      res.status(502).json({ error: `AI 서버 응답 오류 (${openaiRes.status})` });
       return;
     }
 
-    const data = await anthropicRes.json();
-    const text = (data.content || [])
-      .filter((block) => block.type === 'text')
-      .map((block) => block.text)
-      .join('\n')
-      .trim();
+    const data = await openaiRes.json();
+    const text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '').trim();
 
     res.status(200).json({ interpretation: text || '해석을 생성하지 못했습니다.' });
   } catch (err) {
