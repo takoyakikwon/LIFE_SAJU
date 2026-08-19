@@ -1630,6 +1630,31 @@ function resetAiPanel(){
   $('#aiResult').hidden = true;
   $('#aiError').hidden = true;
 }
+// 사주 8자(년월일시 각 간지) 각각의 십성/지장간/12운성을 한 줄씩 정리 — AI 프롬프트용 상세 데이터
+function buildSajuPillarDetail(s){
+  const pillars = s.pillars;
+  const rows = [
+    {label:'년주', g:pillars.year.g, z:pillars.year.z},
+    {label:'월주', g:pillars.month.g, z:pillars.month.z},
+    {label:'일주', g:pillars.day.g, z:pillars.day.z, isDay:true},
+  ];
+  if(pillars.hour) rows.push({label:'시주', g:pillars.hour.g, z:pillars.hour.z});
+  const dmG = pillars.day.g;
+  return rows.map(r=>{
+    const ganTg = r.isDay ? '일원(나)' : tenGodOf(dmG, GAN_ELEMENT[r.g], r.g%2);
+    const zhiTg = tenGodOf(dmG, ZHI_ELEMENT[r.z], r.z%2);
+    const janggan = ZHI_JANGGAN[r.z].map(g=>`${GAN[g]}(${tenGodOf(dmG, GAN_ELEMENT[g], g%2)})`).join('·');
+    const stage = twelveStage(dmG, r.z);
+    return `${r.label} ${GAN[r.g]}${ZHI[r.z]}(${GAN_HANJA[r.g]}${ZHI_HANJA[r.z]}) — 천간십성:${ganTg}, 지지십성:${zhiTg}, 지장간:${janggan}, 12운성:${stage}`;
+  }).join('\n');
+}
+// 자미두수 12궁 전체(각 궁의 지지·천간·포함된 별)를 한 줄씩 정리 — AI 프롬프트용 상세 데이터
+function buildZiweiPalaceDetail(z){
+  return z.palaces.map(p=>{
+    const stars = p.stars.length ? p.stars.map(st=>st.hanja+(st.aux?'(보조성)':'')).join(', ') : '(주요 별 없음)';
+    return `${p.name}(${ZHI_HANJA[p.stdZhi]}) — ${stars}`;
+  }).join('\n');
+}
 function buildAiPayload(){
   const s = lastSajuResult, z = lastZiweiResult;
   if(!s) return null;
@@ -1644,6 +1669,18 @@ function buildAiPayload(){
   const hadBirthday = (today.getMonth()>birthLocal.getMonth()) || (today.getMonth()===birthLocal.getMonth() && today.getDate()>=birthLocal.getDate());
   if(!hadBirthday) curAge -= 1;
   const curDaeun = s.daeun.list.find(d=>curAge>=d.startAge && curAge<=d.endAge);
+  // 공망
+  let dayCombined = 0;
+  for(let c=0;c<60;c++){ if(mod(c,10)===s.pillars.day.g && mod(c,12)===s.pillars.day.z){ dayCombined=c; break; } }
+  const gm = gongmangZhi(dayCombined);
+  const gongmangStr = `${ZHI[gm[0]]}(${ZHI_HANJA[gm[0]]})·${ZHI[gm[1]]}(${ZHI_HANJA[gm[1]]})`;
+  // 자미두수 현재 대한 + 신궁
+  let curZiweiDaehan = null, bodyPalaceName = null;
+  if(z){
+    curZiweiDaehan = z.daeHan.list.find(d=>curAge>=d.startAge && curAge<=d.endAge) || null;
+    const bp = z.palaces.find(p=>p.reducedIdx===mod(z.bodyIndex,12));
+    bodyPalaceName = bp ? bp.name : null;
+  }
 
   const payload = {
     name: lastName || null,
@@ -1657,13 +1694,20 @@ function buildAiPayload(){
       일간: `${GAN[s.pillars.day.g]}(${ELEMENT_NAME[GAN_ELEMENT[s.pillars.day.g]]})`,
       오행분포: ohaengSummary,
       현재대운: curDaeun ? `${curDaeun.startAge}-${curDaeun.endAge}세, ${GAN[curDaeun.g]}${ZHI[curDaeun.z]}(${ELEMENT_NAME[GAN_ELEMENT[curDaeun.g]]})` : null,
+      공망: gongmangStr,
+      // 8자 각각의 십성/지장간/12운성 상세 (줄바꿈으로 구분된 텍스트)
+      사주상세: buildSajuPillarDetail(s),
     },
     ziwei: z ? {
       음력생일: `${z.lunar.lunarYear}년 ${z.lunar.isLeapMonth?'윤':''}${z.lunar.lunarMonth}월 ${z.lunar.lunarDay}일`,
       오행국: z.bureau.name,
       명궁: `${ZHI[z.soulZhiStd]}(${ZHI_HANJA[z.soulZhiStd]}), 천간 ${GAN[z.mingGan]}`,
+      신궁: bodyPalaceName,
       명궁의별: (z.palaces.find(p=>p.name==='명궁')||{stars:[]}).stars.map(st=>st.hanja).join(', '),
       사화: z.sihwaInfo.map(si=>`${si.label}:${si.starName}→${si.palace||'-'}`).join(', '),
+      현재대한: curZiweiDaehan ? `${curZiweiDaehan.startAge}-${curZiweiDaehan.endAge}세, ${curZiweiDaehan.palaceName}` : null,
+      // 12궁 전체(각 궁의 지지·별) 상세 (줄바꿈으로 구분된 텍스트) — 재백궁/관록궁/부처궁/부모궁 등 전부 포함
+      궁위상세: buildZiweiPalaceDetail(z),
     } : null,
   };
   return payload;
