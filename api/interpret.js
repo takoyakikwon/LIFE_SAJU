@@ -10,30 +10,26 @@ const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 // 더 높은 품질을 원하면 Vercel 환경변수에 OPENAI_MODEL=gpt-4o 등으로 지정하세요.
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
-function buildPrompt(payload) {
-  const { name, gender, birth, saju, ziwei } = payload;
-
+// 사주/자미두수 기본+상세 텍스트 블록을 한 사람 분량으로 만든다. 궁합&결혼처럼 2인 입력을
+// 받는 카테고리에서 상대방(partner) 데이터도 같은 형식으로 재사용하기 위해 분리해뒀다.
+function buildPersonSajuZiweiBlock(saju, ziwei, labelPrefix) {
   const lines = [];
-  lines.push(`이름: ${name || '(비공개)'}`);
-  lines.push(`성별: ${gender}`);
-  lines.push(`생년월일시: ${birth}`);
-  lines.push('');
-  lines.push('[사주팔자 기본]');
+  lines.push(`[${labelPrefix}사주팔자 기본]`);
   if (saju) {
     lines.push(`년주 ${saju.년주} / 월주 ${saju.월주} / 일주 ${saju.일주} / 시주 ${saju.시주}`);
-    lines.push(`일간(나): ${saju.일간}`);
+    lines.push(`일간: ${saju.일간}`);
     lines.push(`오행 분포: ${saju.오행분포}`);
     if (saju.현재대운) lines.push(`현재 대운: ${saju.현재대운}`);
     if (saju.공망) lines.push(`공망: ${saju.공망}`);
     if (saju.사주상세) {
       lines.push('');
-      lines.push('[사주팔자 상세 — 8자 각각의 십성/지장간/12운성]');
+      lines.push(`[${labelPrefix}사주팔자 상세 — 8자 각각의 십성/지장간/12운성]`);
       lines.push(saju.사주상세);
     }
   }
   if (ziwei) {
     lines.push('');
-    lines.push('[자미두수 기본]');
+    lines.push(`[${labelPrefix}자미두수 기본]`);
     lines.push(`음력 생일: ${ziwei.음력생일}`);
     lines.push(`오행국: ${ziwei.오행국}`);
     lines.push(`명궁: ${ziwei.명궁}`);
@@ -43,9 +39,33 @@ function buildPrompt(payload) {
     if (ziwei.현재대한) lines.push(`현재 대한: ${ziwei.현재대한}`);
     if (ziwei.궁위상세) {
       lines.push('');
-      lines.push('[자미두수 12궁 전체 상세 — 각 궁의 지지와 포함된 별]');
+      lines.push(`[${labelPrefix}자미두수 12궁 전체 상세 — 각 궁의 지지와 포함된 별]`);
       lines.push(ziwei.궁위상세);
     }
+  }
+  return lines.join('\n');
+}
+
+function buildPrompt(payload) {
+  const { name, gender, birth, saju, ziwei, partner } = payload;
+
+  const lines = [];
+  lines.push(`${partner ? '[사람 A] ' : ''}이름: ${name || '(비공개)'}`);
+  lines.push(`성별: ${gender}`);
+  lines.push(`생년월일시: ${birth}`);
+  lines.push('');
+  lines.push(buildPersonSajuZiweiBlock(saju, ziwei, ''));
+
+  // 궁합&결혼처럼 두 사람의 데이터를 함께 받는 카테고리용. partner가 없으면(기존 1인 카테고리)
+  // 이 블록은 통째로 생략되므로 기존 프롬프트 텍스트는 한 글자도 바뀌지 않는다.
+  if (partner) {
+    lines.push('');
+    lines.push('====================');
+    lines.push(`[사람 B / 상대방] 이름: ${partner.name || '(비공개)'}`);
+    lines.push(`성별: ${partner.gender}`);
+    lines.push(`생년월일시: ${partner.birth}`);
+    lines.push('');
+    lines.push(buildPersonSajuZiweiBlock(partner.saju, partner.ziwei, '상대방 '));
   }
 
   return lines.join('\n');
@@ -123,8 +143,22 @@ function buildCategoryPromptLove(loveStatus) {
 - 마지막 소주제("다가오는 시기와 총평")에서 앞선 내용을 종합해 마무리합니다.`;
 }
 
+const CATEGORY_PROMPT_COMPATIBILITY = `
+[이 리포트는 "궁합&결혼" 카테고리입니다 — 아래 규칙을 추가로 지키세요]
+
+- 이 리포트는 두 사람(사람 A, 사람 B/상대방)의 사주·자미두수 데이터를 모두 받았습니다. 반드시 두 사람의 실제 데이터를 함께 근거로 사용해 비교·해석하세요. 한쪽 데이터만 보고 쓰거나 상대방을 막연하게 묘사하지 않습니다. 예를 들어 "사람 A의 일간은 계수, 사람 B의 일간은 정화라 물과 불처럼 대조적인 조합입니다"처럼 두 사람을 항상 나란히 인용합니다.
+- 아래 5개 소주제를 이 순서대로 다룹니다: "두 사람의 기질 비교", "함께 있을 때의 케미", "마찰이 생기기 쉬운 지점", "관계가 좋아지는 방법", "총평".
+- "두 사람의 기질 비교" 섹션: 두 사람의 일간·오행, 명궁의 별 등을 나란히 대조하며 각자의 기본 성향을 짚습니다.
+- "함께 있을 때의 케미" 섹션: 두 사람의 조합이 만들어내는 강점 — 서로 잘 맞물리는 지점, 함께 있을 때 시너지가 나는 부분 — 을 구체적으로 짚습니다.
+- "마찰이 생기기 쉬운 지점" 섹션: 두 사람의 성향 차이나 상충하는 오행·십성을 근거로, 실제로 부딪힐 수 있는 구체적인 상황을 묘사합니다. "이 두 사람은 안 맞는다"처럼 단정하지 말고, 마찰의 이유와 함께 완화될 여지도 짚어줍니다.
+- "관계가 좋아지는 방법" 섹션: 위에서 짚은 마찰 지점에 대한 구체적이고 실천 가능한 조언을 두 사람 모두에게 제시합니다.
+- "결혼 궁합"을 자동으로 전제하지 말고 기본적으로는 "이 두 사람이 관계를 맺을 때"의 궁합으로 다루되, 자연스러운 흐름에서 결혼 이후를 함께 언급하는 것은 괜찮습니다.
+- 각 소주제는 충분히 구체적으로, 두 사람 모두를 근거로 인용하며 씁니다. 전체 분량은 3,000~4,000자 내외로 작성합니다.
+- 마지막 "총평" 소주제에서 앞선 내용을 종합해 두 사람 관계의 핵심을 한 문장으로 정리하며 마무리합니다.`;
+
 const CATEGORY_PROMPTS = {
   comprehensive: CATEGORY_PROMPT_COMPREHENSIVE,
+  compatibility: CATEGORY_PROMPT_COMPATIBILITY,
 };
 
 module.exports = async (req, res) => {
