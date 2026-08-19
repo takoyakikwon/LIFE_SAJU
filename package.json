@@ -1,0 +1,9 @@
+{
+  "name": "saju-ziwei-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "사주팔자 + 자미두수 계산 및 AI 해석 웹앱",
+  "engines": {
+    "node": ">=18"
+  }
+}
