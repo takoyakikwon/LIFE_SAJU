@@ -84,19 +84,46 @@ const CATEGORY_PROMPT_COMPREHENSIVE = `
 - 전체 분량은 3,000~4,000자 내외로, 각 소주제를 충분히 구체적이고 깊이 있게 씁니다.
 - 마지막 소주제는 도입부("한마디로 보면")의 핵심 통찰을 다시 불러오는 총평으로 마무리합니다.`;
 
-const CATEGORY_PROMPT_LOVE = `
+// 연애·재회운은 사용자의 현재 연애 상태(loveStatus)에 따라 5번째 소주제만 바꿔치기한다.
+// - dating: 지금 만나는 사람이 있음 → 재회 언급 없이 관계를 단단히 하는 조언
+// - single: 지금 솔로, 새 인연을 원함 → 재회 언급 없이 새로운 인연 시기
+// - breakup: 최근 이별, 재회를 고민 중 → 기존의 재회 가능성 섹션
+// - general(기본값, loveStatus 미전달 시): 상태를 모르므로 이별/재회/새 인연을 전제하지 않는 중립적 섹션
+const LOVE_STATUS_MAP = {
+  dating: {
+    subtitle: '관계를 더 단단하게 만드는 지점',
+    guide: '지금 만나고 있는 사람이 있다는 전제로 씁니다. 특정 상대의 정보는 없으므로 상대를 묘사하지 말고, 이 사람 자신의 성향과 흐름을 근거로 관계를 더 안정적이고 깊게 만들기 위해 스스로 주의하거나 시도해보면 좋을 지점을 짚어줍니다. 이별이나 재회를 전제하는 표현은 쓰지 않습니다.',
+  },
+  single: {
+    subtitle: '새로운 인연이 다가오는 시기',
+    guide: '지금 만나는 사람이 없고 새로운 인연을 원한다는 전제로 씁니다. 헤어진 인연이나 재회를 전제하는 표현은 쓰지 않습니다. 새로운 사람을 만나기 좋은 시기, 그 인연을 알아보는 신호, 이 사람이 먼저 마음을 열면 좋을 부분을 사주·자미두수 흐름 근거로 짚어줍니다.',
+  },
+  breakup: {
+    subtitle: '재회의 가능성을 읽다',
+    guide: '최근 이별했거나 재회를 고민하고 있다는 전제로 씁니다. 특정 인물을 전제하지 말고, 이 사람이 헤어진 인연을 대하는 성향과 현재 대운·대한이 재회에 우호적인 흐름인지를 일반적으로 짚어줍니다.',
+  },
+  general: {
+    subtitle: '앞으로의 연애를 대하는 자세',
+    guide: '연애 상태를 알 수 없으므로, 특정 상대나 이별·재회를 전제하지 않습니다. 이 사람이 앞으로 연애를 대할 때 마음에 새기면 좋을 태도와, 다가오는 흐름에서 기대해볼 만한 지점을 사주·자미두수 흐름 근거로 짚어줍니다.',
+  },
+};
+
+function buildCategoryPromptLove(loveStatus) {
+  const status = LOVE_STATUS_MAP[loveStatus] ? loveStatus : 'general';
+  const s = LOVE_STATUS_MAP[status];
+  return `
 [이 리포트는 "연애·재회운" 카테고리입니다 — 아래 규칙을 추가로 지키세요]
 
-- 상대방의 정보는 입력받지 않았습니다. 특정 인물과의 궁합이 아니라, 이 사람 본인의 연애 패턴과 지금 흐르고 있는 연애·재회 기운을 자미두수 부처궁(배우자궁)에 있는 별, 그리고 사주에서 연애·이성관계와 관련되는 십성(비견·겁재·식신·상관·정관·편관 등)을 근거로 풀이합니다. 부처궁이나 관련 십성 데이터가 없다면 억지로 지어내지 말고 다른 근거로 풀이합니다.
-- 아래 5개 소주제를 이 순서대로 다룹니다: "감정을 표현하는 방식", "지금 이 사람의 연애 흐름", "마음이 자주 흔들리는 지점", "재회의 가능성을 읽다", "다가오는 시기와 총평".
-- "재회의 가능성을 읽다" 섹션은 특정 인물을 전제하지 말고, 이 사람이 헤어진 인연을 대하는 성향과 현재 대운·대한이 재회에 우호적인 흐름인지를 일반적으로 짚어줍니다.
+- 상대방의 정보는 입력받지 않았습니다. 특정 인물과의 궁합이 아니라, 이 사람 본인의 연애 패턴과 지금 흐르고 있는 연애 기운을 자미두수 부처궁(배우자궁)에 있는 별, 그리고 사주에서 연애·이성관계와 관련되는 십성(비견·겁재·식신·상관·정관·편관 등)을 근거로 풀이합니다. 부처궁이나 관련 십성 데이터가 없다면 억지로 지어내지 말고 다른 근거로 풀이합니다.
+- 아래 5개 소주제를 이 순서대로 다룹니다: "감정을 표현하는 방식", "지금 이 사람의 연애 흐름", "마음이 자주 흔들리는 지점", "${s.subtitle}", "다가오는 시기와 총평".
+- "${s.subtitle}" 섹션 지침: ${s.guide}
 - 각 소주제는 최소 5~7문장 이상으로, 근거 데이터 인용 → 그 의미 해석 → 구체적인 상황 묘사나 조언까지 충분히 풀어서 씁니다. 짧게 요약하듯 끝내지 말고 각 소주제마다 문단을 2개 이상으로 나눠도 좋습니다.
 - 전체 분량은 2,800~3,600자 내외로, 다른 카테고리 못지않게 충분히 길고 깊이 있게 작성합니다.
 - 마지막 소주제("다가오는 시기와 총평")에서 앞선 내용을 종합해 마무리합니다.`;
+}
 
 const CATEGORY_PROMPTS = {
   comprehensive: CATEGORY_PROMPT_COMPREHENSIVE,
-  love: CATEGORY_PROMPT_LOVE,
 };
 
 module.exports = async (req, res) => {
@@ -125,7 +152,9 @@ module.exports = async (req, res) => {
   }
 
   const userPrompt = buildPrompt(payload);
-  const categoryPrompt = CATEGORY_PROMPTS[payload.category] || CATEGORY_PROMPT_COMPREHENSIVE;
+  const categoryPrompt = payload.category === 'love'
+    ? buildCategoryPromptLove(payload.loveStatus)
+    : (CATEGORY_PROMPTS[payload.category] || CATEGORY_PROMPT_COMPREHENSIVE);
   const SYSTEM_PROMPT = BASE_PROMPT + '\n' + categoryPrompt;
 
   try {
