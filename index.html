@@ -122,13 +122,14 @@
     display:block; font-size:12px; font-weight:700; color:var(--ink-soft);
     margin-bottom:7px; letter-spacing:0.2px;
   }
-  .field input[type="text"], .field input[type="date"], .field input[type="time"]{
+  .field input[type="text"], .field input[type="date"], .field input[type="time"], .field input[type="email"], .field textarea{
     width:100%; padding:13px 14px; font-size:15px;
     border:1.5px solid var(--line); border-radius:var(--radius-sm);
     background:var(--paper-card); color:var(--ink);
     font-family:"Noto Sans KR"; font-weight:500;
   }
-  .field input:focus{outline:none; border-color:var(--seal);}
+  .field textarea{ resize:vertical; min-height:96px; line-height:1.5; }
+  .field input:focus, .field textarea:focus{outline:none; border-color:var(--seal);}
   .seg{display:flex; gap:8px;}
   .seg button{
     flex:1; padding:12px 0; border-radius:var(--radius-sm);
@@ -498,6 +499,14 @@
   .admin-summary .stat .l{ font-size:10px; color:var(--ink-faint); margin-top:3px; }
   .admin-section-title{ font-family:"Noto Serif KR"; font-weight:900; font-size:13px; margin:14px 0 8px; }
   .admin-section-title:first-of-type{ margin-top:0; }
+  /* CS 문의 폼 */
+  .form-msg{ font-size:12px; line-height:1.6; padding:10px 12px; border-radius:var(--radius-sm); margin-bottom:14px; }
+  .form-msg.ok{ background:#E7F2E4; color:#3C7A3C; }
+  .form-msg.err{ background:#F2E0DC; color:#A14B3A; }
+  .history-item-linkbtn{
+    margin-top:9px; background:none; border:none; padding:0; color:var(--seal);
+    font-size:11px; font-weight:700; cursor:pointer; font-family:"Noto Sans KR";
+  }
   /* AI 카테고리 선택 단계 */
   .cat-picker{display:flex; flex-direction:column; gap:10px;}
   .cat-option{
@@ -848,6 +857,29 @@
     <div class="admin-section-title">CS 문의</div>
     <div class="history-list" id="adminInquiryList"></div>
     <button class="modal-cancel" id="adminModalCancel">닫기</button>
+  </div>
+</div>
+<div id="inquiryModal" class="modal-overlay" hidden>
+  <div class="modal-card">
+    <div class="modal-title">문의하기</div>
+    <p class="modal-desc">계산 결과나 결제에 대해 궁금한 점, 오류 제보를 남겨주세요. 로그인 없이도 남길 수 있어요.</p>
+    <div id="inquiryMsg"></div>
+    <form id="inquiryForm">
+      <div class="field" id="inquiryContactField">
+        <label for="inquiryContact">회신받을 연락처 (이메일 등)</label>
+        <input type="text" id="inquiryContact" placeholder="예: you@example.com">
+      </div>
+      <div class="field">
+        <label for="inquirySubject">제목</label>
+        <input type="text" id="inquirySubject" placeholder="예: 결제했는데 결과가 안 보여요" required>
+      </div>
+      <div class="field">
+        <label for="inquiryMessage">내용</label>
+        <textarea id="inquiryMessage" placeholder="상황을 자세히 알려주시면 더 빨리 도와드릴 수 있어요." required></textarea>
+      </div>
+      <button type="submit" class="submit-btn" id="inquirySubmitBtn">문의 남기기</button>
+    </form>
+    <button class="modal-cancel" id="inquiryModalCancel">닫기</button>
   </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -2414,9 +2446,10 @@ function renderPurchaseList(container, rows, showOwner){
     const ownerLine = showOwner
       ? `<div class="history-meta">👤 ${escapeHtml((r.profiles && r.profiles.nickname) || '알 수 없음')}</div>`
       : '';
-    const resultBlock = r.result_text
-      ? `<div class="history-result" hidden>${escapeHtml(r.result_text)}</div>`
-      : `<div class="history-result" hidden>저장된 해석 내용이 없어요.</div>`;
+    const resultText = r.result_text
+      ? escapeHtml(r.result_text)
+      : '저장된 해석 내용이 없어요.';
+    const inquiryBtn = showOwner ? '' : `<button class="history-item-linkbtn" data-purchase-id="${escapeHtml(r.id)}" data-purchase-cat="${cat}">이 건 문의하기 ›</button>`;
     return `<div class="history-item">
         <div class="history-item-top">
           <span class="history-cat">${cat}</span>
@@ -2427,13 +2460,20 @@ function renderPurchaseList(container, rows, showOwner){
           <span class="history-status ${escapeHtml(r.status)}">${statusLabel}</span>
           <span>${formatDateTime(r.created_at)}</span>
         </div>
-        ${resultBlock}
+        <div class="history-result" hidden>${resultText}${inquiryBtn}</div>
       </div>`;
   }).join('');
   container.querySelectorAll('.history-item').forEach(el=>{
     el.addEventListener('click', ()=>{
       const box = el.querySelector('.history-result');
       if(box){ box.hidden = !box.hidden; }
+    });
+  });
+  container.querySelectorAll('.history-item-linkbtn').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      closeHistoryModal();
+      openInquiryModal({ subject: `[${btn.dataset.purchaseCat}] 관련 문의`, purchaseId: btn.dataset.purchaseId });
     });
   });
 }
@@ -2508,6 +2548,61 @@ function closeAdminModal(){ $('#adminModal').hidden = true; }
 $('#historyModalCancel').addEventListener('click', closeHistoryModal);
 $('#adminModalCancel').addEventListener('click', closeAdminModal);
 
+/* =========================================================
+   CS 문의 (로그인/비로그인 모두 가능 — cs_inquiries insert)
+   ========================================================= */
+let inquiryPrefill = null; // { subject, purchaseId } — 결제내역에서 "이 건 문의하기"로 열었을 때만 채워짐
+
+function openInquiryModal(prefill){
+  inquiryPrefill = prefill || null;
+  $('#inquiryModal').hidden = false;
+  $('#inquiryMsg').innerHTML = '';
+  $('#inquiryForm').hidden = false;
+  $('#inquirySubject').value = (inquiryPrefill && inquiryPrefill.subject) || '';
+  $('#inquiryMessage').value = '';
+  $('#inquiryContact').value = '';
+  // 로그인 상태면 계정으로 회신 가능하니 연락처 입력칸은 숨김(선택적으로 남겨도 되지만 필수 아님)
+  $('#inquiryContactField').hidden = !!currentSession;
+  $('#inquirySubmitBtn').disabled = false;
+  $('#inquirySubmitBtn').textContent = '문의 남기기';
+}
+function closeInquiryModal(){ $('#inquiryModal').hidden = true; inquiryPrefill = null; }
+
+$('#inquiryModalCancel').addEventListener('click', closeInquiryModal);
+
+$('#inquiryForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const subject = $('#inquirySubject').value.trim();
+  const message = $('#inquiryMessage').value.trim();
+  const contact = $('#inquiryContact').value.trim();
+  if(!subject || !message){
+    $('#inquiryMsg').innerHTML = '<div class="form-msg err">제목과 내용을 입력해주세요.</div>';
+    return;
+  }
+  if(!sb){
+    $('#inquiryMsg').innerHTML = '<div class="form-msg err">문의 기능을 불러오지 못했어요. 잠시 후 다시 시도해주세요.</div>';
+    return;
+  }
+  $('#inquirySubmitBtn').disabled = true;
+  $('#inquirySubmitBtn').textContent = '보내는 중...';
+  const row = {
+    subject,
+    message,
+    user_id: currentSession ? currentSession.user.id : null,
+    guest_contact: currentSession ? null : (contact || null),
+    purchase_id: (inquiryPrefill && inquiryPrefill.purchaseId) || null,
+  };
+  const { error } = await sb.from('cs_inquiries').insert(row);
+  if(error){
+    $('#inquiryMsg').innerHTML = '<div class="form-msg err">문의 접수에 실패했어요. (' + escapeHtml(error.message) + ')</div>';
+    $('#inquirySubmitBtn').disabled = false;
+    $('#inquirySubmitBtn').textContent = '문의 남기기';
+    return;
+  }
+  $('#inquiryMsg').innerHTML = '<div class="form-msg ok">문의가 접수됐어요. 확인 후 답변드릴게요. 감사합니다.</div>';
+  $('#inquiryForm').hidden = true;
+});
+
 function openLoginModal(){ renderLoginModal(); $('#loginModal').hidden = false; }
 function closeLoginModal(){ $('#loginModal').hidden = true; }
 
@@ -2526,10 +2621,12 @@ function renderLoginModal(){
         '</div>' +
       '</div>' +
       '<button class="menu-btn" id="historyMenuBtn">📋 내 결제내역</button>' +
+      '<button class="menu-btn" id="inquiryMenuBtn">📮 문의하기</button>' +
       (isAdmin ? '<button class="menu-btn" id="adminMenuBtn">🛠 관리자 페이지</button>' : '') +
       '<button class="logout-btn" id="logoutBtn">로그아웃</button>' +
       '<button class="modal-cancel" id="loginModalCancel">닫기</button>';
     $('#historyMenuBtn').addEventListener('click', ()=>{ closeLoginModal(); openHistoryModal(); });
+    $('#inquiryMenuBtn').addEventListener('click', ()=>{ closeLoginModal(); openInquiryModal(); });
     if(isAdmin){ $('#adminMenuBtn').addEventListener('click', ()=>{ closeLoginModal(); openAdminModal(); }); }
     $('#logoutBtn').addEventListener('click', async ()=>{
       if(sb){ await sb.auth.signOut(); }
@@ -2544,8 +2641,10 @@ function renderLoginModal(){
         '<div class="p"><span class="ck">✓</span>친구 초대 리워드 (준비 중)</div>' +
       '</div>' +
       '<button class="kakao-login-btn" id="kakaoLoginBtn">💬 카카오로 3초만에 시작하기</button>' +
+      '<button class="menu-btn" id="guestInquiryBtn" style="margin-top:10px;">🙋 로그인 없이 문의만 남기기</button>' +
       '<button class="modal-cancel" id="loginModalCancel">닫기</button>';
     $('#kakaoLoginBtn').addEventListener('click', loginWithKakao);
+    $('#guestInquiryBtn').addEventListener('click', ()=>{ closeLoginModal(); openInquiryModal(); });
   }
   $('#loginModalCancel').addEventListener('click', closeLoginModal);
 }
