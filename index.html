@@ -93,8 +93,15 @@
   .topbar .sub{
     font-size:11px; color:var(--ink-soft); margin-top:2px;
   }
+  .account-btn{
+    margin-left:auto; width:34px; height:34px; border-radius:50%; flex-shrink:0;
+    border:1.5px solid var(--line); background:var(--paper-card); color:var(--ink-soft);
+    font-size:15px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    font-family:"Noto Sans KR"; padding:0;
+  }
+  .account-btn:active{background:var(--paper-deep);}
+  .account-btn.logged-in{border-color:var(--gold-line); background:#FEE500;}
   .topbar .back-btn{
-    margin-left:auto;
     font-size:13px; color:var(--ink-soft);
     background:none; border:1px solid var(--line); border-radius:100px;
     padding:7px 13px; cursor:pointer;
@@ -445,6 +452,27 @@
     width:100%; margin-top:10px; padding:12px 0; background:none; border:none;
     color:var(--ink-faint); font-size:12.5px; cursor:pointer;
   }
+  /* 계정 / 로그인 모달 */
+  .kakao-login-btn{
+    width:100%; padding:14px 0; border:none; border-radius:12px; background:#FEE500; color:#191919;
+    font-family:"Noto Sans KR"; font-weight:700; font-size:14.5px; cursor:pointer;
+  }
+  .kakao-login-btn:active{background:#F5D900;}
+  .login-perklist{margin:14px 0 18px; display:flex; flex-direction:column; gap:8px;}
+  .login-perklist .p{font-size:12px; color:var(--ink-soft); display:flex; gap:6px; align-items:flex-start; line-height:1.5;}
+  .login-perklist .ck{color:var(--wood); font-weight:900; flex-shrink:0;}
+  .account-profile{display:flex; align-items:center; gap:10px; margin-bottom:16px;}
+  .account-avatar{
+    width:40px; height:40px; border-radius:50%; background:#FEE500;
+    display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0;
+  }
+  .account-name{font-weight:700; font-size:14px;}
+  .account-sub{font-size:11px; color:var(--ink-faint); margin-top:2px;}
+  .logout-btn{
+    width:100%; padding:12px 0; border:1px solid var(--line); border-radius:12px; background:none;
+    color:var(--ink-soft); font-size:13px; cursor:pointer; font-family:"Noto Sans KR"; font-weight:600;
+  }
+  .logout-btn:active{background:var(--paper-deep);}
   /* AI 카테고리 선택 단계 */
   .cat-picker{display:flex; flex-direction:column; gap:10px;}
   .cat-option{
@@ -473,6 +501,7 @@
       <h1>사주풀이</h1>
       <div class="sub">전통 명리학 기반 사주팔자 계산</div>
     </div>
+    <button class="account-btn" id="accountBtn" title="로그인"><span>👤</span></button>
     <button class="back-btn" id="backBtn" hidden>다시 보기</button>
   </header>
   <main>
@@ -774,6 +803,10 @@
     <button class="modal-cancel" id="payModalCancel">닫기</button>
   </div>
 </div>
+<div id="loginModal" class="modal-overlay" hidden>
+  <div class="modal-card" id="loginModalCard"></div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
 (function(){
 "use strict";
@@ -2261,6 +2294,102 @@ async function runAiInterpretation(){
     $('#aiLocked').hidden = false;
   }
 }
+
+/* =========================================================
+   계정 / 로그인 (Supabase Auth + 카카오 로그인)
+   ========================================================= */
+const SUPABASE_URL = 'https://wvszaqqducsuifixvprw.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_KC-0hKTGsmray03tI_K7XQ_roYvu2y-';
+const sb = (window.supabase && window.supabase.createClient)
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY)
+  : null;
+
+let currentSession = null;
+let currentProfile = null;
+
+function openLoginModal(){ renderLoginModal(); $('#loginModal').hidden = false; }
+function closeLoginModal(){ $('#loginModal').hidden = true; }
+
+function renderLoginModal(){
+  const card = $('#loginModalCard');
+  if(currentSession){
+    const meta = currentSession.user.user_metadata || {};
+    const nickname = (currentProfile && currentProfile.nickname) || meta.nickname || meta.name || meta.full_name || '회원';
+    card.innerHTML =
+      '<div class="account-profile">' +
+        '<div class="account-avatar">✨</div>' +
+        '<div>' +
+          '<div class="account-name">' + nickname + '님</div>' +
+          '<div class="account-sub">카카오 계정으로 로그인 중</div>' +
+        '</div>' +
+      '</div>' +
+      '<button class="logout-btn" id="logoutBtn">로그아웃</button>' +
+      '<button class="modal-cancel" id="loginModalCancel">닫기</button>';
+    $('#logoutBtn').addEventListener('click', async ()=>{
+      if(sb){ await sb.auth.signOut(); }
+      closeLoginModal();
+    });
+  } else {
+    card.innerHTML =
+      '<div class="modal-title">간편하게 시작하기</div>' +
+      '<p class="modal-desc">카카오 계정으로 3초 만에 시작하고, 결제한 관측 결과를 언제든 다시 열어볼 수 있어요.</p>' +
+      '<div class="login-perklist">' +
+        '<div class="p"><span class="ck">✓</span>결제한 사주 풀이, 1회 다시보기</div>' +
+        '<div class="p"><span class="ck">✓</span>친구 초대 리워드 (준비 중)</div>' +
+      '</div>' +
+      '<button class="kakao-login-btn" id="kakaoLoginBtn">💬 카카오로 3초만에 시작하기</button>' +
+      '<button class="modal-cancel" id="loginModalCancel">닫기</button>';
+    $('#kakaoLoginBtn').addEventListener('click', loginWithKakao);
+  }
+  $('#loginModalCancel').addEventListener('click', closeLoginModal);
+}
+
+async function loginWithKakao(){
+  if(!sb){ alert('로그인 기능을 불러오지 못했어요. 잠시 후 다시 시도해주세요.'); return; }
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'kakao',
+    options: { redirectTo: window.location.origin + window.location.pathname }
+  });
+  if(error){ alert('로그인을 시작하지 못했어요: ' + error.message); }
+}
+
+function updateAccountBtn(){
+  const btn = $('#accountBtn');
+  if(!btn) return;
+  if(currentSession){
+    btn.classList.add('logged-in');
+    btn.title = '내 계정';
+    btn.innerHTML = '<span>✨</span>';
+  } else {
+    btn.classList.remove('logged-in');
+    btn.title = '로그인';
+    btn.innerHTML = '<span>👤</span>';
+  }
+}
+
+async function loadProfile(userId){
+  if(!sb) return null;
+  const { data } = await sb.from('profiles').select('nickname, is_admin').eq('id', userId).maybeSingle();
+  return data || null;
+}
+
+async function initAuth(){
+  if(!sb){ return; }
+  const { data } = await sb.auth.getSession();
+  currentSession = data.session || null;
+  if(currentSession){ currentProfile = await loadProfile(currentSession.user.id); }
+  updateAccountBtn();
+  sb.auth.onAuthStateChange(async (event, session)=>{
+    currentSession = session || null;
+    currentProfile = currentSession ? await loadProfile(currentSession.user.id) : null;
+    updateAccountBtn();
+    if($('#loginModal') && !$('#loginModal').hidden){ renderLoginModal(); }
+    if(event === 'SIGNED_IN'){ closeLoginModal(); }
+  });
+}
+
+$('#accountBtn').addEventListener('click', openLoginModal);
+initAuth();
 })();
 </script>
 </body>
