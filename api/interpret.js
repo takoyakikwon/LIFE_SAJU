@@ -10,6 +10,79 @@ const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 // 더 높은 품질을 원하면 Vercel 환경변수에 OPENAI_MODEL=gpt-4o 등으로 지정하세요.
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
+// 결제 기록(purchases 테이블) 연동용. Vercel 환경변수에 아래 두 개가 등록되어 있어야 합니다.
+//   SUPABASE_URL = https://xxxx.supabase.co
+//   SUPABASE_SERVICE_ROLE_KEY = (Supabase 대시보드의 Secret key — RLS를 우회해 서버에서만 써야 함)
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+// 카테고리별 실제 결제 금액(원 단위 정수). AI_CATEGORY_META의 표시용 문자열과 반드시 일치시켜야 합니다.
+const CATEGORY_AMOUNT_KRW = {
+  comprehensive: 3900,
+  love: 2900,
+  compatibility: 4900,
+  newyear: 9900,
+};
+
+// 클라이언트가 보낸 Supabase 액세스 토큰으로 실제 로그인한 사용자인지 서버에서 직접 확인한다.
+// (클라이언트가 보낸 user_id를 그대로 믿으면 다른 사람 명의로 결제 기록을 조작할 수 있으므로,
+//  반드시 Supabase Auth에 토큰을 되물어 검증된 사용자 id만 사용한다.)
+async function verifySupabaseUser(accessToken) {
+  if (!accessToken || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'apikey': SUPABASE_SERVICE_ROLE_KEY,
+      },
+    });
+    if (!r.ok) return null;
+    const data = await r.json();
+    return (data && data.id) ? data : null;
+  } catch (e) {
+    console.error('verifySupabaseUser failed:', e);
+    return null;
+  }
+}
+
+// purchases 테이블에 결제 1건을 기록한다(RLS 우회를 위해 서비스 롤 키 사용).
+// 실패해도 이미 생성된 AI 해석 응답 자체는 막지 않고, 서버 로그만 남긴다.
+async function recordPurchase({ userId, category, amount, payload, resultText }) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('recordPurchase skipped: SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY not configured');
+    return false;
+  }
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/purchases`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'Prefer': 'return=minimum',
+      },
+      body: JSON.stringify({
+        user_id: userId,
+        category,
+        amount,
+        status: 'paid',
+        pg_provider: null,
+        payload,
+        result_text: resultText,
+      }),
+    });
+    if (!r.ok) {
+      const errText = await r.text();
+      console.error('recordPurchase insert failed:', r.status, errText);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error('recordPurchase error:', e);
+    return false;
+  }
+}
+
 // 사주/자미두수 기본+상세 텍스트 블록을 한 사람 분량으로 만든다. 궁합&결혼처럼 2인 입력을
 // 받는 카테고리에서 상대방(partner) 데이터도 같은 형식으로 재사용하기 위해 분리해뒀다.
 function buildPersonSajuZiweiBlock(saju, ziwei, labelPrefix) {
@@ -276,6 +349,14 @@ module.exports = async (req, res) => {
     return;
   }
 
+  // 결제 기록을 남기려면 실제 로그인한 사용자여야 한다. 클라이언트가 보낸 access_token을
+  // Supabase Auth에 되물어 검증하고, 검증된 user.id만 신뢰한다(클라이언트가 보낸 user_id는 쓰지 않음).
+  const user = await verifySupabaseUser(payload.access_token);
+  if (!user) {
+    res.status(401).json({ error: '로그인이 필요한 서비스입니다. 카카오 로그인 후 다시 시도해주세요.' });
+    return;
+  }
+
   const userPrompt = buildPrompt(payload);
   const categoryPrompt = payload.category === 'love'
     ? buildCategoryPromptLove(payload.loveStatus)
@@ -316,7 +397,21 @@ module.exports = async (req, res) => {
       }
     }
 
-    res.status(200).json({ interpretation: text || '해석을 생성하지 못했습니다.' });
+    const finalText = text || '해석을 생성하지 못했습니다.';
+
+    // 결제 기록 + 재열람용 캐시 저장. access_token 검증을 통과한 사용자이므로 여기서만 기록한다.
+    // (payload에 access_token이 그대로 들어있으면 DB에 시크릿 성격의 값이 남으므로 제외하고 저장)
+    const { access_token, ...payloadWithoutToken } = payload;
+    const amount = CATEGORY_AMOUNT_KRW[payload.category] || CATEGORY_AMOUNT_KRW.comprehensive;
+    await recordPurchase({
+      userId: user.id,
+      category: payload.category || 'comprehensive',
+      amount,
+      payload: payloadWithoutToken,
+      resultText: finalText,
+    });
+
+    res.status(200).json({ interpretation: finalText });
   } catch (err) {
     console.error('interpret.js error:', err);
     res.status(500).json({ error: '서버 내부 오류가 발생했습니다.' });
