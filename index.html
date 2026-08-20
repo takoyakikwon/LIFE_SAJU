@@ -473,6 +473,31 @@
     color:var(--ink-soft); font-size:13px; cursor:pointer; font-family:"Noto Sans KR"; font-weight:600;
   }
   .logout-btn:active{background:var(--paper-deep);}
+  .menu-btn{
+    width:100%; padding:12px 0; border:1px solid var(--line); border-radius:12px; background:var(--paper-card);
+    color:var(--ink); font-size:13px; cursor:pointer; font-family:"Noto Sans KR"; font-weight:600; margin-bottom:8px;
+  }
+  .menu-btn:active{background:var(--paper-deep);}
+  /* 결제내역 / 관리자 화면 */
+  .modal-card-wide{ max-width:440px; }
+  .history-list{ display:flex; flex-direction:column; gap:9px; max-height:44vh; overflow-y:auto; margin-bottom:6px; }
+  .history-item{ border:1.5px solid var(--line); border-radius:var(--radius-sm); background:var(--paper-card); padding:12px 13px; cursor:pointer; }
+  .history-item-top{ display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .history-cat{ font-family:"Noto Serif KR"; font-weight:900; font-size:13px; }
+  .history-amt{ font-family:"Noto Serif KR"; font-weight:900; font-size:12.5px; color:var(--seal); flex-shrink:0; }
+  .history-meta{ font-size:10.5px; color:var(--ink-faint); margin-top:5px; display:flex; gap:7px; align-items:center; flex-wrap:wrap; }
+  .history-status{ padding:1px 7px; border-radius:20px; font-size:9.5px; font-weight:700; }
+  .history-status.paid{ background:#E7F2E4; color:#3C7A3C; }
+  .history-status.pending{ background:#F2ECD8; color:#8A7434; }
+  .history-status.failed, .history-status.refunded{ background:#F2E0DC; color:#A14B3A; }
+  .history-result{ margin-top:9px; padding-top:9px; border-top:1px dashed var(--line); font-size:11.5px; line-height:1.7; white-space:pre-wrap; color:var(--ink-soft); }
+  .history-empty{ text-align:center; padding:26px 10px; color:var(--ink-faint); font-size:12px; }
+  .admin-summary{ display:flex; gap:8px; margin:2px 0 14px; }
+  .admin-summary .stat{ flex:1; text-align:center; border:1px solid var(--line); border-radius:var(--radius-sm); padding:10px 6px; background:var(--paper-card); }
+  .admin-summary .stat .n{ font-family:"Noto Serif KR"; font-weight:900; font-size:15px; }
+  .admin-summary .stat .l{ font-size:10px; color:var(--ink-faint); margin-top:3px; }
+  .admin-section-title{ font-family:"Noto Serif KR"; font-weight:900; font-size:13px; margin:14px 0 8px; }
+  .admin-section-title:first-of-type{ margin-top:0; }
   /* AI 카테고리 선택 단계 */
   .cat-picker{display:flex; flex-direction:column; gap:10px;}
   .cat-option{
@@ -805,6 +830,25 @@
 </div>
 <div id="loginModal" class="modal-overlay" hidden>
   <div class="modal-card" id="loginModalCard"></div>
+</div>
+<div id="historyModal" class="modal-overlay" hidden>
+  <div class="modal-card modal-card-wide">
+    <div class="modal-title">내 결제내역</div>
+    <p class="modal-desc">결제한 리포트를 다시 눌러보면 그때 받은 AI 해석을 다시 볼 수 있어요 (재호출 없이 저장된 내용을 그대로 보여줘요).</p>
+    <div class="history-list" id="historyList"></div>
+    <button class="modal-cancel" id="historyModalCancel">닫기</button>
+  </div>
+</div>
+<div id="adminModal" class="modal-overlay" hidden>
+  <div class="modal-card modal-card-wide">
+    <div class="modal-title">관리자 — 결제/문의 현황</div>
+    <div class="admin-summary" id="adminSummary"></div>
+    <div class="admin-section-title">전체 결제내역</div>
+    <div class="history-list" id="adminPurchaseList"></div>
+    <div class="admin-section-title">CS 문의</div>
+    <div class="history-list" id="adminInquiryList"></div>
+    <button class="modal-cancel" id="adminModalCancel">닫기</button>
+  </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
@@ -2320,6 +2364,150 @@ const sb = (window.supabase && window.supabase.createClient)
 let currentSession = null;
 let currentProfile = null;
 
+// 사용자가 입력한 문자열(닉네임 등)을 innerHTML에 꽂아넣을 때 HTML/스크립트로 해석되지 않도록 이스케이프.
+function escapeHtml(str){
+  return String(str == null ? '' : str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+const CATEGORY_LABEL = { comprehensive:'종합 사주 해석', love:'연애·재회운', compatibility:'궁합&결혼', newyear:'2027 신년운세' };
+const PURCHASE_STATUS_LABEL = { paid:'결제완료', pending:'대기중', failed:'실패', refunded:'환불됨' };
+function formatKRW(n){ return (typeof n === 'number' ? n : 0).toLocaleString('ko-KR') + '원'; }
+function formatDateTime(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  const pad = v => String(v).padStart(2,'0');
+  return `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/* =========================================================
+   내 결제내역 (본인 것만 — RLS가 자동으로 필터링)
+   ========================================================= */
+async function openHistoryModal(){
+  $('#historyModal').hidden = false;
+  const listEl = $('#historyList');
+  listEl.innerHTML = '<div class="history-empty">불러오는 중...</div>';
+  if(!sb || !currentSession){
+    listEl.innerHTML = '<div class="history-empty">로그인이 필요해요.</div>';
+    return;
+  }
+  const { data, error } = await sb.from('purchases')
+    .select('id,category,amount,status,created_at,result_text')
+    .order('created_at', { ascending:false })
+    .limit(100);
+  if(error){
+    listEl.innerHTML = '<div class="history-empty">불러오지 못했어요. (' + escapeHtml(error.message) + ')</div>';
+    return;
+  }
+  renderPurchaseList(listEl, data || []);
+}
+function closeHistoryModal(){ $('#historyModal').hidden = true; }
+
+function renderPurchaseList(container, rows, showOwner){
+  if(!rows.length){
+    container.innerHTML = '<div class="history-empty">아직 결제 내역이 없어요.</div>';
+    return;
+  }
+  container.innerHTML = rows.map(r=>{
+    const cat = escapeHtml(CATEGORY_LABEL[r.category] || r.category);
+    const statusLabel = escapeHtml(PURCHASE_STATUS_LABEL[r.status] || r.status);
+    const ownerLine = showOwner
+      ? `<div class="history-meta">👤 ${escapeHtml((r.profiles && r.profiles.nickname) || '알 수 없음')}</div>`
+      : '';
+    const resultBlock = r.result_text
+      ? `<div class="history-result" hidden>${escapeHtml(r.result_text)}</div>`
+      : `<div class="history-result" hidden>저장된 해석 내용이 없어요.</div>`;
+    return `<div class="history-item">
+        <div class="history-item-top">
+          <span class="history-cat">${cat}</span>
+          <span class="history-amt">${formatKRW(r.amount)}</span>
+        </div>
+        ${ownerLine}
+        <div class="history-meta">
+          <span class="history-status ${escapeHtml(r.status)}">${statusLabel}</span>
+          <span>${formatDateTime(r.created_at)}</span>
+        </div>
+        ${resultBlock}
+      </div>`;
+  }).join('');
+  container.querySelectorAll('.history-item').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const box = el.querySelector('.history-result');
+      if(box){ box.hidden = !box.hidden; }
+    });
+  });
+}
+
+/* =========================================================
+   관리자 페이지 — is_admin 계정만 UI에 노출되지만, 실제 데이터 접근 권한은
+   서버(Supabase RLS: public.is_admin())가 최종적으로 검사한다. 즉 이 버튼이
+   안 보여도 UI를 몰래 열 수는 없고, is_admin=false인 계정은 쿼리 자체가 빈 결과만 받는다.
+   ========================================================= */
+async function openAdminModal(){
+  $('#adminModal').hidden = false;
+  const purchaseEl = $('#adminPurchaseList');
+  const inquiryEl = $('#adminInquiryList');
+  const summaryEl = $('#adminSummary');
+  summaryEl.innerHTML = '';
+  purchaseEl.innerHTML = '<div class="history-empty">불러오는 중...</div>';
+  inquiryEl.innerHTML = '<div class="history-empty">불러오는 중...</div>';
+  if(!sb || !currentSession){
+    purchaseEl.innerHTML = '<div class="history-empty">로그인이 필요해요.</div>';
+    inquiryEl.innerHTML = '';
+    return;
+  }
+  const { data: purchases, error: pErr } = await sb.from('purchases')
+    .select('id,category,amount,status,created_at,result_text,profiles(nickname)')
+    .order('created_at', { ascending:false })
+    .limit(200);
+  if(pErr){
+    purchaseEl.innerHTML = '<div class="history-empty">불러오지 못했어요. (' + escapeHtml(pErr.message) + ')</div>';
+  } else {
+    const paidRows = (purchases||[]).filter(r=>r.status==='paid');
+    const totalAmount = paidRows.reduce((sum,r)=>sum+(r.amount||0), 0);
+    summaryEl.innerHTML =
+      `<div class="stat"><div class="n">${(purchases||[]).length}</div><div class="l">전체 결제건</div></div>` +
+      `<div class="stat"><div class="n">${paidRows.length}</div><div class="l">결제완료</div></div>` +
+      `<div class="stat"><div class="n">${formatKRW(totalAmount)}</div><div class="l">누적 결제액</div></div>`;
+    renderPurchaseList(purchaseEl, purchases || [], true);
+  }
+  const { data: inquiries, error: iErr } = await sb.from('cs_inquiries')
+    .select('id,subject,message,status,guest_contact,created_at,profiles(nickname)')
+    .order('created_at', { ascending:false })
+    .limit(200);
+  if(iErr){
+    inquiryEl.innerHTML = '<div class="history-empty">불러오지 못했어요. (' + escapeHtml(iErr.message) + ')</div>';
+    return;
+  }
+  if(!inquiries || !inquiries.length){
+    inquiryEl.innerHTML = '<div class="history-empty">아직 등록된 CS 문의가 없어요.</div>';
+    return;
+  }
+  const CS_STATUS_LABEL = { open:'미답변', answered:'답변완료', closed:'종료' };
+  inquiryEl.innerHTML = inquiries.map(q=>{
+    const who = escapeHtml((q.profiles && q.profiles.nickname) || q.guest_contact || '비회원');
+    const statusLabel = escapeHtml(CS_STATUS_LABEL[q.status] || q.status);
+    return `<div class="history-item">
+        <div class="history-item-top">
+          <span class="history-cat">${escapeHtml(q.subject)}</span>
+          <span class="history-status ${escapeHtml(q.status)}">${statusLabel}</span>
+        </div>
+        <div class="history-meta">👤 ${who} · ${formatDateTime(q.created_at)}</div>
+        <div class="history-result" hidden>${escapeHtml(q.message)}${q.admin_reply ? ('\n\n[답변]\n' + escapeHtml(q.admin_reply)) : ''}</div>
+      </div>`;
+  }).join('');
+  inquiryEl.querySelectorAll('.history-item').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const box = el.querySelector('.history-result');
+      if(box){ box.hidden = !box.hidden; }
+    });
+  });
+}
+function closeAdminModal(){ $('#adminModal').hidden = true; }
+
+$('#historyModalCancel').addEventListener('click', closeHistoryModal);
+$('#adminModalCancel').addEventListener('click', closeAdminModal);
+
 function openLoginModal(){ renderLoginModal(); $('#loginModal').hidden = false; }
 function closeLoginModal(){ $('#loginModal').hidden = true; }
 
@@ -2328,16 +2516,21 @@ function renderLoginModal(){
   if(currentSession){
     const meta = currentSession.user.user_metadata || {};
     const nickname = (currentProfile && currentProfile.nickname) || meta.nickname || meta.name || meta.full_name || '회원';
+    const isAdmin = !!(currentProfile && currentProfile.is_admin);
     card.innerHTML =
       '<div class="account-profile">' +
         '<div class="account-avatar">✨</div>' +
         '<div>' +
-          '<div class="account-name">' + nickname + '님</div>' +
+          '<div class="account-name">' + escapeHtml(nickname) + '님</div>' +
           '<div class="account-sub">카카오 계정으로 로그인 중</div>' +
         '</div>' +
       '</div>' +
+      '<button class="menu-btn" id="historyMenuBtn">📋 내 결제내역</button>' +
+      (isAdmin ? '<button class="menu-btn" id="adminMenuBtn">🛠 관리자 페이지</button>' : '') +
       '<button class="logout-btn" id="logoutBtn">로그아웃</button>' +
       '<button class="modal-cancel" id="loginModalCancel">닫기</button>';
+    $('#historyMenuBtn').addEventListener('click', ()=>{ closeLoginModal(); openHistoryModal(); });
+    if(isAdmin){ $('#adminMenuBtn').addEventListener('click', ()=>{ closeLoginModal(); openAdminModal(); }); }
     $('#logoutBtn').addEventListener('click', async ()=>{
       if(sb){ await sb.auth.signOut(); }
       closeLoginModal();
