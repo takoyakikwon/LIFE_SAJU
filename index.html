@@ -793,6 +793,13 @@
             <button class="submit-btn" id="partnerNextBtn">다음</button>
           </div>
 
+          <div id="aiStepCompatFree" hidden>
+            <button type="button" class="cat-back" id="compatFreeBackBtn">← 다른 리포트 선택</button>
+            <p class="section-desc" style="margin:14px 0 12px;">사주·자미두수 명식을 바탕으로 한 무료 궁합 미리보기예요. 더 깊은 풀이는 AI 리포트에서 확인할 수 있어요.</p>
+            <div id="compatFreeBox"></div>
+            <button class="submit-btn" id="compatFreeUnlockBtn" style="margin-top:16px;">AI로 더 자세히 풀어보기</button>
+          </div>
+
           <div id="aiStepPay" hidden>
             <button type="button" class="cat-back" id="payBackBtn">← 다른 리포트 선택</button>
             <div class="ai-price-card" style="margin-top:14px;">
@@ -896,6 +903,14 @@ const ZHI_HANJA = ["子","丑","寅","卯","辰","巳","午","未","申","酉","
 const ZHI_ANIMAL = ["쥐","소","호랑이","토끼","용","뱀","말","양","원숭이","닭","개","돼지"];
 const GAN_ELEMENT = [0,0,1,1,2,2,3,3,4,4]; // 목목화화토토금금수수
 const ZHI_ELEMENT = [4,2,0,0,2,1,1,2,3,3,2,4]; // 자축인묘진사오미신유술해
+// 지지 육합(합이 되면 서로 끌어당기는 조합) / 지지 충(정반대라 부딪히는 조합) — 궁합 비교용
+const ZHI_YUKHAP = { 0:1,1:0, 2:11,11:2, 3:10,10:3, 4:9,9:4, 5:8,8:5, 6:7,7:6 }; // 자축·인해·묘술·진유·사신·오미
+const ZHI_CHUNG  = { 0:6,6:0, 1:7,7:1, 2:8,8:2, 3:9,9:3, 4:10,10:4, 5:11,11:5 }; // 자오·축미·인신·묘유·진술·사해
+// 오행 상생(生, 에너지를 주는 방향) / 상극(剋, 억누르는 방향) — 인덱스: 목0 화1 토2 금3 수4
+const ELEMENT_GENERATES = {0:1, 1:2, 2:3, 3:4, 4:0}; // 목생화·화생토·토생금·금생수·수생목
+const ELEMENT_OVERCOMES = {0:2, 2:4, 4:1, 1:3, 3:0}; // 목극토·토극수·수극화·화극금·금극목
+// 자미두수에서 흔히 살성(煞星)으로 묶여 변수/굴곡을 뜻한다고 보는 4개 보조성 — 부처궁 확인용
+const ZIWEI_MALEFIC_STARS = ['화성','영성','경양','타라'];
 const ELEMENT_NAME = ["목","화","토","금","수"];
 const ELEMENT_HANJA = ["木","火","土","金","水"];
 const ELEMENT_CLASS = ["el-wood","el-fire","el-earth","el-metal","el-water"];
@@ -1893,6 +1908,78 @@ function renderCross(saju, zw){
   html += `<div style="color:var(--ink-faint); font-size:11.5px; margin-top:14px;">두 체계는 만들어진 시대와 계산 방식이 달라 완전히 같은 결론을 내지는 않아요. 겹치는 부분은 특히 신뢰도 높은 특징으로, 어긋나는 부분은 상황에 따라 달라질 수 있는 여지로 참고하면 좋습니다.</div>`;
   $('#crossBox').innerHTML = html;
 }
+// 두 원소(0~4) 사이의 오행 관계를 판정 — same / a가 b를 생함 / b가 a를 생함 / a가 b를 극함 / b가 a를 극함
+function relationLabel(elA, elB){
+  if(elA === elB) return 'same';
+  if(ELEMENT_GENERATES[elA] === elB) return 'a-gen-b';
+  if(ELEMENT_GENERATES[elB] === elA) return 'b-gen-a';
+  if(ELEMENT_OVERCOMES[elA] === elB) return 'a-over-b';
+  return 'b-over-a';
+}
+// 무료 궁합 미리보기 — 두 사람의 이미 계산된 사주/자미두수 데이터를 규칙 기반으로 비교 (AI 미사용)
+function renderFreeCompat(a, b){
+  const box = $('#compatFreeBox');
+  if(!box || !a.saju || !b.saju) return;
+  const aName = escapeHtml(a.name || '나');
+  const bName = escapeHtml(b.name || '상대방');
+  let html = '';
+
+  const aDmEl = GAN_ELEMENT[a.saju.pillars.day.g];
+  const bDmEl = GAN_ELEMENT[b.saju.pillars.day.g];
+  const dmRel = relationLabel(aDmEl, bDmEl);
+  const DM_REL_TEXT = {
+    same: `두 분의 일간이 모두 ${ELEMENT_NAME[aDmEl]}(${ELEMENT_HANJA[aDmEl]}) 기운이에요. 서로 비슷한 방식으로 생각하고 움직여서 편안함을 느끼기 쉽지만, 같은 지점에서 함께 고집을 부리거나 부딪힐 여지도 있어요.`,
+    'a-gen-b': `${aName}님의 일간(${ELEMENT_NAME[aDmEl]})이 ${bName}님의 일간(${ELEMENT_NAME[bDmEl]})을 생(生)해주는 관계예요. ${aName}님이 ${bName}님에게 힘을 보태주는 방향의 궁합으로 볼 수 있어요.`,
+    'b-gen-a': `${bName}님의 일간(${ELEMENT_NAME[bDmEl]})이 ${aName}님의 일간(${ELEMENT_NAME[aDmEl]})을 생(生)해주는 관계예요. ${bName}님이 ${aName}님을 채워주는 방향의 궁합으로 볼 수 있어요.`,
+    'a-over-b': `${aName}님의 일간(${ELEMENT_NAME[aDmEl]})이 ${bName}님의 일간(${ELEMENT_NAME[bDmEl]})을 극(剋)하는 관계예요. ${aName}님의 기운이 강하게 작용해 ${bName}님이 맞춰야 하는 순간이 종종 생길 수 있어요.`,
+    'b-over-a': `${bName}님의 일간(${ELEMENT_NAME[bDmEl]})이 ${aName}님의 일간(${ELEMENT_NAME[aDmEl]})을 극(剋)하는 관계예요. ${bName}님의 기운이 강하게 작용해 ${aName}님이 맞춰야 하는 순간이 종종 생길 수 있어요.`,
+  };
+  html += `<div style="margin-bottom:10px;"><b>일간 오행 궁합</b> — ${DM_REL_TEXT[dmRel]}</div>`;
+
+  const aDmZ = a.saju.pillars.day.z, bDmZ = b.saju.pillars.day.z;
+  let ziText;
+  if(ZHI_YUKHAP[aDmZ] === bDmZ){
+    ziText = `두 분의 일지가 ${ZHI[aDmZ]}(${ZHI_HANJA[aDmZ]})·${ZHI[bDmZ]}(${ZHI_HANJA[bDmZ]}) 육합(六合) 관계예요. 전통적으로 배우자 자리끼리 서로 끌어당기는 조합으로 보는 궁합이에요.`;
+  } else if(ZHI_CHUNG[aDmZ] === bDmZ){
+    ziText = `두 분의 일지가 ${ZHI[aDmZ]}(${ZHI_HANJA[aDmZ]})·${ZHI[bDmZ]}(${ZHI_HANJA[bDmZ]}) 충(沖) 관계예요. 서로 정반대 기운이라 초반엔 끌리다가도 부딪히는 순간이 있을 수 있는 조합으로 봐요. 다만 충은 자극과 변화를 함께 주는 자리라 나쁘게만 볼 필요는 없어요.`;
+  } else if(aDmZ === bDmZ){
+    ziText = `두 분의 일지가 똑같이 ${ZHI[aDmZ]}(${ZHI_HANJA[aDmZ]})예요. 생활 리듬이나 취향이 비슷하게 맞아떨어질 가능성이 있어요.`;
+  } else {
+    ziText = `두 분의 일지는 ${ZHI[aDmZ]}(${ZHI_HANJA[aDmZ]})·${ZHI[bDmZ]}(${ZHI_HANJA[bDmZ]})로, 합이나 충처럼 뚜렷하게 두드러지는 관계는 아니에요. 무난하게 각자의 속도를 유지하는 조합으로 볼 수 있어요.`;
+  }
+  html += `<div style="margin-bottom:10px;"><b>일지(배우자 자리) 궁합</b> — ${ziText}</div>`;
+
+  if(a.ziwei && b.ziwei){
+    const aMingEl = ZHI_ELEMENT[a.ziwei.soulZhiStd];
+    const bMingEl = ZHI_ELEMENT[b.ziwei.soulZhiStd];
+    const mingRel = relationLabel(aMingEl, bMingEl);
+    const mingText = mingRel==='same'
+      ? '두 분의 명궁 기운이 같아서, 겉으로 풍기는 인상이나 사람을 대하는 태도가 서로 닮아 보일 수 있어요.'
+      : (mingRel==='a-gen-b' || mingRel==='b-gen-a')
+        ? '두 분의 명궁 기운이 서로 돕는 관계라, 함께 있을 때 시너지가 나는 조합으로 볼 수 있어요.'
+        : '두 분의 명궁 기운이 서로 다른 방향이라 인상이나 스타일 차이를 느낄 수 있지만, 그만큼 서로에게 없는 부분을 채워줄 여지도 있어요.';
+    html += `<div style="margin-bottom:10px;"><b>자미두수 명궁 궁합</b> — ${aName}님의 명궁은 ${ZHI[a.ziwei.soulZhiStd]}(${ELEMENT_NAME[aMingEl]}), ${bName}님의 명궁은 ${ZHI[b.ziwei.soulZhiStd]}(${ELEMENT_NAME[bMingEl]})이에요. ${mingText}</div>`;
+
+    const aBucheo = a.ziwei.palaces.find(p=>p.name==='부처궁');
+    const bBucheo = b.ziwei.palaces.find(p=>p.name==='부처궁');
+    if(aBucheo && bBucheo){
+      const aHasMalefic = aBucheo.stars.some(s=>ZIWEI_MALEFIC_STARS.includes(s.name));
+      const bHasMalefic = bBucheo.stars.some(s=>ZIWEI_MALEFIC_STARS.includes(s.name));
+      let buText;
+      if(!aHasMalefic && !bHasMalefic){
+        buText = '두 분 모두 부처궁(배우자 자리)에 화성·영성·경양·타라 같은 변수성이 없어서, 관계가 비교적 안정적으로 흘러가는 편으로 볼 수 있어요.';
+      } else if(aHasMalefic && bHasMalefic){
+        buText = '두 분 모두 부처궁에 변수성이 있어요. 관계 초반이나 특정 시기에 감정 기복이나 갈등이 두드러질 수 있지만, 서로 그 시기를 함께 안다는 점에서 오히려 이해의 폭이 넓어질 수도 있어요.';
+      } else {
+        buText = `${aHasMalefic? aName : bName}님의 부처궁에만 변수성이 있어요. 관계 안에서 감정 기복을 주로 느끼는 쪽이 한쪽으로 쏠릴 수 있다는 뜻으로 참고하면 좋아요.`;
+      }
+      html += `<div style="margin-bottom:10px;"><b>부처궁(배우자 자리) 확인</b> — ${buText}</div>`;
+    }
+  }
+
+  html += `<div style="color:var(--ink-faint); font-size:11.5px; margin-top:14px;">이 미리보기는 원국 데이터를 규칙 기반으로 단순 비교한 결과예요. 실제 관계는 두 분이 함께 만들어가는 과정과 태도에 훨씬 크게 좌우되니, 참고용으로만 봐주세요.</div>`;
+  box.innerHTML = html;
+}
 /* =========================================================
    3. 이벤트 바인딩
    ========================================================= */
@@ -2008,7 +2095,7 @@ function resetAiPanel(){
 }
 // AI 패널 내부의 단계(카테고리 선택 → 부가입력 → 결제) 전환
 function showAiStep(stepId){
-  ['aiStepCategory','aiStepLove','aiStepPartner','aiStepPay'].forEach(id=>{
+  ['aiStepCategory','aiStepLove','aiStepPartner','aiStepCompatFree','aiStepPay'].forEach(id=>{
     $('#'+id).hidden = (id !== stepId);
   });
 }
@@ -2329,7 +2416,11 @@ $('#partnerNextBtn').addEventListener('click', ()=>{
     const pZiwei = calcZiwei({year:py, month:pm, day:pdd, hour:phour, minute:pminute, unknownTime:punknown, gender:partnerGenderVal, trueHourFloat: pResult.trueHourFloat, sajuYear: pResult.sajuYear});
     partnerData = { name: ($('#partnerName').value||'').trim(), gender: partnerGenderVal, saju: pResult, ziwei: pZiwei };
     $('#partnerError').hidden = true;
-    goToAiPayStep();
+    renderFreeCompat(
+      { name: lastName, saju: lastSajuResult, ziwei: lastZiweiResult },
+      { name: partnerData.name, saju: partnerData.saju, ziwei: partnerData.ziwei }
+    );
+    showAiStep('aiStepCompatFree');
   } catch(err){
     $('#partnerError').hidden = false;
     $('#partnerError').textContent = '상대방 사주 계산 중 오류가 발생했어요. 입력값을 확인해주세요. (' + err.message + ')';
@@ -2337,6 +2428,8 @@ $('#partnerNextBtn').addEventListener('click', ()=>{
 });
 $('#loveBackBtn').addEventListener('click', ()=>{ showAiStep('aiStepCategory'); });
 $('#partnerBackBtn').addEventListener('click', ()=>{ showAiStep('aiStepCategory'); });
+$('#compatFreeBackBtn').addEventListener('click', ()=>{ showAiStep('aiStepCategory'); });
+$('#compatFreeUnlockBtn').addEventListener('click', ()=>{ goToAiPayStep(); });
 $('#payBackBtn').addEventListener('click', ()=>{ showAiStep('aiStepCategory'); });
 $('#mockPayBtn').addEventListener('click', ()=>{
   // 결제 기록은 로그인한 사용자 명의로만 남길 수 있어요(비회원 결제 위조 방지) — 로그인 안 돼 있으면 먼저 로그인부터 안내
