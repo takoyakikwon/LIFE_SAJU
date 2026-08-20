@@ -1655,6 +1655,99 @@ function buildZiweiPalaceDetail(z){
     return `${p.name}(${ZHI_HANJA[p.stdZhi]}) — ${stars}`;
   }).join('\n');
 }
+/* =========================================================
+   4b. 오늘의 사주 — 알고리즘 전용 계산 (AI 미사용)
+   일진/오행/십성 비교로 스코어링하고, 바이오리듬·행운 컬러/아이템/숫자는
+   순수 공식·매핑으로 계산합니다. AI는 이후 "오늘의 종합운" 한 단락에만 붙입니다.
+   기존 GAN/ZHI/ELEMENT/tenGodOf/dayPillarIdxFromJD 등을 그대로 재사용합니다.
+   ========================================================= */
+const TODAY_ELEMENT_HEX = { "목":"#7ed08a", "화":"#f47272", "토":"#e0b563", "금":"#e8e8ef", "수":"#7a8ce0" };
+const TODAY_ELEMENT_COLOR_LABEL = { "목":"그린 계열", "화":"레드/오렌지 계열", "토":"골드/옐로우 계열", "금":"화이트/실버 계열", "수":"네이비/블랙 계열" };
+const TODAY_NUMBER_MAP = { "목":"3 · 8", "화":"2 · 7", "토":"5 · 10", "금":"4 · 9", "수":"1 · 6" }; // 하도(河圖) 오행생성수
+const TODAY_ITEM_MAP = {
+  "목": { item:"작은 화분이나 초록색 소지품", coordi:"그린 계열 포인트 아이템", place:"공원, 식물원처럼 초록이 많은 곳" },
+  "화": { item:"붉은 계열 액세서리", coordi:"레드·오렌지 포인트 컬러", place:"활기찬 사람이 많은 장소, 조명이 밝은 카페" },
+  "토": { item:"베이지·황토색 소품", coordi:"뉴트럴 톤 코디", place:"흙·돌이 있는 산책로, 도자기 공방" },
+  "금": { item:"화이트·실버 액세서리", coordi:"화이트·그레이 톤 미니멀 코디", place:"미술관, 깔끔하게 정돈된 공간" },
+  "수": { item:"네이비·블랙 소품", coordi:"다크 톤 코디", place:"물가, 조용한 서점이나 도서관" },
+};
+// 오늘(로컬 날짜) 기준 일진 — 프로덕션 사주 계산과 동일한 dayPillarIdxFromJD/REF_DAYNUM 기준점 재사용
+function todayDayPillar(){
+  const now = new Date();
+  const jd = toJD(toWall(now.getFullYear(), now.getMonth()+1, now.getDate(), 12, 0));
+  return dayPillarIdxFromJD(jd);
+}
+// 오늘의 일진과 사용자 일간을 비교해 종합/애정/금전/건강 스코어 산출
+function scoreToday(ohaengCounts, dayGanIdx, userDayGanIdx){
+  const dayElementIdx = GAN_ELEMENT[dayGanIdx];
+  const god = tenGodOf(userDayGanIdx, dayElementIdx, dayGanIdx % 2);
+  const total = ohaengCounts.reduce((a,b)=>a+b,0);
+  const avg = total/5;
+  let score = 68;
+  const reasons = [];
+  if (ohaengCounts[dayElementIdx] < avg) { score += 10; reasons.push(`부족했던 ${ELEMENT_NAME[dayElementIdx]} 기운을 오늘이 채워줘요`); }
+  else if (ohaengCounts[dayElementIdx] > avg*1.5) { score -= 6; reasons.push(`이미 강한 ${ELEMENT_NAME[dayElementIdx]} 기운이 오늘 더 쌓여요`); }
+  const GOOD = ["정관","정재","식신","정인","비견"], CHALLENGE = ["편관","겁재"];
+  if (GOOD.includes(god)) { score += 12; reasons.push(`오늘의 일진이 십성상 ${god} — 안정적인 기운`); }
+  else if (CHALLENGE.includes(god)) { score -= 8; reasons.push(`오늘의 일진이 십성상 ${god} — 다소 긴장·변수가 있는 기운`); }
+  else { score += 4; reasons.push(`오늘의 일진이 십성상 ${god} — 변화와 기회의 기운`); }
+  score = Math.max(35, Math.min(96, Math.round(score)));
+  const wealthGods = ["편재","정재"], loveGods = ["정관","편관","비견","겁재"];
+  const clamp = v => Math.max(30, Math.min(98, Math.round(v)));
+  return {
+    score, god, reasons,
+    love: clamp(score + (loveGods.includes(god)? 6 : -3)),
+    wealth: clamp(score + (wealthGods.includes(god)? 10 : -4)),
+    health: clamp(score + (ohaengCounts[dayElementIdx] < avg ? 6 : -2)),
+  };
+}
+// 생년월일 기준 바이오리듬(23/28/33일 주기 사인곡선). 사주와 무관한 독립 계산.
+// range를 주면 오늘을 중심으로 앞뒤 range일치 시계열도 함께 반환(그래프용).
+function biorhythmToday(birthY, birthM, birthD, range){
+  const todayNow = new Date();
+  const daysSince = dayNumFromJD(toJD(toWall(todayNow.getFullYear(), todayNow.getMonth()+1, todayNow.getDate(), 12, 0)))
+                   - dayNumFromJD(toJD(toWall(birthY, birthM, birthD, 12, 0)));
+  const waveAt = (period, d) => Math.sin(2*Math.PI*d/period);
+  const today = { physical: Math.round(waveAt(23,daysSince)*100), emotional: Math.round(waveAt(28,daysSince)*100), intellectual: Math.round(waveAt(33,daysSince)*100) };
+  let series = null;
+  if (range) {
+    series = { physical:[], emotional:[], intellectual:[] };
+    for(let off=-range; off<=range; off++){
+      series.physical.push(waveAt(23, daysSince+off));
+      series.emotional.push(waveAt(28, daysSince+off));
+      series.intellectual.push(waveAt(33, daysSince+off));
+    }
+  }
+  return { daysSince, today, series };
+}
+// 사주 계산 결과(calcSaju 반환값)와 생년월일로 "오늘의 사주" 전체 데이터를 한 번에 계산
+function calcTodayFortune(sajuResult, birthY, birthM, birthD, bioRange){
+  const counts = [0,0,0,0,0];
+  [sajuResult.pillars.year, sajuResult.pillars.month, sajuResult.pillars.day].forEach(p=>{ counts[GAN_ELEMENT[p.g]]++; counts[ZHI_ELEMENT[p.z]]++; });
+  if (sajuResult.pillars.hour) { counts[GAN_ELEMENT[sajuResult.pillars.hour.g]]++; counts[ZHI_ELEMENT[sajuResult.pillars.hour.z]]++; }
+  const dp = todayDayPillar();
+  const sc = scoreToday(counts, dp.g, sajuResult.pillars.day.g);
+  const bio = biorhythmToday(birthY, birthM, birthD, bioRange || 20);
+  const dayElement = ELEMENT_NAME[GAN_ELEMENT[dp.g]];
+  const weakestIdx = counts.indexOf(Math.min(...counts));
+  const weakestElement = ELEMENT_NAME[weakestIdx];
+  const it = TODAY_ITEM_MAP[weakestElement];
+  return {
+    iljin: { g: dp.g, z: dp.z, text: `${GAN[dp.g]}${ZHI[dp.z]}(${GAN_HANJA[dp.g]}${ZHI_HANJA[dp.z]})`, animal: ZHI_ANIMAL[dp.z], element: dayElement },
+    score: sc,
+    bio,
+    ohaengCounts: counts,
+    weakestElement,
+    luckyColor: { name: TODAY_ELEMENT_COLOR_LABEL[weakestElement], hex: TODAY_ELEMENT_HEX[weakestElement] },
+    luckyNumber: TODAY_NUMBER_MAP[dayElement],
+    luckyItem: it.item,
+    luckyCoordi: it.coordi,
+    luckyPlace: it.place,
+  };
+}
+// 화면 연동 전까지 콘솔에서 바로 테스트할 수 있도록 전역에 노출
+window.calcTodayFortune = calcTodayFortune;
+
 function buildAiPayload(){
   const s = lastSajuResult, z = lastZiweiResult;
   if(!s) return null;
