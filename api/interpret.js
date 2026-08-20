@@ -76,6 +76,15 @@ function buildPrompt(payload) {
     lines.push(payload.세운);
   }
 
+  // 오늘의 사주(today) 카테고리용. calcTodayFortune()이 이미 계산한 오늘의 일진·십성·
+  // 오행 근거·점수를 프론트에서 텍스트 블록으로 만들어 보낸다. 다른 카테고리는 이 필드를
+  // 보내지 않으므로 이 블록은 그때는 통째로 생략된다.
+  if (payload.오늘) {
+    lines.push('');
+    lines.push('[오늘의 관측 정보]');
+    lines.push(payload.오늘);
+  }
+
   return lines.join('\n');
 }
 
@@ -176,10 +185,30 @@ const CATEGORY_PROMPT_NEWYEAR = `
 - 각 소주제는 충분히 구체적으로 작성합니다. 전체 분량은 3,500~4,500자 내외로, 프리미엄 카테고리에 걸맞게 깊이 있게 작성합니다.
 - 마지막 "총평" 소주제에서 1년 전체 흐름을 종합하고, 첫 섹션에서 짚은 원국·대운 맥락과 "총론"의 핵심 통찰을 다시 불러오며, 2027년을 잘 보내기 위한 종합적인 조언(대안)으로 마무리합니다.`;
 
+// 오늘의 사주는 다른 카테고리와 달리 여러 소제목의 긴 리포트가 아니라, 오늘 하루에 대한
+// 짧은 문단 하나입니다. 구독자 수 × 365일로 호출이 누적되는 구조라 분량을 짧게 유지해
+// 비용을 통제합니다(아래 MAX_TOKENS_BY_CATEGORY도 함께 참고).
+const CATEGORY_PROMPT_TODAY = `
+[이 리포트는 "오늘의 사주 — 오늘의 종합운" 카테고리입니다 — 아래 규칙을 추가로 지키세요. 다른 카테고리와 달리 여러 소제목으로 나뉜 리포트가 아니라, 오늘 하루에 대한 짧은 문단 하나입니다.]
+
+- 위 공통 규칙 중 "각 소제목은 [짧은 주제어] — [문장] 형식으로 쓴다"는 지침은 이 카테고리에는 적용하지 않습니다. 소제목이나 제목 없이, 자연스럽게 이어지는 하나의 문단으로만 씁니다.
+- [오늘의 관측 정보]로 제공된 오늘의 일진(간지)과 사용자 일간의 십성 관계, 오행 근거, 이미 계산된 종합·애정·금전·건강 점수를 반드시 근거로 삼아 오늘 하루의 기운을 구체적으로 풀이합니다. 점수를 그대로 다시 나열하지 말고("오늘 점수는 90점입니다" 같은 문장 금지), 왜 그런 흐름인지를 설명하는 근거로만 사용합니다.
+- 사용자의 원국(일간, 오행 분포)도 함께 참고해 "원래 이런 기질인데 오늘은 이런 기운이 온다"는 맥락으로 짧게 연결하되, 원국 전체를 다시 설명하지 않습니다 — 오늘 하루에 집중합니다.
+- 오늘 하루를 보내는 데 참고할 만한 구체적이고 실천 가능한 조언을 한 가지 이상 자연스럽게 포함합니다.
+- 공통 규칙의 마지막 문장(전통 명리학 기반 참고용 안내)은 이 카테고리에서는 생략합니다 — 오늘의 사주 화면에는 이미 별도의 안내 문구가 있습니다.
+- 전체 분량은 200~320자 내외의 한 문단으로, 짧지만 밀도 있게 씁니다. 인사말이나 "오늘의 운세를 알려드립니다" 같은 군더더기 도입 없이 바로 본문으로 시작합니다.`;
+
 const CATEGORY_PROMPTS = {
   comprehensive: CATEGORY_PROMPT_COMPREHENSIVE,
   compatibility: CATEGORY_PROMPT_COMPATIBILITY,
   newyear: CATEGORY_PROMPT_NEWYEAR,
+  today: CATEGORY_PROMPT_TODAY,
+};
+
+// 카테고리별 max_tokens 상한. 대부분은 긴 리포트라 4000을 그대로 쓰지만, 오늘의 사주는
+// 짧은 한 문단이라 낮게 잡아 출력 토큰 비용을 통제한다(구독자 수 × 365일 누적 구조).
+const MAX_TOKENS_BY_CATEGORY = {
+  today: 700,
 };
 
 module.exports = async (req, res) => {
@@ -222,7 +251,7 @@ module.exports = async (req, res) => {
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 4000,
+        max_tokens: MAX_TOKENS_BY_CATEGORY[payload.category] || 4000,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: userPrompt },
