@@ -7,8 +7,18 @@
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 // 필요 시 환경변수로 모델을 바꿀 수 있게 해둠. gpt-4o-mini는 저렴하면서 이런 글쓰기 작업엔 충분합니다.
-// 더 높은 품질을 원하면 Vercel 환경변수에 OPENAI_MODEL=gpt-4o 등으로 지정하세요.
-const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+// 기본값은 전부 gpt-4o-mini이고, 프롬프트 개선만으로 부족한 카테고리가 생기면 전체를 다 올리지
+// 않고 그 카테고리만 상위 모델로 바꿀 수 있게 카테고리별 오버라이드를 둔다.
+// 예: Vercel 환경변수에 OPENAI_MODEL_NEWYEAR=gpt-4o 를 추가하면 신년운세만 그 모델을 씀
+// (다른 카테고리는 그대로 OPENAI_MODEL 또는 기본값 gpt-4o-mini 유지).
+const DEFAULT_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const MODEL_BY_CATEGORY = {
+  comprehensive: process.env.OPENAI_MODEL_COMPREHENSIVE || DEFAULT_MODEL,
+  love: process.env.OPENAI_MODEL_LOVE || DEFAULT_MODEL,
+  compatibility: process.env.OPENAI_MODEL_COMPATIBILITY || DEFAULT_MODEL,
+  newyear: process.env.OPENAI_MODEL_NEWYEAR || DEFAULT_MODEL,
+  today: process.env.OPENAI_MODEL_TODAY || DEFAULT_MODEL,
+};
 
 // 결제 기록(purchases 테이블) 연동용. Vercel 환경변수에 아래 두 개가 등록되어 있어야 합니다.
 //   SUPABASE_URL = https://xxxx.supabase.co
@@ -178,6 +188,10 @@ const BASE_PROMPT = `당신은 20년 넘게 사주명리학과 자미두수를 �
 - 존댓말을 쓰되, 딱딱한 상담 어투보다는 확신 있고 담백한 전문가의 어투를 씁니다.
 - 사용자 메시지에 제공된 사주/자미두수 데이터(간지, 십성, 지장간, 12운성, 공망, 궁위, 별, 사화, 대운/대한 등)만 근거로 삼습니다. 제공되지 않은 궁위·별·간지는 절대로 지어내지 마세요 — 데이터에 없으면 언급하지 않습니다.
 - 성격이나 흐름을 설명할 때는 "일간이 庚金이고 亥월생입니다", "관록궁에 천부가 있습니다" 처럼 실제 제공된 데이터를 구체적으로 인용한 뒤에 해석을 붙입니다. 근거 없이 뭉뚱그린 성격 묘사만 나열하지 않습니다.
+- 사주팔자와 자미두수를 각각 따로 설명한 뒤 이어 붙이는 방식("사주에서는 ~합니다. 자미두수에서는 ~합니다. 종합하면 ~입니다")은 쓰지 않습니다. 먼저 두 체계가 공통으로 가리키는 이 사람의 핵심 성향을 파악한 뒤, 그 성향을 설명하는 근거로 사주와 자미두수 데이터를 함께 인용하세요.
+- 중요한 결론을 낼 때, 사주와 자미두수 양쪽에서 같은 방향의 근거가 함께 확인되면 확신 있게 서술하고, 한쪽 체계에서만 나타나는 근거라면 "~일 수 있습니다"처럼 조금 더 조심스러운 어투로 구분해서 씁니다.
+- 다음과 같이 누구에게나 적용되는 상투적 문구는 쓰지 않습니다: "당신은 특별한 사람입니다", "타고난 리더입니다", "무한한 가능성이 있습니다", "귀인이 도와줍니다", "좋은 일이 생길 것입니다", "노력하면 성공합니다", "균형이 중요합니다".
+- 사람을 한 가지 성격으로 단정하지 않습니다. 데이터에서 상반되는 성향(예: 강한데 예민하다, 안정을 원하면서도 계속 변화를 만든다, 독립적인데 인정받고 싶어 한다)이 함께 나타난다면 그 양면성을 반드시 짚어 설명합니다.
 - 이 사람이 스스로에게 할 법한 혼잣말이나, 주변 사람이 이 사람에 대해 할 법한 말을 자연스럽게 따옴표로 인용해 몰입감을 높입니다. (예: "내가 왜 이걸 해야 하지?", "저 사람 생각보다 고집이 있네")
 - 단정적 예언("반드시 ~합니다", "100% ~")은 피하고 "~가능성이 높습니다", "~일 수 있습니다" 같은 확률적 어투를 씁니다.
 - 미신적으로 겁을 주거나("이 시기에 큰 사고를 조심하세요" 류의 구체적 위협) 불안을 조장하는 문장은 쓰지 않습니다. 특히 건강 관련 내용은 특정 질병을 지목하지 않고 "컨디션 관리에 신경 쓰면 좋은 시기" 정도로 순화합니다.
@@ -305,14 +319,14 @@ const CONTINUATION_PROMPT = `방금 작성한 리포트가 목표 분량에 못 
 - 새로운 소제목을 만들지 말고, 소제목 형식("[짧은 주제어] — [문장]") 없이 본문 문단만 이어서 작성하세요.
 - "이어서 말씀드리면", "추가로" 같은 메타 표현 없이 바로 본문 내용으로 시작하고, 마크다운 문법은 쓰지 마세요.`;
 
-async function callOpenAI(apiKey, messages, maxTokens) {
+async function callOpenAI(apiKey, messages, maxTokens, model) {
   const openaiRes = await fetch(OPENAI_API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({ model: MODEL, max_tokens: maxTokens, messages }),
+    body: JSON.stringify({ model, max_tokens: maxTokens, messages }),
   });
   if (!openaiRes.ok) {
     const errText = await openaiRes.text();
@@ -364,12 +378,13 @@ module.exports = async (req, res) => {
   const SYSTEM_PROMPT = BASE_PROMPT + '\n' + categoryPrompt;
 
   const maxTokens = MAX_TOKENS_BY_CATEGORY[payload.category] || 4000;
+  const model = MODEL_BY_CATEGORY[payload.category] || DEFAULT_MODEL;
 
   try {
     const first = await callOpenAI(apiKey, [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: userPrompt },
-    ], maxTokens);
+    ], maxTokens, model);
 
     if (!first.ok) {
       res.status(502).json({ error: `AI 서버 응답 오류 (${first.status})` });
@@ -387,7 +402,7 @@ module.exports = async (req, res) => {
           { role: 'user', content: userPrompt },
           { role: 'assistant', content: text },
           { role: 'user', content: CONTINUATION_PROMPT },
-        ], maxTokens);
+        ], maxTokens, model);
         if (cont.ok && cont.text) {
           text = text + '\n\n' + cont.text;
         }
