@@ -445,6 +445,24 @@
     width:100%; margin-top:10px; padding:12px 0; background:none; border:none;
     color:var(--ink-faint); font-size:12.5px; cursor:pointer;
   }
+  /* AI 카테고리 선택 단계 */
+  .cat-picker{display:flex; flex-direction:column; gap:10px;}
+  .cat-option{
+    text-align:left; width:100%; padding:16px 16px; cursor:pointer;
+    border:1.5px solid var(--line); border-radius:var(--radius-sm); background:var(--paper-card);
+    font-family:"Noto Sans KR";
+  }
+  .cat-option:active{transform:translateY(1px);}
+  .cat-option-name{font-family:"Noto Serif KR"; font-weight:900; font-size:15px; color:var(--ink);}
+  .cat-option-desc{font-size:12px; color:var(--ink-soft); margin-top:5px; line-height:1.55;}
+  .cat-option-price{font-family:"Noto Serif KR"; font-weight:900; font-size:13.5px; color:var(--seal); margin-top:9px;}
+  .cat-back{
+    background:none; border:none; padding:0; margin-bottom:2px;
+    color:var(--ink-faint); font-size:12.5px; cursor:pointer; font-family:"Noto Sans KR"; font-weight:500;
+  }
+  .love-status-grid{flex-wrap:wrap;}
+  .love-status-grid button{flex:1 1 calc(50% - 4px); font-size:12.5px; padding:12px 4px;}
+  .partner-note{font-size:11px; color:var(--ink-faint); margin-top:-8px; margin-bottom:16px; line-height:1.6;}
 </style>
 </head>
 <body>
@@ -643,10 +661,82 @@
         <h2 class="section-title">AI 종합 해석 <span class="en">AI READING</span></h2>
         <p class="section-desc">지금까지 계산된 사주·자미두수 데이터를 바탕으로, AI가 성격과 기질, 지금 흐름을 글로 풀어드려요.</p>
         <div id="aiLocked">
-          <div class="ai-price-card">
-            <div class="ai-price-amt">3,900원</div>
-            <div class="ai-price-desc">1회 결제로 이 사주의 AI 해석 리포트를 확인할 수 있어요.</div>
-            <button class="submit-btn" id="aiUnlockBtn" style="margin-top:14px;">AI 해석 보기</button>
+          <div id="aiStepCategory">
+            <p class="section-desc" style="margin-bottom:14px;">원하는 리포트를 선택해주세요.</p>
+            <div class="cat-picker">
+              <button type="button" class="cat-option" data-cat="comprehensive">
+                <div class="cat-option-name">종합 사주 해석</div>
+                <div class="cat-option-desc">성격·기질부터 지금의 흐름까지, 사주 전체를 폭넓게 풀어드려요.</div>
+                <div class="cat-option-price">3,900원</div>
+              </button>
+              <button type="button" class="cat-option" data-cat="love">
+                <div class="cat-option-name">연애·재회운</div>
+                <div class="cat-option-desc">지금 이 사람의 연애 흐름과 마음이 흔들리는 지점을 짚어드려요.</div>
+                <div class="cat-option-price">2,900원</div>
+              </button>
+              <button type="button" class="cat-option" data-cat="compatibility">
+                <div class="cat-option-name">궁합&결혼</div>
+                <div class="cat-option-desc">상대방 정보를 더해, 두 사람의 궁합을 함께 풀어드려요.</div>
+                <div class="cat-option-price">4,900원</div>
+              </button>
+              <button type="button" class="cat-option" data-cat="newyear">
+                <div class="cat-option-name">2027 신년운세</div>
+                <div class="cat-option-desc">원국·대운을 바탕으로 2027년 한 해의 흐름을 분기별로 풀어드려요.</div>
+                <div class="cat-option-price">9,900원</div>
+              </button>
+            </div>
+          </div>
+
+          <div id="aiStepLove" hidden>
+            <button type="button" class="cat-back" id="loveBackBtn">← 다른 리포트 선택</button>
+            <p class="section-desc" style="margin:14px 0;">지금 연애 상태에 가장 가까운 걸 골라주세요.</p>
+            <div class="seg love-status-grid" id="loveStatusSeg">
+              <button type="button" data-val="dating">연애 중</button>
+              <button type="button" data-val="single">솔로, 새 인연 원함</button>
+              <button type="button" data-val="breakup">최근 이별, 재회 고민</button>
+              <button type="button" data-val="general">선택 안 함</button>
+            </div>
+            <button class="submit-btn" id="loveNextBtn" style="margin-top:18px;">다음</button>
+          </div>
+
+          <div id="aiStepPartner" hidden>
+            <button type="button" class="cat-back" id="partnerBackBtn">← 다른 리포트 선택</button>
+            <p class="section-desc" style="margin:14px 0 6px;">상대방 정보를 입력해주세요.</p>
+            <p class="partner-note">상대방 태어난 곳의 진태양시 보정은 적용되지 않아요(표준시 기준으로 계산).</p>
+            <div class="field">
+              <label for="partnerName">상대방 이름 (선택)</label>
+              <input type="text" id="partnerName" placeholder="예: 김민준">
+            </div>
+            <div class="field">
+              <label for="partnerDate">상대방 생년월일 (양력)</label>
+              <input type="date" id="partnerDate">
+            </div>
+            <div class="field">
+              <label for="partnerTime">상대방 태어난 시간</label>
+              <input type="time" id="partnerTime">
+              <div class="checkline">
+                <input type="checkbox" id="partnerUnknown">
+                <label for="partnerUnknown" style="margin:0;">태어난 시간을 몰라요</label>
+              </div>
+            </div>
+            <div class="field">
+              <label>상대방 성별</label>
+              <div class="seg" id="partnerGenderSeg">
+                <button type="button" data-val="남" class="active">남자</button>
+                <button type="button" data-val="여">여자</button>
+              </div>
+            </div>
+            <div id="partnerError" hidden class="ai-error" style="margin-bottom:10px;"></div>
+            <button class="submit-btn" id="partnerNextBtn">다음</button>
+          </div>
+
+          <div id="aiStepPay" hidden>
+            <button type="button" class="cat-back" id="payBackBtn">← 다른 리포트 선택</button>
+            <div class="ai-price-card" style="margin-top:14px;">
+              <div class="ai-price-amt" id="aiPriceAmt">3,900원</div>
+              <div class="ai-price-desc" id="aiPriceDesc">1회 결제로 이 사주의 AI 해석 리포트를 확인할 수 있어요.</div>
+              <button class="submit-btn" id="aiUnlockBtn" style="margin-top:14px;">AI 해석 보기</button>
+            </div>
           </div>
         </div>
         <div id="aiLoading" hidden>
@@ -679,7 +769,7 @@
   <div class="modal-card">
     <div class="modal-title">결제 (테스트 모드)</div>
     <p class="modal-desc">실제 결제 수단은 아직 연동 전이에요. 아래 버튼으로 결제 완료 상태를 임시로 체험할 수 있어요.</p>
-    <div class="modal-price">3,900원</div>
+    <div class="modal-price" id="modalPrice">3,900원</div>
     <button class="submit-btn" id="mockPayBtn">테스트 결제 완료</button>
     <button class="modal-cancel" id="payModalCancel">닫기</button>
   </div>
@@ -1700,6 +1790,16 @@ function renderCross(saju, zw){
 let selectedGender = "남";
 let lastSajuResult = null, lastZiweiResult = null, lastName = "";
 let aiUnlocked = false;
+let selectedAiCategory = null;
+let selectedLoveStatus = null;
+let partnerGenderVal = "남";
+let partnerData = null; // { name, gender, saju(calcSaju 결과), ziwei(calcZiwei 결과) }
+const AI_CATEGORY_META = {
+  comprehensive: { price: '3,900원', desc: '1회 결제로 이 사주의 종합 해석 리포트를 확인할 수 있어요.' },
+  love: { price: '2,900원', desc: '1회 결제로 연애·재회운 리포트를 확인할 수 있어요.' },
+  compatibility: { price: '4,900원', desc: '1회 결제로 두 분의 궁합 리포트를 확인할 수 있어요.' },
+  newyear: { price: '9,900원', desc: '1회 결제로 2027 신년운세 리포트를 확인할 수 있어요.' },
+};
 $$('#genderSeg button').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     $$('#genderSeg button').forEach(b=>b.classList.remove('active'));
@@ -1786,10 +1886,28 @@ $$('#tabbar button').forEach(btn=>{
    ========================================================= */
 function resetAiPanel(){
   aiUnlocked = false;
+  selectedAiCategory = null;
+  selectedLoveStatus = null;
+  partnerData = null;
   $('#aiLocked').hidden = false;
   $('#aiLoading').hidden = true;
   $('#aiResult').hidden = true;
   $('#aiError').hidden = true;
+  showAiStep('aiStepCategory');
+  $$('#loveStatusSeg button').forEach(b=>b.classList.remove('active'));
+  $('#partnerError').hidden = true;
+}
+// AI 패널 내부의 단계(카테고리 선택 → 부가입력 → 결제) 전환
+function showAiStep(stepId){
+  ['aiStepCategory','aiStepLove','aiStepPartner','aiStepPay'].forEach(id=>{
+    $('#'+id).hidden = (id !== stepId);
+  });
+}
+function goToAiPayStep(){
+  const meta = AI_CATEGORY_META[selectedAiCategory] || AI_CATEGORY_META.comprehensive;
+  $('#aiPriceAmt').textContent = meta.price;
+  $('#aiPriceDesc').textContent = meta.desc;
+  showAiStep('aiStepPay');
 }
 // 사주 8자(년월일시 각 간지) 각각의 십성/지장간/12운성을 한 줄씩 정리 — AI 프롬프트용 상세 데이터
 function buildSajuPillarDetail(s){
@@ -1959,8 +2077,10 @@ function renderTodayPanel(sajuResult, birthY, birthM, birthD){
   $('#todayItemNumber').textContent = t.luckyNumber;
 }
 
-function buildAiPayload(){
-  const s = lastSajuResult, z = lastZiweiResult;
+// 한 사람(사주 계산 결과 s + 자미두수 계산 결과 z)의 AI 페이로드 블록(birth/saju/ziwei)을 만든다.
+// 기존에는 lastSajuResult/lastZiweiResult 전용으로 buildAiPayload() 안에 인라인돼 있던 로직을
+// 궁합&결혼 카테고리에서 상대방(partner)에게도 그대로 재사용할 수 있도록 분리했다.
+function buildPersonBlock(s, z){
   if(!s) return null;
   const counts = [0,0,0,0,0];
   [s.pillars.year, s.pillars.month, s.pillars.day].forEach(p=>{ counts[GAN_ELEMENT[p.g]]++; counts[ZHI_ELEMENT[p.z]]++; });
@@ -1985,10 +2105,7 @@ function buildAiPayload(){
     const bp = z.palaces.find(p=>p.reducedIdx===mod(z.bodyIndex,12));
     bodyPalaceName = bp ? bp.name : null;
   }
-
-  const payload = {
-    name: lastName || null,
-    gender: s.input.gender,
+  return {
     birth: `${s.input.year}-${String(s.input.month).padStart(2,'0')}-${String(s.input.day).padStart(2,'0')} ${s.input.unknownTime? '시간미상' : String(s.input.hour).padStart(2,'0')+':'+String(s.input.minute).padStart(2,'0')}`,
     saju: {
       년주: pillarStr(s.pillars.year),
@@ -2014,12 +2131,101 @@ function buildAiPayload(){
       궁위상세: buildZiweiPalaceDetail(z),
     } : null,
   };
+}
+// 신년운세(newyear) 카테고리용. targetYear의 세운 간지와 사용자 일간의 십성 관계를 한 문장 텍스트로 만든다.
+// seunList()가 이미 쓰는 yearPillarIdx()를 그대로 재사용.
+function buildSeunText(s, targetYear){
+  const dmG = s.pillars.day.g;
+  const yp = yearPillarIdx(targetYear);
+  const god = tenGodOf(dmG, GAN_ELEMENT[yp.g], yp.g % 2);
+  return `${targetYear}년 세운: ${GAN[yp.g]}${ZHI[yp.z]}(${GAN_HANJA[yp.g]}${ZHI_HANJA[yp.z]})년, ${ELEMENT_NAME[GAN_ELEMENT[yp.g]]}${ELEMENT_NAME[ZHI_ELEMENT[yp.z]]} 기운. 일간 ${GAN[dmG]}(${ELEMENT_NAME[GAN_ELEMENT[dmG]]})과의 십성 관계: ${god}.`;
+}
+function buildAiPayload(){
+  const s = lastSajuResult, z = lastZiweiResult;
+  if(!s) return null;
+  const person = buildPersonBlock(s, z);
+  const payload = {
+    name: lastName || null,
+    gender: s.input.gender,
+    birth: person.birth,
+    saju: person.saju,
+    ziwei: person.ziwei,
+    category: selectedAiCategory || 'comprehensive',
+  };
+  if(selectedAiCategory === 'love'){
+    payload.loveStatus = selectedLoveStatus || 'general';
+  }
+  if(selectedAiCategory === 'compatibility' && partnerData){
+    const pPerson = buildPersonBlock(partnerData.saju, partnerData.ziwei);
+    payload.partner = {
+      name: partnerData.name || null,
+      gender: partnerData.gender,
+      birth: pPerson.birth,
+      saju: pPerson.saju,
+      ziwei: pPerson.ziwei,
+    };
+  }
+  if(selectedAiCategory === 'newyear'){
+    payload.세운 = buildSeunText(s, 2027);
+  }
   return payload;
 }
-function openPayModal(){ $('#payModal').hidden = false; }
+function openPayModal(){
+  const meta = AI_CATEGORY_META[selectedAiCategory] || AI_CATEGORY_META.comprehensive;
+  $('#modalPrice').textContent = meta.price;
+  $('#payModal').hidden = false;
+}
 function closePayModal(){ $('#payModal').hidden = true; }
 $('#aiUnlockBtn').addEventListener('click', ()=>{ openPayModal(); });
 $('#payModalCancel').addEventListener('click', closePayModal);
+// 카테고리 선택 → 카테고리별 다음 단계로 분기
+$$('.cat-option').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    selectedAiCategory = btn.dataset.cat;
+    if(selectedAiCategory === 'love'){ showAiStep('aiStepLove'); }
+    else if(selectedAiCategory === 'compatibility'){ showAiStep('aiStepPartner'); }
+    else { goToAiPayStep(); } // comprehensive, newyear는 바로 결제 단계
+  });
+});
+$$('#loveStatusSeg button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    $$('#loveStatusSeg button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedLoveStatus = btn.dataset.val;
+  });
+});
+$('#loveNextBtn').addEventListener('click', ()=>{ goToAiPayStep(); });
+$$('#partnerGenderSeg button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    $$('#partnerGenderSeg button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    partnerGenderVal = btn.dataset.val;
+  });
+});
+$('#partnerNextBtn').addEventListener('click', ()=>{
+  const pd = $('#partnerDate').value;
+  if(!pd){ $('#partnerError').hidden = false; $('#partnerError').textContent = '상대방 생년월일을 입력해주세요.'; return; }
+  const [py,pm,pdd] = pd.split('-').map(Number);
+  const punknown = $('#partnerUnknown').checked;
+  let phour=12, pminute=0;
+  if(!punknown){
+    const tv = $('#partnerTime').value || '12:00';
+    [phour,pminute] = tv.split(':').map(Number);
+  }
+  try{
+    const pResult = calcSaju({year:py, month:pm, day:pdd, hour:phour, minute:pminute, unknownTime:punknown, gender:partnerGenderVal, longitude:127.5});
+    const pZiwei = calcZiwei({year:py, month:pm, day:pdd, hour:phour, minute:pminute, unknownTime:punknown, gender:partnerGenderVal, trueHourFloat: pResult.trueHourFloat, sajuYear: pResult.sajuYear});
+    partnerData = { name: ($('#partnerName').value||'').trim(), gender: partnerGenderVal, saju: pResult, ziwei: pZiwei };
+    $('#partnerError').hidden = true;
+    goToAiPayStep();
+  } catch(err){
+    $('#partnerError').hidden = false;
+    $('#partnerError').textContent = '상대방 사주 계산 중 오류가 발생했어요. 입력값을 확인해주세요. (' + err.message + ')';
+  }
+});
+$('#loveBackBtn').addEventListener('click', ()=>{ showAiStep('aiStepCategory'); });
+$('#partnerBackBtn').addEventListener('click', ()=>{ showAiStep('aiStepCategory'); });
+$('#payBackBtn').addEventListener('click', ()=>{ showAiStep('aiStepCategory'); });
 $('#mockPayBtn').addEventListener('click', ()=>{
   // TODO: 실제 결제 SDK(토스페이먼츠/포트원 등) 연동 시 이 부분을 교체하세요.
   // 결제 성공 콜백 안에서 아래 두 줄을 호출하면 됩니다.
