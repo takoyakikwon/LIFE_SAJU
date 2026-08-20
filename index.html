@@ -171,6 +171,75 @@
   .dm-text .t2{font-size:13px; font-weight:700; margin-top:1px;}
   .panel{display:none;}
   .panel.active{display:block; animation:fadein .25s ease;}
+  /* ---------- 오늘의 사주 패널 (다크 미스틱 UI, 시안6 v2 그대로 포트) ---------- */
+  .today-dark{
+    --bg0:#0a0a14; --bg1:#14142a; --card:rgba(255,255,255,.055); --card-b:rgba(255,255,255,.12);
+    --gold:#f4c463; --violet:#a78bfa; --pink:#f472b6; --txt:#f1eefc; --sub:#9c98c4;
+    position:relative; overflow:hidden; margin:-20px -20px -8px -20px; padding:20px 16px 32px;
+    background:
+      radial-gradient(900px 500px at 20% -10%, #29215a55, transparent 60%),
+      radial-gradient(800px 500px at 100% 20%, #4a1f5a55, transparent 60%),
+      linear-gradient(180deg, var(--bg0), var(--bg1));
+    color:var(--txt); font-family:'Noto Sans KR', sans-serif;
+  }
+  .today-dark .stars{position:absolute; inset:0; z-index:0; pointer-events:none; opacity:.6;
+    background-image:
+      radial-gradient(1.5px 1.5px at 20px 30px, #fff, transparent),
+      radial-gradient(1.5px 1.5px at 130px 90px, #fff, transparent),
+      radial-gradient(1px 1px at 210px 40px, #fff, transparent),
+      radial-gradient(1.5px 1.5px at 300px 150px, #fff, transparent),
+      radial-gradient(1px 1px at 80px 200px, #fff, transparent),
+      radial-gradient(1.5px 1.5px at 360px 60px, #fff, transparent);
+    background-repeat:repeat; background-size:400px 400px;
+  }
+  .today-dark > *{position:relative; z-index:1;}
+  .today-dark .hero{text-align:center; padding:6px 0 20px;}
+  .today-dark .today-badge{display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:700; color:var(--gold); background:rgba(244,196,99,.1); border:1px solid rgba(244,196,99,.28); padding:6px 14px; border-radius:100px;}
+  .today-dark .cat-lore{font-family:'Noto Serif KR',serif; color:var(--gold); font-size:12px; letter-spacing:.15em; margin-top:14px;}
+  .today-dark .cat-name{font-family:'Noto Serif KR',serif; font-weight:900; font-size:24px; margin-top:6px;}
+  .today-dark .date-row{color:var(--sub); font-size:12.5px; margin-top:8px;}
+  .today-dark .iljin-tag{display:inline-block; margin-top:10px; font-family:'Noto Serif KR',serif; font-weight:700; font-size:13px; color:#c9c3ff; background:rgba(167,139,250,.12); border:1px solid rgba(167,139,250,.3); padding:5px 14px; border-radius:100px;}
+  .today-dark .card{background:var(--card); border:1px solid var(--card-b); border-radius:20px; padding:22px; backdrop-filter:blur(18px); margin-top:16px;}
+  .today-dark .card-head{display:flex; align-items:center; gap:8px; font-family:'Noto Serif KR',serif; font-weight:700; font-size:14.5px; color:var(--gold); margin-bottom:14px;}
+  .today-dark .card-head .badge-mini{font-family:'Noto Sans KR',sans-serif; font-size:9.5px; font-weight:700; color:#6b6790; background:rgba(255,255,255,.06); padding:2px 8px; border-radius:100px; margin-left:auto;}
+  .today-dark .score-row{display:flex; align-items:center; gap:18px;}
+  .today-dark .score-ring{position:relative; width:84px; height:84px; flex-shrink:0;}
+  .today-dark .score-ring svg{transform:rotate(-90deg);}
+  .today-dark .score-num{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;}
+  .today-dark .score-num .n{font-family:'Noto Serif KR',serif; font-weight:900; font-size:22px; color:var(--gold);}
+  .today-dark .score-num .l{font-size:9px; color:var(--sub);}
+  .today-dark .score-text p{font-size:13px; line-height:1.85; color:#e8e5f7;}
+  .today-dark .mini-scores{display:flex; gap:8px; margin-top:16px;}
+  .today-dark .mini-score{flex:1; text-align:center; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:10px 6px;}
+  .today-dark .mini-score .l{font-size:10px; color:var(--sub);}
+  .today-dark .mini-score .v{font-family:'Noto Serif KR',serif; font-weight:800; font-size:15px; margin-top:4px;}
+  .today-dark .mini-score.love .v{color:var(--pink);} .today-dark .mini-score.money .v{color:var(--gold);} .today-dark .mini-score.health .v{color:#7dd3fc;}
+  .today-dark .bio-chart{position:relative; height:110px; margin-top:4px;}
+  .today-dark .bio-legend{display:flex; gap:14px; margin-top:12px; flex-wrap:wrap;}
+  .today-dark .bio-legend .li{display:flex; align-items:center; gap:6px; font-size:11px; color:var(--sub);}
+  .today-dark .bio-legend .dot{width:8px; height:8px; border-radius:50%;}
+  .today-dark .bio-note{font-size:10.5px; color:#6b6790; margin-top:12px; line-height:1.7;}
+  .today-dark .luck-row{display:flex; align-items:center; gap:16px;}
+  .today-dark .luck-swatch{width:52px; height:52px; border-radius:16px; flex-shrink:0; box-shadow:0 4px 18px rgba(0,0,0,.3);}
+  .today-dark .luck-title{font-weight:700; font-size:14px;}
+  .today-dark .luck-desc{color:var(--sub); font-size:12px; margin-top:4px; line-height:1.6;}
+  .today-dark .fun-tag{display:inline-block; font-size:9.5px; color:#6b6790; background:rgba(255,255,255,.05); padding:2px 8px; border-radius:100px; margin-top:0; margin-left:auto;}
+  .today-dark .item-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:4px;}
+  .today-dark .item-box{background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:14px; text-align:center;}
+  .today-dark .item-box .e{font-size:22px;}
+  .today-dark .item-box .t{font-size:11.5px; font-weight:700; margin-top:8px;}
+  .today-dark .item-box .d{font-size:10.5px; color:var(--sub); margin-top:3px; line-height:1.5;}
+  .today-dark .sub-card{background:linear-gradient(160deg, rgba(167,139,250,.16), rgba(244,114,182,.08)); border:1px solid rgba(255,255,255,.16); text-align:center;}
+  .today-dark .sub-card .t{font-family:'Noto Serif KR',serif; font-weight:800; font-size:17px;}
+  .today-dark .sub-card .d{color:var(--sub); font-size:12.5px; margin-top:8px; line-height:1.7;}
+  .today-dark .sub-price{margin:16px 0; font-family:'Noto Serif KR',serif; font-weight:900; font-size:26px; color:var(--gold);}
+  .today-dark .sub-price span{font-size:12px; color:var(--sub); font-weight:400;}
+  .today-dark .sub-btn{width:100%; padding:15px; border:none; border-radius:14px; background:linear-gradient(90deg,var(--violet),var(--pink)); color:#fff; font-weight:800; font-size:14px; font-family:inherit; cursor:pointer;}
+  .today-dark .sub-perks{text-align:left; margin-top:16px; display:flex; flex-direction:column; gap:8px;}
+  .today-dark .sub-perks .p{font-size:12px; color:#d8d5f0; display:flex; gap:8px; align-items:flex-start;}
+  .today-dark .sub-perks .p .ck{color:#22d3a8; flex-shrink:0;}
+  .today-dark .channel-note{display:flex; gap:8px; justify-content:center; margin-top:14px;}
+  .today-dark .channel-chip{font-size:10.5px; color:var(--sub); background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); padding:5px 11px; border-radius:100px;}
   @keyframes fadein{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;}}
   .section-title{
     font-family:"Noto Serif KR"; font-weight:900; font-size:15px;
@@ -480,6 +549,96 @@
         <p class="section-desc">사주팔자와 자미두수, 두 체계를 나란히 놓고 공통점과 차이점을 짚어봅니다.</p>
         <div class="ziwei-summary" id="crossBox"></div>
       </div>
+      <div class="panel" data-panel="today">
+        <div class="today-dark">
+          <div class="stars"></div>
+          <div class="hero">
+            <div class="today-badge" id="todayBadge">☀ · 오늘의 관측</div>
+            <div class="cat-lore">오늘의 관측</div>
+            <div class="cat-name">오늘의 사주</div>
+            <div class="date-row" id="todayDateRow">계산 중...</div>
+            <div class="iljin-tag" id="todayIljinTag">오늘의 일진 · 계산 중...</div>
+          </div>
+          <div class="card">
+            <div class="card-head">✦ 오늘의 종합운<span class="badge-mini" id="todayAiBadge">임시문구 · AI는 다음 단계</span></div>
+            <div class="score-row">
+              <div class="score-ring">
+                <svg width="84" height="84">
+                  <circle cx="42" cy="42" r="36" stroke="rgba(255,255,255,.08)" stroke-width="8" fill="none"/>
+                  <circle id="todayScoreArc" cx="42" cy="42" r="36" stroke="url(#todayG1)" stroke-width="8" fill="none" stroke-linecap="round"
+                    stroke-dasharray="226" stroke-dashoffset="226"/>
+                  <defs><linearGradient id="todayG1" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="#a78bfa"/><stop offset="100%" stop-color="#f4c463"/>
+                  </linearGradient></defs>
+                </svg>
+                <div class="score-num"><div class="n" id="todayScoreNum">--</div><div class="l">종합점수</div></div>
+              </div>
+              <div class="score-text">
+                <p id="todayScoreText">계산 중...</p>
+              </div>
+            </div>
+            <div class="mini-scores">
+              <div class="mini-score love"><div class="l">애정운</div><div class="v" id="todayLoveScore">--</div></div>
+              <div class="mini-score money"><div class="l">금전운</div><div class="v" id="todayWealthScore">--</div></div>
+              <div class="mini-score health"><div class="l">건강운</div><div class="v" id="todayHealthScore">--</div></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head">📈 오늘의 바이오리듬<span class="badge-mini">공식 계산</span></div>
+            <div class="bio-chart">
+              <svg width="100%" height="110" viewBox="0 0 400 110" preserveAspectRatio="none">
+                <line x1="0" y1="55" x2="400" y2="55" stroke="rgba(255,255,255,.12)" stroke-width="1"/>
+                <path id="todayBioPhysicalPath" fill="none" stroke="#a78bfa" stroke-width="2.5"/>
+                <path id="todayBioEmotionalPath" fill="none" stroke="#f472b6" stroke-width="2.5"/>
+                <path id="todayBioIntellectualPath" fill="none" stroke="#f4c463" stroke-width="2.5"/>
+                <circle id="todayBioPhysicalDot" cx="200" cy="55" r="4" fill="#a78bfa"/>
+                <circle id="todayBioEmotionalDot" cx="200" cy="55" r="4" fill="#f472b6"/>
+                <circle id="todayBioIntellectualDot" cx="200" cy="55" r="4" fill="#f4c463"/>
+              </svg>
+            </div>
+            <div class="bio-legend">
+              <div class="li"><span class="dot" style="background:#a78bfa;"></span><span id="todayBioPhysicalLabel">신체 리듬</span></div>
+              <div class="li"><span class="dot" style="background:#f472b6;"></span><span id="todayBioEmotionalLabel">감정 리듬</span></div>
+              <div class="li"><span class="dot" style="background:#f4c463;"></span><span id="todayBioIntellectualLabel">지성 리듬</span></div>
+            </div>
+            <p class="bio-note">생년월일을 기준으로 한 신체·감정·지성 주기(23·28·33일) 계산으로, 사주와는 별개의 재미 콘텐츠예요. 곡선은 오늘을 중심으로 앞뒤 20일간의 실제 사인곡선입니다.</p>
+          </div>
+          <div class="card">
+            <div class="card-head">🎨 오늘의 행운 컬러</div>
+            <div class="luck-row">
+              <div class="luck-swatch" id="todayLuckSwatch"></div>
+              <div>
+                <div class="luck-title" id="todayLuckTitle">계산 중...</div>
+                <div class="luck-desc" id="todayLuckDesc"></div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head">✨ 오늘의 추천<span class="fun-tag">재미로 보는 콘텐츠</span></div>
+            <div class="item-grid">
+              <div class="item-box"><div class="e">👔</div><div class="t">오늘의 코디</div><div class="d" id="todayItemCoordi">--</div></div>
+              <div class="item-box"><div class="e">📍</div><div class="t">행운의 장소</div><div class="d" id="todayItemPlace">--</div></div>
+              <div class="item-box"><div class="e">🍀</div><div class="t">행운의 아이템</div><div class="d" id="todayItemLucky">--</div></div>
+              <div class="item-box"><div class="e">🔢</div><div class="t">행운의 숫자</div><div class="d" id="todayItemNumber">--</div></div>
+            </div>
+          </div>
+          <div class="card sub-card">
+            <div class="t">오늘의 사주, 매일 받아보세요</div>
+            <div class="d">월 구독으로 매일 아침 오늘의 종합운·바이오리듬·행운 컬러까지<br>이메일과 카카오 알림톡으로 바로 받아볼 수 있어요.</div>
+            <div class="sub-price">4,900원<span> / 월</span></div>
+            <button class="sub-btn" type="button" onclick="alert('구독 결제는 준비 중이에요. 곧 열릴 예정이에요!')">✦ 구독하고 매일 받아보기</button>
+            <div class="sub-perks">
+              <div class="p"><span class="ck">✓</span>매일 아침 오늘의 사주 전체 열람</div>
+              <div class="p"><span class="ck">✓</span>이메일 + 카카오 알림톡으로 자동 전달</div>
+              <div class="p"><span class="ck">✓</span>언제든 해지 가능 (자동 갱신)</div>
+            </div>
+            <div class="channel-note">
+              <span class="channel-chip">📧 이메일</span>
+              <span class="channel-chip">💬 카카오 알림톡</span>
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="panel" data-panel="ai">
         <h2 class="section-title">AI 종합 해석 <span class="en">AI READING</span></h2>
         <p class="section-desc">지금까지 계산된 사주·자미두수 데이터를 바탕으로, AI가 성격과 기질, 지금 흐름을 글로 풀어드려요.</p>
@@ -512,6 +671,7 @@
     <button data-panel="seun"><span class="ico">年</span><span class="lb">세운</span></button>
     <button data-panel="ziwei"><span class="ico">紫</span><span class="lb">자미</span></button>
     <button data-panel="cross"><span class="ico">合</span><span class="lb">종합</span></button>
+    <button data-panel="today"><span class="ico">☀</span><span class="lb">오늘</span></button>
     <button data-panel="ai"><span class="ico">AI</span><span class="lb">해석</span></button>
   </nav>
 </div>
@@ -1596,6 +1756,7 @@ $('#submitBtn').addEventListener('click', ()=>{
   lastSajuResult = result;
   lastZiweiResult = ziweiResult;
   lastName = ($('#inpName').value||"").trim();
+  renderTodayPanel(result, y, m, d);
   resetAiPanel();
   $('#view-input').hidden = true;
   $('#view-result').hidden = false;
@@ -1747,6 +1908,56 @@ function calcTodayFortune(sajuResult, birthY, birthM, birthD, bioRange){
 }
 // 화면 연동 전까지 콘솔에서 바로 테스트할 수 있도록 전역에 노출
 window.calcTodayFortune = calcTodayFortune;
+// "오늘" 패널 렌더링 — calcTodayFortune() 결과를 시안6 v2 마크업에 그대로 채워 넣음
+function seriesToPath(series){
+  const w=400, mid=55, amp=42, n=series.length;
+  return series.map((v,i)=> `${i===0?'M':'L'}${(i/(n-1)*w).toFixed(1)},${(mid - v*amp).toFixed(1)}`).join(' ');
+}
+function placeBioDot(id, series, midIdx){
+  const w=400, mid=55, amp=42, n=series.length;
+  const x = (midIdx/(n-1))*w, y = mid - series[midIdx]*amp;
+  const el = $(id);
+  el.setAttribute('cx', x.toFixed(1)); el.setAttribute('cy', y.toFixed(1));
+}
+function phaseLabel(v){ return v>60?'최고조': v>15?'상승': v>-15?'평온': v>-60?'하강':'저점'; }
+function renderTodayPanel(sajuResult, birthY, birthM, birthD){
+  const t = calcTodayFortune(sajuResult, birthY, birthM, birthD, 20);
+  const now = new Date();
+  const dmG = sajuResult.pillars.day.g;
+  $('#todayBadge').textContent = `☀ ${now.getFullYear()}년 ${now.getMonth()+1}월 ${now.getDate()}일 · 오늘의 관측`;
+  $('#todayDateRow').textContent = `${lastName ? lastName+'님 · ' : ''}${GAN[dmG]}${ZHI[sajuResult.pillars.day.z]}(${GAN_HANJA[dmG]}${ZHI_HANJA[sajuResult.pillars.day.z]}) 일주 기준`;
+  $('#todayIljinTag').textContent = `오늘의 일진 · ${t.iljin.text}`;
+
+  $('#todayScoreNum').textContent = t.score.score;
+  const circumference = 226;
+  $('#todayScoreArc').setAttribute('stroke-dashoffset', Math.round(circumference * (1 - t.score.score/100)));
+  const scoreSentence = `오늘은 ${t.iljin.text}의 기운이 들어오는 날로, ${GAN[dmG]}(${ELEMENT_NAME[GAN_ELEMENT[dmG]]}) 일간인 당신에게는 십성상 ${t.score.god}에 해당해요. ${t.score.reasons[0]}${t.score.reasons[1]? ', '+t.score.reasons[1] : ''}. ${["편관","겁재"].includes(t.score.god) ? '다소 긴장될 수 있는 기운이니 서두르기보다 차분하게 페이스를 지키는 편이 유리해요.' : '평소보다 안정적인 흐름이니 중요한 결정을 진행하기에도 나쁘지 않은 날이에요.'}`;
+  $('#todayScoreText').textContent = scoreSentence;
+  $('#todayLoveScore').textContent = t.score.love;
+  $('#todayWealthScore').textContent = t.score.wealth;
+  $('#todayHealthScore').textContent = t.score.health;
+
+  const series = t.bio.series;
+  $('#todayBioPhysicalPath').setAttribute('d', seriesToPath(series.physical));
+  $('#todayBioEmotionalPath').setAttribute('d', seriesToPath(series.emotional));
+  $('#todayBioIntellectualPath').setAttribute('d', seriesToPath(series.intellectual));
+  const midIdx = Math.floor(series.physical.length/2);
+  placeBioDot('#todayBioPhysicalDot', series.physical, midIdx);
+  placeBioDot('#todayBioEmotionalDot', series.emotional, midIdx);
+  placeBioDot('#todayBioIntellectualDot', series.intellectual, midIdx);
+  $('#todayBioPhysicalLabel').textContent = `신체 리듬 · ${phaseLabel(t.bio.today.physical)} (${t.bio.today.physical})`;
+  $('#todayBioEmotionalLabel').textContent = `감정 리듬 · ${phaseLabel(t.bio.today.emotional)} (${t.bio.today.emotional})`;
+  $('#todayBioIntellectualLabel').textContent = `지성 리듬 · ${phaseLabel(t.bio.today.intellectual)} (${t.bio.today.intellectual})`;
+
+  $('#todayLuckSwatch').style.background = `linear-gradient(135deg, ${t.luckyColor.hex}, ${t.luckyColor.hex}bb)`;
+  $('#todayLuckTitle').textContent = t.luckyColor.name;
+  $('#todayLuckDesc').textContent = `사주 오행 중 ${t.weakestElement} 기운이 가장 약해서, 오늘은 이 색으로 보완하면 좋은 날이에요.`;
+
+  $('#todayItemCoordi').textContent = t.luckyCoordi;
+  $('#todayItemPlace').textContent = t.luckyPlace;
+  $('#todayItemLucky').textContent = t.luckyItem;
+  $('#todayItemNumber').textContent = t.luckyNumber;
+}
 
 function buildAiPayload(){
   const s = lastSajuResult, z = lastZiweiResult;
