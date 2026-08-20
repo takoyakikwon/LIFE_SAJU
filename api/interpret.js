@@ -211,6 +211,41 @@ const MAX_TOKENS_BY_CATEGORY = {
   today: 700,
 };
 
+// ============================================================
+// 이어쓰기(continuation) — 분량 미달 대응
+// 연애·재회운/궁합&결혼/신년운세 3개 카테고리 모두 gpt-4o-mini가 프롬프트에 지시한 목표
+// 분량의 대략 40~70% 선에서 스스로 멈추는 경향이 반복 확인됐다(프롬프트 엔지니어링만으로는
+// 한계). 모델을 바꾸지 않고, 1차 응답이 카테고리별 최소 분량에 못 미치면 방금 쓴 응답을
+// 대화 맥락에 그대로 넣고 "이어서 더 써달라"는 후속 호출을 한 번 더 보내 그 결과를 이어
+// 붙이는 방식으로 먼저 시도해본다. 최대 1회만 이어쓰기하며(무한 재시도 없음), 실패해도
+// 1차 응답은 이미 있으므로 그대로 반환한다.
+const MIN_LENGTH_BY_CATEGORY = {
+  love: 4000,
+  compatibility: 3000,
+  newyear: 3500,
+};
+
+const CONTINUATION_PROMPT = `방금 작성한 리포트가 목표 분량에 못 미칩니다. 지금까지 쓴 내용은 반복하지 말고 그대로 유지한 채, 이어서 내용을 더 채워주세요. 이미 다룬 소주제들에서 다루지 못했던 구체적인 근거·사례·조언을 추가하거나, 자연스럽게 다룰 만한 세부 내용을 덧붙여 전체를 더 깊고 풍부하게 만들어주세요. 새로운 소제목을 만들지 말고, 기존 흐름에 자연스럽게 이어지는 본문 문단만 이어서 작성하세요. "이어서 말씀드리면" 같은 메타 표현 없이 바로 본문으로 시작하고, 마크다운 문법은 쓰지 마세요.`;
+
+async function callOpenAI(apiKey, messages, maxTokens) {
+  const openaiRes = await fetch(OPENAI_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({ model: MODEL, max_tokens: maxTokens, messages }),
+  });
+  if (!openaiRes.ok) {
+    const errText = await openaiRes.text();
+    console.error('OpenAI API error:', openaiRes.status, errText);
+    return { ok: false, status: openaiRes.status };
+  }
+  const data = await openaiRes.json();
+  const text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '').trim();
+  return { ok: true, text };
+}
+
 module.exports = async (req, res) => {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'POST 요청만 지원합니다.' });
@@ -242,32 +277,39 @@ module.exports = async (req, res) => {
     : (CATEGORY_PROMPTS[payload.category] || CATEGORY_PROMPT_COMPREHENSIVE);
   const SYSTEM_PROMPT = BASE_PROMPT + '\n' + categoryPrompt;
 
-  try {
-    const openaiRes = await fetch(OPENAI_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: MAX_TOKENS_BY_CATEGORY[payload.category] || 4000,
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: userPrompt },
-        ],
-      }),
-    });
+  const maxTokens = MAX_TOKENS_BY_CATEGORY[payload.category] || 4000;
 
-    if (!openaiRes.ok) {
-      const errText = await openaiRes.text();
-      console.error('OpenAI API error:', openaiRes.status, errText);
-      res.status(502).json({ error: `AI 서버 응답 오류 (${openaiRes.status})` });
+  try {
+    const first = await callOpenAI(apiKey, [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: userPrompt },
+    ], maxTokens);
+
+    if (!first.ok) {
+      res.status(502).json({ error: `AI 서버 응답 오류 (${first.status})` });
       return;
     }
 
-    const data = await openaiRes.json();
-    const text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '').trim();
+    let text = first.text;
+
+    // 이어쓰기: 카테고리별 최소 분량에 못 미치면 후속 호출을 한 번 더 보내 이어 붙인다.
+    const minLen = MIN_LENGTH_BY_CATEGORY[payload.category];
+    if (minLen && text.length < minLen) {
+      try {
+        const cont = await callOpenAI(apiKey, [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: userPrompt },
+          { role: 'assistant', content: text },
+          { role: 'user', content: CONTINUATION_PROMPT },
+        ], maxTokens);
+        if (cont.ok && cont.text) {
+          text = text + '\n\n' + cont.text;
+        }
+      } catch (contErr) {
+        // 이어쓰기 호출이 실패해도 1차 응답은 이미 있으므로 그대로 반환한다.
+        console.error('continuation call failed:', contErr);
+      }
+    }
 
     res.status(200).json({ interpretation: text || '해석을 생성하지 못했습니다.' });
   } catch (err) {
