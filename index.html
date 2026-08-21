@@ -407,6 +407,7 @@
     display:grid; grid-template-columns:repeat(3,1fr); gap:7px;
   }
   .ziwei-palace{
+    position:relative;
     border:1.5px solid var(--line); border-radius:var(--radius-sm);
     background:var(--paper-card); padding:9px 8px; min-height:96px;
     display:flex; flex-direction:column; gap:4px;
@@ -415,6 +416,12 @@
   .ziwei-palace:active{ border-color:var(--seal); }
   .ziwei-palace.is-ming{ border-color:var(--seal); background:var(--fire-soft); }
   .ziwei-palace.expanded{ grid-column:1 / -1; border-color:var(--seal); }
+  .ziwei-palace.is-cur-daehan{ box-shadow: inset 0 0 0 1.5px var(--gold-line); }
+  .ziwei-palace.is-cur-daehan::after{
+    content:'현재 대한'; position:absolute; top:-7px; right:6px;
+    font-size:8.5px; font-weight:900; color:#241a0a; background:var(--gold);
+    padding:2px 5px; border-radius:100px; line-height:1.4; letter-spacing:-.2px;
+  }
   .ziwei-palace .zp-name{
     font-size:10.5px; font-weight:900; color:var(--ink-soft);
     display:flex; justify-content:space-between; align-items:baseline;
@@ -2528,6 +2535,11 @@ function renderZiwei(zw, curAge){
   const lunarLabel = `${zw.lunar.lunarYear}년 ${zw.lunar.isLeapMonth?'윤':''}${zw.lunar.lunarMonth}월 ${zw.lunar.lunarDay}일 (음력)`;
   const mingGung = zw.palaces.find(p=>p.name==='명궁');
   const bodyPalace = zw.palaces.find(p=>p.reducedIdx===mod(zw.bodyIndex,12));
+  // 상단 12궁 그리드에서 "명궁"(violet)은 태어날 때 정해진 고정 자리이고,
+  // 아래 대한(大限) 목록의 "현재"(gold)는 지금 나이대가 어느 궁을 지나는지를 보여준다.
+  // 서로 다른 개념이라 같은 화면에 있으면 헷갈릴 수 있어, 현재 대한에 해당하는 궁에도
+  // 그리드 위에 작은 금색 "현재 대한" 표시를 함께 붙여준다.
+  const curDaehan = zw.daeHan.list.find(d=> curAge!==null && curAge>=d.startAge && curAge<=d.endAge);
   $('#ziweiSummary').innerHTML = `
     <div><b>${lunarLabel}</b> · 년주(설날 기준) ${GAN[zw.yearPillar.g]}${ZHI[zw.yearPillar.z]}(${GAN_HANJA[zw.yearPillar.g]}${ZHI_HANJA[zw.yearPillar.z]})</div>
     <div style="margin-top:4px;">오행국 <b>${zw.bureau.name}</b> · 명궁 <b>${ZHI[zw.soulZhiStd]}(${ZHI_HANJA[zw.soulZhiStd]})</b>, 천간 ${GAN[zw.mingGan]}(${GAN_HANJA[zw.mingGan]}) · 신궁 <b>${ZHI[zw.bodyZhiStd]}(${ZHI_HANJA[zw.bodyZhiStd]})</b></div>
@@ -2536,9 +2548,10 @@ function renderZiwei(zw, curAge){
   let gridHtml = '';
   zw.palaces.forEach((p,idx)=>{
     const isMing = p.name==='명궁';
+    const isCurDaehan = curDaehan && p.name === curDaehan.palaceName;
     const majorStars = p.stars.filter(s=>!s.aux);
     const auxStarsList = p.stars.filter(s=>s.aux);
-    gridHtml += `<div class="ziwei-palace ${isMing?'is-ming':''}" data-idx="${idx}">
+    gridHtml += `<div class="ziwei-palace ${isMing?'is-ming':''} ${isCurDaehan?'is-cur-daehan':''}" data-idx="${idx}">
       <div class="zp-name"><span>${p.name}</span><span class="zp-gz">${GAN_HANJA[p.gan]}${ZHI_HANJA[p.stdZhi]}</span><span class="zp-chevron">▾</span></div>
       <div class="zp-stars">
         ${majorStars.map(s=>`<span class="zp-star">${s.hanja}</span>`).join('')}
@@ -2828,7 +2841,7 @@ function setupLunarDateInput({ segId, solarFieldId, lunarFieldId, dateId, yearId
 const mainLunarInput = setupLunarDateInput({
   segId: 'inpCalSeg', solarFieldId: 'inpDateSolarField', lunarFieldId: 'inpDateLunarField',
   dateId: 'inpDate', yearId: 'inpLunarYear', monthId: 'inpLunarMonth', dayId: 'inpLunarDay', leapId: 'inpLunarLeap',
-  defaultYear: 1995, defaultMonth: 7, defaultDay: 24,
+  defaultYear: new Date().getFullYear()-30, defaultMonth: 1, defaultDay: 1,
 });
 // 생년월일을 고르는 즉시(양력/음력 무관) 일간 한 글자를 미리 보여주는 훅.
 // 진태양시·표준시 보정은 생략하고 정오 기준으로만 계산하는 약식값이지만, 일간은
@@ -2864,7 +2877,7 @@ updateDayStemPreview();
      (#inpCalSeg / #inpDate / #inpLunarYear 등)에 그대로 반영되므로,
      계산 로직(submitBtn 핸들러)은 전혀 손대지 않아도 됨.
    ========================================================= */
-const pk = { calType:'solar', year:1995, month:8, day:20, leap:false, hour:14, minute:30 };
+const pk = { calType:'solar', year:new Date().getFullYear()-30, month:1, day:1, leap:false, hour:0, minute:0 };
 function pkPad(n){ return String(n).padStart(2,'0'); }
 function pkLunarMaxDay(year, month, isLeap){ return lunarMonthDayCount(year, month, isLeap) || 30; }
 function pkSolarMaxDay(year, month){ return new Date(year, month, 0).getDate(); }
@@ -3502,7 +3515,7 @@ $$('#partnerGenderSeg button').forEach(btn=>{
 const partnerLunarInput = setupLunarDateInput({
   segId: 'partnerCalSeg', solarFieldId: 'partnerDateSolarField', lunarFieldId: 'partnerDateLunarField',
   dateId: 'partnerDate', yearId: 'partnerLunarYear', monthId: 'partnerLunarMonth', dayId: 'partnerLunarDay', leapId: 'partnerLunarLeap',
-  defaultYear: 1995, defaultMonth: 7, defaultDay: 24,
+  defaultYear: new Date().getFullYear()-30, defaultMonth: 1, defaultDay: 1,
 });
 $('#partnerNextBtn').addEventListener('click', ()=>{
   let py, pm, pdd;
