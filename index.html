@@ -122,14 +122,16 @@
     display:block; font-size:12px; font-weight:700; color:var(--ink-soft);
     margin-bottom:7px; letter-spacing:0.2px;
   }
-  .field input[type="text"], .field input[type="date"], .field input[type="time"], .field input[type="email"], .field textarea{
+  .field input[type="text"], .field input[type="date"], .field input[type="time"], .field input[type="email"], .field textarea, .field select{
     width:100%; padding:13px 14px; font-size:15px;
     border:1.5px solid var(--line); border-radius:var(--radius-sm);
     background:var(--paper-card); color:var(--ink);
     font-family:"Noto Sans KR"; font-weight:500;
   }
   .field textarea{ resize:vertical; min-height:96px; line-height:1.5; }
-  .field input:focus, .field textarea:focus{outline:none; border-color:var(--seal);}
+  .field input:focus, .field textarea:focus, .field select:focus{outline:none; border-color:var(--seal);}
+  .lunar-date-row{display:flex; gap:8px;}
+  .lunar-date-row select{flex:1; min-width:0;}
   .seg{display:flex; gap:8px;}
   .seg button{
     flex:1; padding:12px 0; border-radius:var(--radius-sm);
@@ -547,8 +549,26 @@
         <input type="text" id="inpName" placeholder="예: 홍길동">
       </div>
       <div class="field">
-        <label for="inpDate">생년월일 (양력)</label>
+        <label>생년월일</label>
+        <div class="seg" id="inpCalSeg">
+          <button type="button" data-val="solar" class="active">양력</button>
+          <button type="button" data-val="lunar">음력</button>
+        </div>
+      </div>
+      <div class="field" id="inpDateSolarField">
         <input type="date" id="inpDate" value="1995-08-20">
+      </div>
+      <div class="field" id="inpDateLunarField" hidden>
+        <div class="lunar-date-row">
+          <select id="inpLunarYear"></select>
+          <select id="inpLunarMonth"></select>
+          <select id="inpLunarDay"></select>
+        </div>
+        <div class="checkline">
+          <input type="checkbox" id="inpLunarLeap">
+          <label for="inpLunarLeap" style="margin:0;">윤달이에요</label>
+        </div>
+        <p class="partner-note" style="margin-top:8px; margin-bottom:0;">입력하신 음력 날짜는 계산할 때 자동으로 양력으로 변환돼요.</p>
       </div>
       <div class="field">
         <label for="inpTime">태어난 시간</label>
@@ -771,8 +791,26 @@
               <input type="text" id="partnerName" placeholder="예: 김민준">
             </div>
             <div class="field">
-              <label for="partnerDate">상대방 생년월일 (양력)</label>
+              <label>상대방 생년월일</label>
+              <div class="seg" id="partnerCalSeg">
+                <button type="button" data-val="solar" class="active">양력</button>
+                <button type="button" data-val="lunar">음력</button>
+              </div>
+            </div>
+            <div class="field" id="partnerDateSolarField">
               <input type="date" id="partnerDate">
+            </div>
+            <div class="field" id="partnerDateLunarField" hidden>
+              <div class="lunar-date-row">
+                <select id="partnerLunarYear"></select>
+                <select id="partnerLunarMonth"></select>
+                <select id="partnerLunarDay"></select>
+              </div>
+              <div class="checkline">
+                <input type="checkbox" id="partnerLunarLeap">
+                <label for="partnerLunarLeap" style="margin:0;">윤달이에요</label>
+              </div>
+              <p class="partner-note" style="margin-top:8px; margin-bottom:0;">입력하신 음력 날짜는 계산할 때 자동으로 양력으로 변환돼요.</p>
             </div>
             <div class="field">
               <label for="partnerTime">상대방 태어난 시간</label>
@@ -1376,10 +1414,10 @@ function buildLunarCalendar(year){
       thisIsLeap = true;
       leapAssigned = true;
     } else {
-      if(i>0){
-        const prevWasLeap = months[i-1] && months[i-1].isLeap;
-        if(!prevWasLeap) monthNum = monthNum===12?1:monthNum+1;
-      }
+      // 윤달의 다음 달도 (윤달과 같은 번호에서) 반드시 1 증가해야 한다.
+      // 예: 6월 -> 윤6월(번호 유지) -> 7월. 직전이 윤달이었다고 증가를 건너뛰면
+      // 윤달 다음 달이 윤달과 같은 번호로 중복 라벨링되는 버그가 생긴다.
+      if(i>0) monthNum = monthNum===12?1:monthNum+1;
     }
     months.push({ startDay: mStartDay, endDay: mEndDay, month: monthNum, isLeap: thisIsLeap });
   }
@@ -1400,6 +1438,28 @@ function solarToLunar(wallJD, year){
         // 그 중 동짓달(11월)·섣달(12월)은 아직 y년 설날 전이므로 "음력 y-1년"에 속한다.
         const lunarYear = (m.month>=11) ? y-1 : y;
         return { lunarYear, lunarMonth: m.month, lunarDay: dayIndex, isLeapMonth: m.isLeap };
+      }
+    }
+  }
+  return null;
+}
+
+// 음력 연/월/일(윤달여부)로부터 양력 연/월/일 산출.
+// solarToLunar()의 음력년 라벨링 로직을 별도로 재구현하지 않고, 후보 날짜를 다시
+// solarToLunar()에 넣어 원래 입력과 정확히 일치하는지 검증하는 안전한 방식을 사용한다.
+function lunarToSolar(lunarYear, lunarMonth, lunarDay, isLeapMonth){
+  for(let y=lunarYear-1; y<=lunarYear+2; y++){
+    const cal = buildLunarCalendar(y);
+    for(const m of cal.months){
+      if(m.month !== lunarMonth || !!m.isLeap !== !!isLeapMonth) continue;
+      const dayNum = m.startDay + (lunarDay-1);
+      if(dayNum < m.startDay || dayNum >= m.endDay) continue; // 그 달에 존재하지 않는 일자
+      const d = fromJD(dayNum - 0.5);
+      const solarYear = d.getUTCFullYear(), solarMonth = d.getUTCMonth()+1, solarDay = d.getUTCDate();
+      const wallJD = toJD(toWall(solarYear, solarMonth, solarDay, 12, 0));
+      const back = solarToLunar(wallJD, solarYear);
+      if(back && back.lunarYear===lunarYear && back.lunarMonth===lunarMonth && back.lunarDay===lunarDay && !!back.isLeapMonth===!!isLeapMonth){
+        return { year: solarYear, month: solarMonth, day: solarDay };
       }
     }
   }
@@ -2020,10 +2080,99 @@ citySelect.addEventListener('change', ()=>{
   const isManual = citySelect.value === "manual";
   $('#inpLon').style.display = isManual ? "block" : "none";
 });
+/* ---------- 음력 생년월일 입력 UI ---------- */
+// 주어진 음력 연/월/윤달여부에 해당하는 달의 실제 일수를 안전하게 산출.
+// lunarToSolar()와 동일하게, 후보를 solarToLunar()로 되돌려 검증하는 방식을 사용한다.
+function lunarMonthDayCount(lunarYear, lunarMonth, isLeapMonth){
+  for(let y=lunarYear-1; y<=lunarYear+2; y++){
+    const cal = buildLunarCalendar(y);
+    for(const mm of cal.months){
+      if(mm.month !== lunarMonth || !!mm.isLeap !== !!isLeapMonth) continue;
+      const d = fromJD(mm.startDay - 0.5);
+      const sy=d.getUTCFullYear(), sm=d.getUTCMonth()+1, sd=d.getUTCDate();
+      const wjd = toJD(toWall(sy, sm, sd, 12, 0));
+      const back = solarToLunar(wjd, sy);
+      if(back && back.lunarYear===lunarYear && back.lunarMonth===lunarMonth && !!back.isLeapMonth===!!isLeapMonth){
+        return mm.endDay - mm.startDay;
+      }
+    }
+  }
+  return null;
+}
+function setupLunarDateInput({ segId, solarFieldId, lunarFieldId, dateId, yearId, monthId, dayId, leapId, defaultYear, defaultMonth, defaultDay }){
+  const state = { calType: 'solar' };
+  $$(`#${segId} button`).forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      $$(`#${segId} button`).forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      state.calType = btn.dataset.val;
+      $(`#${solarFieldId}`).hidden = (state.calType !== 'solar');
+      $(`#${lunarFieldId}`).hidden = (state.calType !== 'lunar');
+    });
+  });
+  const yearSel = $(`#${yearId}`), monthSel = $(`#${monthId}`), daySel = $(`#${dayId}`), leapChk = $(`#${leapId}`);
+  const curYear = new Date().getFullYear();
+  for(let y=curYear; y>=1925; y--){
+    const opt = document.createElement('option');
+    opt.value = y; opt.textContent = y+'년';
+    yearSel.appendChild(opt);
+  }
+  for(let m=1;m<=12;m++){
+    const opt = document.createElement('option');
+    opt.value = m; opt.textContent = m+'월';
+    monthSel.appendChild(opt);
+  }
+  function refreshDays(){
+    const year = Number(yearSel.value), month = Number(monthSel.value), isLeap = leapChk.checked;
+    const dayCount = lunarMonthDayCount(year, month, isLeap) || 30;
+    const prevVal = Number(daySel.value) || 1;
+    daySel.innerHTML = '';
+    for(let d=1; d<=dayCount; d++){
+      const opt = document.createElement('option');
+      opt.value = d; opt.textContent = d+'일';
+      daySel.appendChild(opt);
+    }
+    daySel.value = Math.min(prevVal, dayCount);
+  }
+  yearSel.value = defaultYear;
+  monthSel.value = defaultMonth;
+  refreshDays();
+  daySel.value = defaultDay;
+  yearSel.addEventListener('change', refreshDays);
+  monthSel.addEventListener('change', refreshDays);
+  leapChk.addEventListener('change', refreshDays);
+  return {
+    getCalType: () => state.calType,
+    resolveSolarDate: () => {
+      const year = Number(yearSel.value), month = Number(monthSel.value), day = Number(daySel.value), isLeap = leapChk.checked;
+      const solar = lunarToSolar(year, month, day, isLeap);
+      if(!solar){
+        throw new Error(`입력하신 음력 날짜(${year}년 ${isLeap?'윤':''}${month}월 ${day}일)를 양력으로 바꿀 수 없어요. 윤달 여부를 다시 확인해주세요.`);
+      }
+      return solar;
+    },
+  };
+}
+const mainLunarInput = setupLunarDateInput({
+  segId: 'inpCalSeg', solarFieldId: 'inpDateSolarField', lunarFieldId: 'inpDateLunarField',
+  dateId: 'inpDate', yearId: 'inpLunarYear', monthId: 'inpLunarMonth', dayId: 'inpLunarDay', leapId: 'inpLunarLeap',
+  defaultYear: 1995, defaultMonth: 7, defaultDay: 24,
+});
 $('#submitBtn').addEventListener('click', ()=>{
-  const dateVal = $('#inpDate').value;
-  if(!dateVal){ alert('생년월일을 입력해주세요.'); return; }
-  const [y,m,d] = dateVal.split('-').map(Number);
+  let y, m, d;
+  if(mainLunarInput.getCalType() === 'lunar'){
+    try{
+      const solar = mainLunarInput.resolveSolarDate();
+      y = solar.year; m = solar.month; d = solar.day;
+    } catch(err){
+      alert(err.message);
+      return;
+    }
+  } else {
+    const dateVal = $('#inpDate').value;
+    if(!dateVal){ alert('생년월일을 입력해주세요.'); return; }
+    [y,m,d] = dateVal.split('-').map(Number);
+  }
   const unknownTime = $('#inpUnknown').checked;
   let hour=12, minute=0;
   if(!unknownTime){
@@ -2401,10 +2550,25 @@ $$('#partnerGenderSeg button').forEach(btn=>{
     partnerGenderVal = btn.dataset.val;
   });
 });
+const partnerLunarInput = setupLunarDateInput({
+  segId: 'partnerCalSeg', solarFieldId: 'partnerDateSolarField', lunarFieldId: 'partnerDateLunarField',
+  dateId: 'partnerDate', yearId: 'partnerLunarYear', monthId: 'partnerLunarMonth', dayId: 'partnerLunarDay', leapId: 'partnerLunarLeap',
+  defaultYear: 1995, defaultMonth: 7, defaultDay: 24,
+});
 $('#partnerNextBtn').addEventListener('click', ()=>{
-  const pd = $('#partnerDate').value;
-  if(!pd){ $('#partnerError').hidden = false; $('#partnerError').textContent = '상대방 생년월일을 입력해주세요.'; return; }
-  const [py,pm,pdd] = pd.split('-').map(Number);
+  let py, pm, pdd;
+  if(partnerLunarInput.getCalType() === 'lunar'){
+    try{
+      const solar = partnerLunarInput.resolveSolarDate();
+      py = solar.year; pm = solar.month; pdd = solar.day;
+    } catch(err){
+      $('#partnerError').hidden = false; $('#partnerError').textContent = err.message; return;
+    }
+  } else {
+    const pd = $('#partnerDate').value;
+    if(!pd){ $('#partnerError').hidden = false; $('#partnerError').textContent = '상대방 생년월일을 입력해주세요.'; return; }
+    [py,pm,pdd] = pd.split('-').map(Number);
+  }
   const punknown = $('#partnerUnknown').checked;
   let phour=12, pminute=0;
   if(!punknown){
