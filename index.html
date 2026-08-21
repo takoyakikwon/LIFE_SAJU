@@ -1999,10 +1999,11 @@ function render(result){
   const dateStr = `${input.year}년 ${input.month}월 ${input.day}일`;
   const timeStr = input.unknownTime ? "시간 미상" : `${String(input.hour).padStart(2,'0')}:${String(input.minute).padStart(2,'0')}`;
   const name = ($('#inpName').value||"").trim();
+  const nameSafe = escapeHtml(name);
   const stdLabel = result.solarInfo.stdOff===8.5 ? "UTC+8:30(당시 표준시)" : "UTC+9:00";
   const dstLabel = result.solarInfo.dstOff===1 ? " · 서머타임 적용" : "";
   $('#summaryBox').innerHTML = `
-    <div class="name">${name? name+"님" : "나의 사주"}</div>
+    <div class="name">${nameSafe? nameSafe+"님" : "나의 사주"}</div>
     <div class="meta">${dateStr} · ${timeStr} · ${input.gender}자 &nbsp;/&nbsp; 사주상 ${result.sajuYear}년생</div>
     <div class="meta" style="margin-top:4px; font-size:10.5px;">진태양시 보정: 경도 ${input.longitude.toFixed(2)}° · 균시차 ${result.solarInfo.eotMinutes>=0?'+':''}${result.solarInfo.eotMinutes.toFixed(1)}분 · ${stdLabel}${dstLabel}</div>
     <div class="dm-row">
