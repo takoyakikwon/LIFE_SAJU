@@ -549,7 +549,8 @@
   .cat-picker{display:flex; flex-direction:column; gap:10px;}
   .cat-option{
     text-align:left; width:100%; padding:16px 16px; cursor:pointer;
-    border:1.5px solid var(--line); border-radius:var(--radius-sm); background:var(--paper-card);
+    border:1.5px solid var(--gold-line); border-radius:var(--radius-sm); background:var(--paper-card);
+    box-shadow:0 0 0 1px rgba(244,196,99,.08);
     font-family:"Noto Sans KR";
   }
   .cat-option:active{transform:translateY(1px);}
@@ -719,6 +720,35 @@
   .pillar-col.reveal-pop{ animation:pillarPop .5s cubic-bezier(.34,1.56,.64,1) backwards; }
   @keyframes dmPop{ 0%{opacity:0; transform:scale(.7);} 60%{opacity:1; transform:scale(1.06);} 100%{transform:scale(1);} }
   .dm-row.reveal-pop{ animation:dmPop .6s cubic-bezier(.34,1.56,.64,1) backwards; }
+  /* ---------- 무료 탭 끝 → AI 해석 결제 유도 CTA / 탭바 강조 배지 ---------- */
+  .ai-cta-card{
+    margin-top:20px; padding:20px 18px; border-radius:var(--radius-md);
+    background:linear-gradient(180deg, rgba(167,139,250,.12), rgba(244,114,182,.06)), var(--paper-card);
+    border:1px solid rgba(244,196,99,.3);
+    text-align:center;
+  }
+  .ai-cta-title{font-family:"Noto Serif KR"; font-weight:800; font-size:14.5px; color:var(--ink); line-height:1.55; margin-bottom:6px;}
+  .ai-cta-desc{font-size:12px; color:var(--ink-soft); line-height:1.6; margin-bottom:16px;}
+  #tabbar button{position:relative;}
+  .tab-badge-dot{
+    position:absolute; top:3px; right:20px; width:7px; height:7px; border-radius:50%;
+    background:linear-gradient(135deg,var(--gold),var(--pink));
+    box-shadow:0 0 6px rgba(244,196,99,.75);
+    animation:revealPulse 1.6s ease-in-out infinite;
+  }
+  /* ---------- 태어난 곳 검색 바텀시트 (경도 숫자 입력 없이 지역 이름으로 검색) ---------- */
+  .city-search-input{
+    width:100%; padding:12px 14px; margin-bottom:12px; border-radius:10px; border:1.5px solid var(--line);
+    background:rgba(255,255,255,.04); color:var(--ink); font-size:14px; font-family:"Noto Sans KR"; font-weight:500;
+  }
+  .city-list{max-height:280px; overflow-y:auto;}
+  .city-item{
+    display:block; width:100%; text-align:left; padding:13px 6px; border:none; border-bottom:1px solid var(--line);
+    background:none; color:var(--ink); font-size:14.5px; font-family:"Noto Sans KR"; font-weight:500; cursor:pointer;
+  }
+  .city-item:last-child{border-bottom:none;}
+  .city-item.sel{color:var(--gold); font-weight:800;}
+  .city-empty{padding:26px 4px; text-align:center; color:var(--ink-faint); font-size:12.5px; line-height:1.6;}
 </style>
 </head>
 <body>
@@ -803,10 +833,14 @@
         </div>
       </div>
       <div class="field">
-        <label for="inpCity">태어난 곳 (진태양시 보정)</label>
-        <select id="inpCity"></select>
-        <input type="number" id="inpLon" placeholder="경도 (예: 127.5)" step="0.01" style="margin-top:8px; width:100%; padding:13px 14px; font-size:15px; border:1.5px solid var(--line); border-radius:10px; background:var(--paper-card); color:var(--ink); font-family:'Noto Sans KR'; font-weight:500; display:none;">
+        <label>태어난 곳 (진태양시 보정)</label>
+        <button type="button" class="picker-btn" id="cityBtn">
+          <span class="val" id="cityBtnVal">서울</span>
+          <span class="ic">📍</span>
+        </button>
       </div>
+      <!-- 실제 계산에 쓰이는 값 저장용(화면에는 노출 안 함) — 위 지역 검색 시트가 값을 채워 넣고, 기존 계산 로직은 그대로 이 값을 읽음 -->
+      <div hidden><select id="inpCity"></select></div>
       <button class="submit-btn" id="submitBtn">내 사주 풀어보기</button>
       <p class="disclaimer">
         태어난 곳의 경도로 <b>진태양시</b>를 보정하고, 대한민국의 <b>표준시 변경 이력(1954~1961 UTC+8:30)</b>과
@@ -881,6 +915,14 @@
         <button type="button" class="sheet-confirm" id="timeConfirmBtn">완료</button>
       </div>
     </div>
+    <div class="sheet-bg" id="citySheetBg">
+      <div class="sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-title">태어난 곳을 찾아보세요</div>
+        <input type="text" id="citySearchInput" class="city-search-input" placeholder="지역 이름으로 검색 (예: 대구)">
+        <div class="city-list" id="cityList"></div>
+      </div>
+    </div>
     <!-- RESULT VIEW -->
     <section id="view-result" hidden>
       <div class="summary" id="summaryBox"></div>
@@ -933,6 +975,11 @@
         <h2 class="section-title">종합풀이 <span class="en">CROSS-CHECK</span></h2>
         <p class="section-desc">사주팔자와 자미두수, 두 체계를 나란히 놓고 공통점과 차이점을 짚어봅니다.</p>
         <div class="ziwei-summary" id="crossBox"></div>
+        <div class="ai-cta-card">
+          <div class="ai-cta-title">사주팔자·오행·십성·대운·자미두수, 여기까지 살펴보셨어요</div>
+          <div class="ai-cta-desc">이 모든 정보를 하나의 이야기로 엮은 AI 해석으로 완성해보세요.</div>
+          <button type="button" class="submit-btn" id="crossAiCtaBtn">AI로 더 자세히 풀어보기</button>
+        </div>
       </div>
       <div class="panel" data-panel="today">
         <div class="today-dark">
@@ -1150,7 +1197,7 @@
     <button data-group="ziwei"><span class="ico">紫</span><span class="lb">자미</span></button>
     <button data-group="cross"><span class="ico">合</span><span class="lb">종합</span></button>
     <button data-group="today"><span class="ico">☀</span><span class="lb">오늘</span></button>
-    <button data-group="ai"><span class="ico">AI</span><span class="lb">해석</span></button>
+    <button data-group="ai"><span class="ico">AI</span><span class="lb">해석</span><span class="tab-badge-dot" id="aiTabBadge" hidden></span></button>
   </nav>
 </div>
 <div id="payModal" class="modal-overlay" hidden>
@@ -1395,14 +1442,44 @@ function gongmangZhi(combinedIdx){
   return [mod(xunStartZhi+10,12), mod(xunStartZhi+11,12)];
 }
 // ---- 도시별 경도 테이블 (진태양시 보정용) ----
+// 사용자가 원본 경도 숫자를 몰라도 되도록, 지역 이름만 찾아서 고르면 되게 폭넓게 구성.
+// 목록에 없는 지역은 맨 끝의 "목록에 없어요" 항목으로 전국 평균(서울 기준)을 그대로 사용한다.
 const CITY_TABLE = [
+  // 수도권
   {name:"서울", lon:126.98},{name:"인천", lon:126.70},{name:"수원", lon:127.01},
-  {name:"춘천", lon:127.73},{name:"청주", lon:127.49},{name:"대전", lon:127.38},
-  {name:"세종", lon:127.29},{name:"전주", lon:127.15},{name:"광주", lon:126.85},
-  {name:"목포", lon:126.39},{name:"대구", lon:128.60},{name:"부산", lon:129.08},
-  {name:"울산", lon:129.31},{name:"포항", lon:129.37},{name:"창원", lon:128.68},
-  {name:"진주", lon:128.11},{name:"강릉", lon:128.90},{name:"제주", lon:126.53},
-  {name:"평양", lon:125.75},{name:"직접 입력(경도)", lon:null}
+  {name:"성남", lon:127.14},{name:"고양", lon:126.83},{name:"용인", lon:127.18},
+  {name:"부천", lon:126.78},{name:"안산", lon:126.83},{name:"안양", lon:126.95},
+  {name:"남양주", lon:127.22},{name:"화성", lon:126.83},{name:"평택", lon:127.11},
+  {name:"의정부", lon:127.03},{name:"시흥", lon:126.80},{name:"파주", lon:126.78},
+  {name:"김포", lon:126.72},{name:"광명", lon:126.87},{name:"군포", lon:126.94},
+  {name:"이천", lon:127.44},{name:"양주", lon:127.05},{name:"구리", lon:127.14},
+  {name:"안성", lon:127.28},{name:"하남", lon:127.21},{name:"오산", lon:127.08},
+  // 강원
+  {name:"춘천", lon:127.73},{name:"원주", lon:127.95},{name:"강릉", lon:128.90},
+  {name:"속초", lon:128.59},{name:"동해", lon:129.11},{name:"삼척", lon:129.17},
+  {name:"태백", lon:128.99},
+  // 충청
+  {name:"청주", lon:127.49},{name:"충주", lon:127.93},{name:"제천", lon:128.19},
+  {name:"대전", lon:127.38},{name:"세종", lon:127.29},{name:"천안", lon:127.15},
+  {name:"아산", lon:127.00},{name:"서산", lon:126.45},{name:"논산", lon:127.10},
+  {name:"공주", lon:127.12},{name:"보령", lon:126.61},{name:"당진", lon:126.63},
+  // 전라
+  {name:"전주", lon:127.15},{name:"군산", lon:126.71},{name:"익산", lon:126.96},
+  {name:"정읍", lon:126.86},{name:"남원", lon:127.39},{name:"김제", lon:126.88},
+  {name:"광주", lon:126.85},{name:"목포", lon:126.39},{name:"여수", lon:127.66},
+  {name:"순천", lon:127.49},{name:"광양", lon:127.70},{name:"나주", lon:126.71},
+  // 경상
+  {name:"대구", lon:128.60},{name:"포항", lon:129.37},{name:"경주", lon:129.21},
+  {name:"구미", lon:128.34},{name:"안동", lon:128.73},{name:"경산", lon:128.74},
+  {name:"영주", lon:128.62},{name:"상주", lon:128.16},{name:"김천", lon:128.11},
+  {name:"부산", lon:129.08},{name:"울산", lon:129.31},{name:"창원", lon:128.68},
+  {name:"진주", lon:128.11},{name:"김해", lon:128.88},{name:"양산", lon:129.03},
+  {name:"거제", lon:128.62},{name:"통영", lon:128.42},{name:"사천", lon:128.08},
+  {name:"밀양", lon:128.75},
+  // 제주 · 북한
+  {name:"제주", lon:126.53},{name:"서귀포", lon:126.56},{name:"평양", lon:125.75},
+  // 목록에 없는 경우
+  {name:"목록에 없어요 (전국 평균 기준)", lon:127.5}
 ];
 function calcSaju({year,month,day,hour,minute,unknownTime,gender,longitude}){
   const lon = (longitude===null || longitude===undefined) ? 127.5 : longitude;
@@ -2628,18 +2705,46 @@ $('#inpUnknown').addEventListener('change', (e)=>{
   $('#inpTime').disabled = e.target.checked;
   $('#inpTime').style.opacity = e.target.checked ? 0.4 : 1;
 });
-// 출생지 도시 선택 채우기
+// 출생지 도시 선택 채우기(백업 select, 화면에는 노출 안 함 — 실제 UI는 아래 지역 검색 시트)
 const citySelect = $('#inpCity');
 CITY_TABLE.forEach(c=>{
   const opt = document.createElement('option');
-  opt.value = c.lon===null ? "manual" : c.lon;
+  opt.value = c.lon;
   opt.textContent = c.name;
   citySelect.appendChild(opt);
 });
 citySelect.value = "126.98"; // 기본값: 서울
-citySelect.addEventListener('change', ()=>{
-  const isManual = citySelect.value === "manual";
-  $('#inpLon').style.display = isManual ? "block" : "none";
+// ---- 태어난 곳 검색 바텀시트 (경도 숫자를 몰라도 지역 이름만 검색해서 고르면 되도록) ----
+function renderCityList(query){
+  const listEl = $('#cityList');
+  const q = (query||'').trim();
+  const items = q ? CITY_TABLE.filter(c=>c.name.includes(q)) : CITY_TABLE;
+  if(!items.length){
+    listEl.innerHTML = `<div class="city-empty">검색 결과가 없어요. 가장 가까운 지역이나 "목록에 없어요"를 골라주세요.</div>`;
+    return;
+  }
+  listEl.innerHTML = items.map(c=>{
+    const isSel = String(c.lon) === citySelect.value;
+    return `<button type="button" class="city-item${isSel?' sel':''}" data-lon="${c.lon}" data-name="${escapeHtml(c.name)}">${escapeHtml(c.name)}</button>`;
+  }).join('');
+}
+function openCitySheet(){
+  $('#citySearchInput').value = '';
+  renderCityList('');
+  $('#citySheetBg').classList.add('open');
+}
+function closeCitySheet(){ $('#citySheetBg').classList.remove('open'); }
+$('#cityBtn').addEventListener('click', openCitySheet);
+$('#citySearchInput').addEventListener('input', (e)=> renderCityList(e.target.value));
+$('#cityList').addEventListener('click', (e)=>{
+  const btn = e.target.closest('.city-item');
+  if(!btn) return;
+  citySelect.value = btn.dataset.lon;
+  $('#cityBtnVal').textContent = btn.dataset.name;
+  closeCitySheet();
+});
+$('#citySheetBg').addEventListener('click', (e)=>{
+  if(e.target.id === 'citySheetBg') closeCitySheet();
 });
 /* ---------- 음력 생년월일 입력 UI ---------- */
 // 주어진 음력 연/월/윤달여부에 해당하는 달의 실제 일수를 안전하게 산출.
@@ -2953,13 +3058,8 @@ $('#submitBtn').addEventListener('click', ()=>{
     const timeVal = $('#inpTime').value || "12:00";
     [hour,minute] = timeVal.split(':').map(Number);
   }
-  let longitude = 127.5;
-  if(citySelect.value === "manual"){
-    const lonVal = parseFloat($('#inpLon').value);
-    longitude = isNaN(lonVal) ? 127.5 : lonVal;
-  } else {
-    longitude = parseFloat(citySelect.value);
-  }
+  const lonVal = parseFloat(citySelect.value);
+  const longitude = isNaN(lonVal) ? 127.5 : lonVal;
   playRevealSequence(()=>{
     const result = calcSaju({year:y, month:m, day:d, hour, minute, unknownTime, gender:selectedGender, longitude});
     render(result);
@@ -2983,6 +3083,7 @@ $('#submitBtn').addEventListener('click', ()=>{
     $('#tabbar').hidden = false;
     $('#backBtn').hidden = false;
     activateGroup('palja_group');
+    $('#aiTabBadge').hidden = false;
     window.scrollTo(0,0);
   });
 });
@@ -3027,9 +3128,16 @@ function activateGroup(groupKey){
   const targetPanel = lastSubPanel[groupKey] || group.panels[0].id;
   activatePanel(targetPanel);
   renderSubtabBar(groupKey);
+  // 사용자가 AI 해석 탭을 한 번이라도 열어봤다면, 결제 유도용 강조 배지는 더 이상 보여줄 필요가 없음
+  if(groupKey === 'ai'){ $('#aiTabBadge').hidden = true; }
 }
 $$('#tabbar button').forEach(btn=>{
   btn.addEventListener('click', ()=> activateGroup(btn.dataset.group));
+});
+// 종합 탭 끝의 CTA 카드 → AI 해석 탭으로 바로 이동
+$('#crossAiCtaBtn').addEventListener('click', ()=>{
+  activateGroup('ai');
+  window.scrollTo(0,0);
 });
 $('#subtabBar').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-sub]');
