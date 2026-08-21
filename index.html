@@ -646,10 +646,90 @@
     margin-top:22px; width:100%; padding:15px; border-radius:14px; border:none;
     background:linear-gradient(90deg,var(--violet),var(--pink)); color:#fff; font-weight:700; font-size:14.5px; cursor:pointer;
   }
+  /* ---------- 첫인상 임팩트: 히어로 카피 / 살아있는 배경 / 일간 즉시 미리보기 / 결과 리빌 연출 ---------- */
+  @keyframes twinkle{ 0%,100%{opacity:.35;} 50%{opacity:.7;} }
+  .phone::before{ animation:twinkle 5.5s ease-in-out infinite; }
+  .phone::after{
+    content:"";
+    position:absolute; inset:0; opacity:.4;
+    background-image:
+      radial-gradient(1px 1px at 60px 120px, #f4c463, transparent),
+      radial-gradient(1.5px 1.5px at 170px 260px, #fff, transparent),
+      radial-gradient(1px 1px at 250px 100px, #f472b6, transparent),
+      radial-gradient(1.5px 1.5px at 340px 300px, #fff, transparent),
+      radial-gradient(1px 1px at 110px 340px, #a78bfa, transparent),
+      radial-gradient(1.5px 1.5px at 20px 260px, #fff, transparent);
+    background-repeat:repeat; background-size:400px 400px;
+    pointer-events:none; z-index:0;
+    animation:twinkle 7s ease-in-out infinite 2s;
+  }
+  .hero-tagline{
+    font-family:"Noto Serif KR"; font-weight:900; font-size:22px; line-height:1.45;
+    margin:6px 0 14px; letter-spacing:-0.3px;
+    background:linear-gradient(90deg,var(--gold),var(--pink) 55%,var(--violet));
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+  }
+  /* 생년월일을 고르는 순간 바로 보여주는 일간 미리보기 */
+  .dm-preview{
+    display:flex; align-items:center; gap:10px; margin:-6px 0 16px; padding:12px 14px;
+    background:var(--paper-card); border:1px solid var(--line); border-radius:var(--radius-sm);
+    animation:dmPreviewIn .4s cubic-bezier(.34,1.56,.64,1);
+  }
+  .dm-preview-badge{
+    width:36px; height:36px; border-radius:10px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    font-family:"Noto Serif KR"; font-weight:900; font-size:16px; color:#fff;
+  }
+  .dm-preview-label{font-size:10.5px; color:var(--ink-faint); font-weight:700;}
+  .dm-preview-value{font-size:12.5px; color:var(--ink); font-weight:700; margin-top:1px;}
+  @keyframes dmPreviewIn{ 0%{opacity:0; transform:translateY(-4px);} 100%{opacity:1; transform:none;} }
+  /* 제출 직후 사주가 도장처럼 찍히며 드러나는 리빌 연출 오버레이 */
+  .reveal-overlay{
+    position:absolute; inset:0; z-index:200;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px;
+    background:radial-gradient(600px 400px at 50% 40%, #241c44, #0a0a14 78%);
+    opacity:0; pointer-events:none; transition:opacity .35s ease;
+  }
+  .reveal-overlay.show{opacity:1; pointer-events:auto;}
+  .reveal-orb{position:relative; width:88px; height:88px; display:flex; align-items:center; justify-content:center;}
+  .reveal-ring{
+    position:absolute; inset:0; border-radius:50%;
+    border:2px solid rgba(255,255,255,.08);
+    border-top-color:var(--gold); border-right-color:var(--pink);
+    animation:revealSpin 2.1s linear infinite;
+  }
+  @keyframes revealSpin{ to{transform:rotate(360deg);} }
+  .reveal-seal{
+    width:60px; height:60px; border-radius:50%;
+    background:linear-gradient(135deg,var(--violet),var(--pink));
+    display:flex; align-items:center; justify-content:center;
+    font-family:"Noto Serif KR"; font-weight:900; font-size:24px; color:#fff;
+    box-shadow:0 0 30px rgba(167,139,250,.5);
+    animation:revealPulse 1.6s ease-in-out infinite;
+  }
+  @keyframes revealPulse{ 0%,100%{transform:scale(1);} 50%{transform:scale(1.08);} }
+  .reveal-msg{font-family:"Noto Serif KR"; font-weight:700; font-size:14px; color:var(--ink-soft); display:flex; align-items:center;}
+  .reveal-dots{display:inline-flex; gap:3px; margin-left:6px;}
+  .reveal-dots i{width:4px; height:4px; border-radius:50%; background:var(--ink-soft); display:inline-block; animation:revealDot 1.2s ease-in-out infinite;}
+  .reveal-dots i:nth-child(2){animation-delay:.15s;}
+  .reveal-dots i:nth-child(3){animation-delay:.3s;}
+  @keyframes revealDot{ 0%,80%,100%{opacity:.25; transform:translateY(0);} 40%{opacity:1; transform:translateY(-3px);} }
+  /* 사주팔자 여덟 글자가 순서대로 등장 + 일간 배지가 강조되며 등장 */
+  @keyframes pillarPop{ 0%{opacity:0; transform:translateY(10px) scale(.85);} 100%{opacity:1; transform:none;} }
+  .pillar-col.reveal-pop{ animation:pillarPop .5s cubic-bezier(.34,1.56,.64,1) backwards; }
+  @keyframes dmPop{ 0%{opacity:0; transform:scale(.7);} 60%{opacity:1; transform:scale(1.06);} 100%{transform:scale(1);} }
+  .dm-row.reveal-pop{ animation:dmPop .6s cubic-bezier(.34,1.56,.64,1) backwards; }
 </style>
 </head>
 <body>
 <div class="phone">
+  <div class="reveal-overlay" id="revealOverlay" hidden>
+    <div class="reveal-orb">
+      <div class="reveal-ring"></div>
+      <div class="reveal-seal">印</div>
+    </div>
+    <div class="reveal-msg" id="revealMsg">사주를 읽는 중<span class="reveal-dots"><i></i><i></i><i></i></span></div>
+  </div>
   <header class="topbar">
     <div class="mark">四柱</div>
     <div>
@@ -662,6 +742,7 @@
   <main>
     <!-- INPUT VIEW -->
     <section id="view-input">
+      <p class="hero-tagline">당신이 모르는<br>당신의 이야기가 시작됩니다</p>
       <p class="hero-line">태어난 순간, 하늘은 <b>년·월·일·시</b> 네 개의 도장을 찍습니다.<br>그 도장을 함께 읽어볼까요?</p>
       <div class="field">
         <label for="inpName">이름 (선택)</label>
@@ -673,6 +754,13 @@
           <span class="val" id="dateBtnVal">1995년 8월 20일 (양력)</span>
           <span class="ic">📅</span>
         </button>
+      </div>
+      <div class="dm-preview" id="dmPreview" hidden>
+        <div class="dm-preview-badge" id="dmPreviewBadge"></div>
+        <div>
+          <div class="dm-preview-label">이 날 태어난 사람의 일간(日干)</div>
+          <div class="dm-preview-value" id="dmPreviewValue"></div>
+        </div>
       </div>
       <div class="field">
         <label for="timeBtn">태어난 시간</label>
@@ -2183,7 +2271,7 @@ function render(result){
     <div class="name">${nameSafe? nameSafe+"님" : "나의 사주"}</div>
     <div class="meta">${dateStr} · ${timeStr} · ${input.gender}자 &nbsp;/&nbsp; 사주상 ${result.sajuYear}년생</div>
     <div class="meta" style="margin-top:4px; font-size:10.5px;">진태양시 보정: 경도 ${input.longitude.toFixed(2)}° · 균시차 ${result.solarInfo.eotMinutes>=0?'+':''}${result.solarInfo.eotMinutes.toFixed(1)}분 · ${stdLabel}${dstLabel}</div>
-    <div class="dm-row">
+    <div class="dm-row reveal-pop" style="animation-delay:620ms">
       <div class="dm-badge" style="background:var(${ELEMENT_VARCOLOR[dmEl]})">${GAN_HANJA[dmG]}</div>
       <div class="dm-text">
         <div class="t1">일간(日干) · 나를 상징하는 글자</div>
@@ -2199,8 +2287,8 @@ function render(result){
     {label:"시주", g: pillars.hour? pillars.hour.g:null, z: pillars.hour? pillars.hour.z:null}
   ];
   let gridHtml = "";
-  cols.forEach(c=>{
-    gridHtml += `<div class="pillar-col"><div class="pillar-colhead">${c.label}</div>`;
+  cols.forEach((c,colIdx)=>{
+    gridHtml += `<div class="pillar-col reveal-pop" style="animation-delay:${colIdx*120}ms"><div class="pillar-colhead">${c.label}</div>`;
     if(c.g===null){
       gridHtml += `<div class="seal" style="background:var(--paper-deep); border-color:var(--line); color:var(--ink-faint);"><div class="hanja" style="font-size:13px;">시간</div><div class="hangul">미상</div></div>`;
       gridHtml += `<div class="seal" style="background:var(--paper-deep); border-color:var(--line); color:var(--ink-faint);"><div class="hanja" style="font-size:13px;">-</div><div class="hangul">-</div></div>`;
@@ -2631,6 +2719,34 @@ const mainLunarInput = setupLunarDateInput({
   dateId: 'inpDate', yearId: 'inpLunarYear', monthId: 'inpLunarMonth', dayId: 'inpLunarDay', leapId: 'inpLunarLeap',
   defaultYear: 1995, defaultMonth: 7, defaultDay: 24,
 });
+// 생년월일을 고르는 즉시(양력/음력 무관) 일간 한 글자를 미리 보여주는 훅.
+// 진태양시·표준시 보정은 생략하고 정오 기준으로만 계산하는 약식값이지만, 일간은
+// 날짜만으로 정해지는 값이라 이 정도 근사로도 실제 제출 결과와 거의 항상 일치한다.
+function updateDayStemPreview(){
+  let y, m, d;
+  try{
+    if(mainLunarInput.getCalType() === 'lunar'){
+      const solar = mainLunarInput.resolveSolarDate();
+      y = solar.year; m = solar.month; d = solar.day;
+    } else {
+      const dateVal = $('#inpDate').value;
+      if(!dateVal) return;
+      [y,m,d] = dateVal.split('-').map(Number);
+    }
+  } catch(err){ return; }
+  const jd = toJD(toWall(y,m,d,12,0));
+  const dp = dayPillarIdxFromJD(jd);
+  const el = GAN_ELEMENT[dp.g];
+  $('#dmPreviewBadge').style.background = `var(${ELEMENT_VARCOLOR[el]})`;
+  $('#dmPreviewBadge').textContent = GAN_HANJA[dp.g];
+  $('#dmPreviewValue').textContent = `${GAN[dp.g]}(${ELEMENT_NAME[el]}) — ${ELEMENT_DESC[el]}`;
+  const box = $('#dmPreview');
+  box.hidden = false;
+  box.style.animation = 'none';
+  void box.offsetWidth; // reflow로 애니메이션 강제 재시작
+  box.style.animation = '';
+}
+updateDayStemPreview();
 /* =========================================================
    생년월일/시간 휠 스크롤 피커 (시안0_v2 확정안 포트)
    — 여기서 고른 값은 위 setupLunarDateInput()이 읽는 숨김 백업 요소
@@ -2782,6 +2898,7 @@ function confirmDatePicker(){
     $('#dateBtnVal').textContent = `${pk.year}년 ${pk.month}월 ${pk.day}일 (양력)`;
   }
   closeSheet('date');
+  updateDayStemPreview();
 }
 function confirmTimePicker(){
   const manualActive = $('#time-manual').classList.contains('active');
@@ -2795,6 +2912,21 @@ function confirmTimePicker(){
 }
 $('#dateConfirmBtn').addEventListener('click', confirmDatePicker);
 $('#timeConfirmBtn').addEventListener('click', confirmTimePicker);
+// 제출 직후 계산 결과를 곧바로 보여주지 않고, 사주 여덟 글자가 도장처럼 하나씩
+// 찍히는 리빌 연출을 짧게 보여준 다음 실제 렌더링(onComplete)을 실행한다.
+function playRevealSequence(onComplete){
+  const overlay = $('#revealOverlay');
+  const nameVal = ($('#inpName').value||"").trim();
+  $('#revealMsg').innerHTML = (nameVal ? `${escapeHtml(nameVal)}님의 사주를 읽는 중` : `사주를 읽는 중`) +
+    `<span class="reveal-dots"><i></i><i></i><i></i></span>`;
+  overlay.hidden = false;
+  requestAnimationFrame(()=>{ requestAnimationFrame(()=> overlay.classList.add('show')); });
+  setTimeout(()=>{
+    onComplete();
+    overlay.classList.remove('show');
+    setTimeout(()=>{ overlay.hidden = true; }, 350);
+  }, 1300);
+}
 $('#inpUnknown').addEventListener('change', (e)=>{
   $('#timeBtn').classList.toggle('disabled', e.target.checked);
   if(e.target.checked){ $('#timeBtnVal').textContent = '시간 모름'; }
@@ -2828,29 +2960,31 @@ $('#submitBtn').addEventListener('click', ()=>{
   } else {
     longitude = parseFloat(citySelect.value);
   }
-  const result = calcSaju({year:y, month:m, day:d, hour, minute, unknownTime, gender:selectedGender, longitude});
-  render(result);
-  const ziweiResult = calcZiwei({year:y, month:m, day:d, hour, minute, unknownTime, gender:selectedGender, trueHourFloat: result.trueHourFloat, sajuYear: result.sajuYear});
-  if(ziweiResult){
-    const today = new Date();
-    const birthLocal = new Date(y, m-1, d);
-    let curAge = today.getFullYear() - birthLocal.getFullYear();
-    const hadBirthday = (today.getMonth()>birthLocal.getMonth()) || (today.getMonth()===birthLocal.getMonth() && today.getDate()>=birthLocal.getDate());
-    if(!hadBirthday) curAge -= 1;
-    renderZiwei(ziweiResult, curAge);
-    renderCross(result, ziweiResult);
-  }
-  lastSajuResult = result;
-  lastZiweiResult = ziweiResult;
-  lastName = ($('#inpName').value||"").trim();
-  renderTodayPanel(result, y, m, d);
-  resetAiPanel();
-  $('#view-input').hidden = true;
-  $('#view-result').hidden = false;
-  $('#tabbar').hidden = false;
-  $('#backBtn').hidden = false;
-  activateGroup('palja_group');
-  window.scrollTo(0,0);
+  playRevealSequence(()=>{
+    const result = calcSaju({year:y, month:m, day:d, hour, minute, unknownTime, gender:selectedGender, longitude});
+    render(result);
+    const ziweiResult = calcZiwei({year:y, month:m, day:d, hour, minute, unknownTime, gender:selectedGender, trueHourFloat: result.trueHourFloat, sajuYear: result.sajuYear});
+    if(ziweiResult){
+      const today = new Date();
+      const birthLocal = new Date(y, m-1, d);
+      let curAge = today.getFullYear() - birthLocal.getFullYear();
+      const hadBirthday = (today.getMonth()>birthLocal.getMonth()) || (today.getMonth()===birthLocal.getMonth() && today.getDate()>=birthLocal.getDate());
+      if(!hadBirthday) curAge -= 1;
+      renderZiwei(ziweiResult, curAge);
+      renderCross(result, ziweiResult);
+    }
+    lastSajuResult = result;
+    lastZiweiResult = ziweiResult;
+    lastName = ($('#inpName').value||"").trim();
+    renderTodayPanel(result, y, m, d);
+    resetAiPanel();
+    $('#view-input').hidden = true;
+    $('#view-result').hidden = false;
+    $('#tabbar').hidden = false;
+    $('#backBtn').hidden = false;
+    activateGroup('palja_group');
+    window.scrollTo(0,0);
+  });
 });
 $('#backBtn').addEventListener('click', ()=>{
   $('#view-result').hidden = true;
