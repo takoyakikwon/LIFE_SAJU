@@ -321,7 +321,15 @@ const CONTINUATION_PROMPT = `방금 작성한 리포트가 목표 분량에 못 
 - 새로운 소제목을 만들지 말고, 소제목 형식("[짧은 주제어] — [문장]") 없이 본문 문단만 이어서 작성하세요.
 - "이어서 말씀드리면", "추가로" 같은 메타 표현 없이 바로 본문 내용으로 시작하고, 마크다운 문법은 쓰지 마세요.`;
 
-async function callOpenAI(apiKey, messages, maxTokens, model) {
+function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+// 트래픽이 몰릴 때 OpenAI가 일시적으로 429(요청 과다)나 5xx(서버 오류)를 반환하는 경우가 있다.
+// 이런 경우는 보통 몇 초 뒤 재시도하면 성공하므로, 최대 3번까지 지수 백오프(1초→2초)로
+// 재시도한다. 400/401처럼 재시도해도 똑같이 실패할 요청 오류는 재시도하지 않고 바로 반환한다.
+const OPENAI_RETRY_MAX_ATTEMPTS = 3;
+const OPENAI_RETRY_BASE_DELAY_MS = 1000;
+
+async function callOpenAIOnce(apiKey, messages, maxTokens, model) {
   const openaiRes = await fetch(OPENAI_API_URL, {
     method: 'POST',
     headers: {
@@ -338,6 +346,35 @@ async function callOpenAI(apiKey, messages, maxTokens, model) {
   const data = await openaiRes.json();
   const text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '').trim();
   return { ok: true, text };
+}
+
+// 재시도할 가치가 있는 오류인지 판단: 429(rate limit)나 5xx(서버 쪽 일시적 오류), 그리고
+// status 0(=fetch 자체가 실패한 네트워크 순단)만 재시도. 4xx(400/401/403 등 요청 자체의
+// 문제)는 다시 시도해도 똑같이 실패하므로 재시도하지 않는다.
+function isRetryableStatus(status) {
+  return status === 0 || status === 429 || (status >= 500 && status < 600);
+}
+
+async function callOpenAI(apiKey, messages, maxTokens, model) {
+  let lastResult = null;
+  for (let attempt = 1; attempt <= OPENAI_RETRY_MAX_ATTEMPTS; attempt++) {
+    let result;
+    try {
+      result = await callOpenAIOnce(apiKey, messages, maxTokens, model);
+    } catch (networkErr) {
+      // fetch 자체가 실패한 경우(네트워크 순단 등)도 재시도 대상으로 취급
+      console.error(`OpenAI 호출 네트워크 오류 (시도 ${attempt}/${OPENAI_RETRY_MAX_ATTEMPTS}):`, networkErr);
+      result = { ok: false, status: 0 };
+    }
+    if (result.ok) return result;
+    lastResult = result;
+    const isLastAttempt = attempt === OPENAI_RETRY_MAX_ATTEMPTS;
+    if (isLastAttempt || !isRetryableStatus(result.status)) break;
+    const delay = OPENAI_RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1); // 1초 → 2초
+    console.warn(`OpenAI ${result.status} 응답 — ${delay}ms 후 재시도 (${attempt}/${OPENAI_RETRY_MAX_ATTEMPTS})`);
+    await sleep(delay);
+  }
+  return lastResult;
 }
 
 module.exports = async (req, res) => {
