@@ -9,36 +9,40 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700;900&family=Noto+Sans+KR:wght@400;500;700;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --paper:#F2ECDC;
-    --paper-deep:#E7DEC5;
-    --paper-card:#FBF7EC;
-    --ink:#211C16;
-    --ink-soft:#6B6252;
-    --ink-faint:#A79C86;
-    --wood:#2F5E48;
-    --wood-soft:#E4EBE0;
-    --fire:#AC3B2A;
-    --fire-soft:#F3E1DA;
-    --earth:#B9862A;
-    --earth-soft:#F3E7D2;
-    --metal:#75705F;
-    --metal-soft:#E9E5D7;
-    --water:#28374F;
-    --water-soft:#DCE1E9;
-    --seal:#A32B1F;
-    --line:#D9CDAE;
-    --gold-line:#B08D3E;
+    --paper:#14142a;
+    --paper-deep:#1c1a3a;
+    --paper-card:rgba(255,255,255,.055);
+    --ink:#f1eefc;
+    --ink-soft:#9c98c4;
+    --ink-faint:#6b6790;
+    --wood:#34d399;
+    --wood-soft:rgba(52,211,153,.14);
+    --fire:#fb7185;
+    --fire-soft:rgba(251,113,133,.16);
+    --earth:#f4c463;
+    --earth-soft:rgba(244,196,99,.14);
+    --metal:#b8b4d9;
+    --metal-soft:rgba(184,180,217,.12);
+    --water:#7dd3fc;
+    --water-soft:rgba(125,211,252,.14);
+    --seal:#a78bfa;
+    --line:rgba(255,255,255,.13);
+    --gold-line:#f4c463;
+    --violet:#a78bfa;
+    --pink:#f472b6;
+    --gold:#f4c463;
+    --card-b:rgba(255,255,255,.12);
     --radius-lg:28px;
     --radius-md:18px;
     --radius-sm:10px;
-    --shadow-soft: 0 10px 30px rgba(33,28,22,0.10);
+    --shadow-soft: 0 10px 30px rgba(0,0,0,0.35);
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{margin:0;padding:0;}
   body{
     background:
-      radial-gradient(circle at 20% 0%, #2b2620 0%, #171410 55%),
-      #171410;
+      radial-gradient(circle at 20% 0%, #201c38 0%, #0a0a14 55%),
+      #0a0a14;
     min-height:100vh;
     font-family:"Noto Sans KR", sans-serif;
     color:var(--ink);
@@ -51,19 +55,31 @@
     width:100%;
     max-width:430px;
     min-height:calc(100vh - 56px);
-    background:var(--paper);
+    background:
+      radial-gradient(900px 500px at 20% -10%, #29215a66, transparent 60%),
+      radial-gradient(800px 500px at 100% 20%, #4a1f5a66, transparent 60%),
+      linear-gradient(180deg, #0e0e1e, var(--paper));
     border-radius:34px;
-    box-shadow: 0 30px 70px rgba(0,0,0,0.55), 0 0 0 1px rgba(0,0,0,0.35);
+    box-shadow: 0 30px 70px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.06);
     overflow:hidden;
     position:relative;
     display:flex;
     flex-direction:column;
   }
   .phone::before{
-    /* subtle hanji paper grain */
+    /* starfield */
     content:"";
-    position:absolute; inset:0;
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+    position:absolute; inset:0; opacity:.55;
+    background-image:
+      radial-gradient(1.5px 1.5px at 20px 30px, #fff, transparent),
+      radial-gradient(1.5px 1.5px at 130px 90px, #fff, transparent),
+      radial-gradient(1px 1px at 210px 40px, #fff, transparent),
+      radial-gradient(1.5px 1.5px at 300px 150px, #fff, transparent),
+      radial-gradient(1px 1px at 80px 200px, #fff, transparent),
+      radial-gradient(1.5px 1.5px at 360px 60px, #fff, transparent),
+      radial-gradient(1px 1px at 40px 340px, #fff, transparent),
+      radial-gradient(1.5px 1.5px at 260px 380px, #fff, transparent);
+    background-repeat:repeat; background-size:400px 400px;
     pointer-events:none;
     z-index:0;
   }
@@ -79,12 +95,13 @@
   }
   .topbar .mark{
     width:38px; height:38px; border-radius:9px;
-    background:var(--ink);
-    color:var(--paper);
+    background:linear-gradient(135deg,var(--violet),var(--pink));
+    color:#fff;
     display:flex; align-items:center; justify-content:center;
     font-family:"Noto Serif KR"; font-weight:900; font-size:17px;
     letter-spacing:-1px;
     flex-shrink:0;
+    box-shadow:0 4px 14px rgba(167,139,250,.4);
   }
   .topbar h1{
     font-family:"Noto Serif KR"; font-weight:900; font-size:19px; margin:0;
@@ -149,10 +166,10 @@
   .checkline input{accent-color:var(--seal); width:15px; height:15px;}
   .submit-btn{
     width:100%; margin-top:10px; padding:16px 0;
-    background:var(--seal); color:#F6ECE4; border:none; border-radius:100px;
+    background:linear-gradient(90deg,var(--violet),var(--pink)); color:#fff; border:none; border-radius:100px;
     font-family:"Noto Serif KR"; font-weight:900; font-size:16px;
     letter-spacing:0.5px; cursor:pointer;
-    box-shadow:0 10px 22px rgba(163,43,31,0.32);
+    box-shadow:0 10px 26px rgba(167,139,250,.38);
   }
   .submit-btn:active{transform:translateY(1px);}
   .disclaimer{
@@ -456,12 +473,13 @@
     border-radius:var(--radius-sm); padding:12px 14px; line-height:1.6;
   }
   .modal-overlay{
-    position:fixed; inset:0; background:rgba(20,16,10,0.55);
+    position:fixed; inset:0; background:rgba(6,6,14,0.65);
     display:flex; align-items:center; justify-content:center; z-index:50; padding:20px;
   }
   .modal-card{
-    background:var(--paper); border-radius:var(--radius-md); padding:24px 22px;
-    max-width:360px; width:100%; box-shadow:0 20px 50px rgba(0,0,0,0.4);
+    background:linear-gradient(160deg,#1c1a3a,#100f22); border:1px solid var(--line);
+    border-radius:var(--radius-md); padding:24px 22px;
+    max-width:360px; width:100%; box-shadow:0 20px 50px rgba(0,0,0,0.55);
   }
   .modal-title{ font-family:"Noto Serif KR"; font-weight:900; font-size:16px; }
   .modal-desc{ font-size:12px; color:var(--ink-soft); line-height:1.6; margin:10px 0 14px; }
@@ -505,9 +523,9 @@
   .history-amt{ font-family:"Noto Serif KR"; font-weight:900; font-size:12.5px; color:var(--seal); flex-shrink:0; }
   .history-meta{ font-size:10.5px; color:var(--ink-faint); margin-top:5px; display:flex; gap:7px; align-items:center; flex-wrap:wrap; }
   .history-status{ padding:1px 7px; border-radius:20px; font-size:9.5px; font-weight:700; }
-  .history-status.paid{ background:#E7F2E4; color:#3C7A3C; }
-  .history-status.pending{ background:#F2ECD8; color:#8A7434; }
-  .history-status.failed, .history-status.refunded{ background:#F2E0DC; color:#A14B3A; }
+  .history-status.paid{ background:rgba(52,211,153,.16); color:#34d399; }
+  .history-status.pending{ background:rgba(244,196,99,.16); color:#f4c463; }
+  .history-status.failed, .history-status.refunded{ background:rgba(251,113,133,.16); color:#fb7185; }
   .history-result{ margin-top:9px; padding-top:9px; border-top:1px dashed var(--line); font-size:11.5px; line-height:1.7; white-space:pre-wrap; color:var(--ink-soft); }
   .history-empty{ text-align:center; padding:26px 10px; color:var(--ink-faint); font-size:12px; }
   .admin-summary{ display:flex; gap:8px; margin:2px 0 14px; }
@@ -518,8 +536,8 @@
   .admin-section-title:first-of-type{ margin-top:0; }
   /* CS 문의 폼 */
   .form-msg{ font-size:12px; line-height:1.6; padding:10px 12px; border-radius:var(--radius-sm); margin-bottom:14px; }
-  .form-msg.ok{ background:#E7F2E4; color:#3C7A3C; }
-  .form-msg.err{ background:#F2E0DC; color:#A14B3A; }
+  .form-msg.ok{ background:rgba(52,211,153,.14); color:#34d399; }
+  .form-msg.err{ background:rgba(251,113,133,.14); color:#fb7185; }
   .history-item-linkbtn{
     margin-top:9px; background:none; border:none; padding:0; color:var(--seal);
     font-size:11px; font-weight:700; cursor:pointer; font-family:"Noto Sans KR";
@@ -542,6 +560,89 @@
   .love-status-grid{flex-wrap:wrap;}
   .love-status-grid button{flex:1 1 calc(50% - 4px); font-size:12.5px; padding:12px 4px;}
   .partner-note{font-size:11px; color:var(--ink-faint); margin-top:-8px; margin-bottom:16px; line-height:1.6;}
+  /* 유리질감(glassmorphism) 보정 — 다크 미스틱 카드류 전반에 블러 적용 */
+  .summary, .ai-price-card, .modal-card, .cat-option, .history-item, .admin-summary .stat,
+  .ziwei-summary, .ziwei-palace, .ohaeng-note, .daeun-card, .seun-row, .seun-row.current,
+  .ai-result-text, .field input, .field select, .field textarea, .seg button, #tabbar,
+  .subtab-bar{
+    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+  }
+  /* ---------- 하단 탭 그룹 내부의 서브탭(사주팔자 4분류 / 운세흐름 2분류) ---------- */
+  .subtab-bar{
+    display:flex; gap:6px; margin:0 0 18px; padding:4px;
+    background:var(--paper-card); border:1px solid var(--line); border-radius:100px;
+  }
+  .subtab-bar button{
+    flex:1; padding:9px 0; border:none; border-radius:100px; background:none;
+    color:var(--ink-soft); font-family:"Noto Sans KR"; font-weight:700; font-size:12.5px;
+    cursor:pointer;
+  }
+  .subtab-bar button.active{
+    background:linear-gradient(90deg,var(--violet),var(--pink)); color:#fff;
+  }
+  /* ---------- 생년월일/시간 휠 스크롤 피커 (시안0_v2 확정안) ---------- */
+  .picker-btn{
+    width:100%; display:flex; align-items:center; justify-content:space-between; text-align:left;
+    padding:13px 14px; border-radius:var(--radius-sm); border:1.5px solid var(--line);
+    background:var(--paper-card); color:var(--ink); font-size:15px; font-family:"Noto Sans KR"; font-weight:500;
+    cursor:pointer;
+  }
+  .picker-btn .val{font-weight:700;}
+  .picker-btn .ic{color:var(--ink-soft); font-size:15px;}
+  .picker-btn.disabled{opacity:.4; pointer-events:none;}
+  .sheet-bg{
+    position:fixed; inset:0; background:rgba(5,5,12,.65); backdrop-filter:blur(3px);
+    z-index:60; display:none; align-items:flex-end; justify-content:center;
+  }
+  .sheet-bg.open{display:flex;}
+  .sheet{
+    width:100%; max-width:430px; background:var(--paper-deep); border:1px solid var(--line); border-bottom:none;
+    border-radius:24px 24px 0 0; padding:10px 20px calc(22px + env(safe-area-inset-bottom));
+    transform:translateY(100%); transition:transform .28s cubic-bezier(.32,.72,0,1);
+  }
+  .sheet-bg.open .sheet{transform:translateY(0);}
+  .sheet-handle{width:36px; height:4px; border-radius:100px; background:rgba(255,255,255,.18); margin:6px auto 16px;}
+  .sheet-title{font-family:"Noto Serif KR"; font-weight:700; font-size:16px; text-align:center; margin-bottom:16px; color:var(--ink);}
+  .picker-tabs{display:flex; background:rgba(255,255,255,.05); border:1px solid var(--line); border-radius:100px; padding:3px; margin-bottom:18px;}
+  .picker-tabs button{flex:1; border:none; background:none; color:var(--ink-soft); font-size:12.5px; font-weight:700; padding:9px; border-radius:100px; font-family:inherit; cursor:pointer;}
+  .picker-tabs button.active{background:linear-gradient(90deg,var(--violet),var(--pink)); color:#fff;}
+  .lunar-toggle-row{display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:16px;}
+  .leap-row{display:flex; align-items:center; justify-content:center; gap:8px; margin:-6px 0 16px;}
+  .leap-row input[type=checkbox]{width:14px; height:14px; accent-color:var(--gold);}
+  .leap-row label{font-size:11.5px; color:var(--ink-soft);}
+  .wheel-panel{display:none;}
+  .wheel-panel.active{display:block;}
+  .wheel-row{position:relative; display:flex; gap:6px; height:200px;}
+  .wheel-highlight{
+    position:absolute; left:0; right:0; top:80px; height:40px;
+    background:rgba(167,139,250,.12); border-top:1px solid rgba(244,196,99,.4); border-bottom:1px solid rgba(244,196,99,.4);
+    pointer-events:none; border-radius:8px;
+  }
+  .wheel-col{flex:1; height:200px; overflow-y:scroll; scroll-snap-type:y mandatory; scrollbar-width:none; position:relative;}
+  .wheel-col::-webkit-scrollbar{display:none;}
+  .wheel-col::before, .wheel-col::after{content:''; display:block; height:80px;}
+  .wheel-item{
+    height:40px; display:flex; align-items:center; justify-content:center; scroll-snap-align:center;
+    font-size:15px; color:var(--ink-faint); font-weight:500; font-variant-numeric:tabular-nums;
+  }
+  .wheel-item.sel{color:var(--ink); font-weight:800; font-size:17px;}
+  .wheel-fade-top, .wheel-fade-bot{position:absolute; left:0; right:0; height:60px; pointer-events:none; z-index:2;}
+  .wheel-fade-top{top:0; background:linear-gradient(180deg, var(--paper-deep), transparent);}
+  .wheel-fade-bot{bottom:0; background:linear-gradient(0deg, var(--paper-deep), transparent);}
+  .manual-panel{display:none;}
+  .manual-panel.active{display:block;}
+  .manual-row{display:flex; gap:8px;}
+  .manual-row .mfield{flex:1;}
+  .manual-row .mfield label{display:block; font-size:10.5px; color:var(--ink-faint); margin-bottom:6px; text-align:center;}
+  .manual-row input{
+    width:100%; padding:12px 8px; text-align:center; border-radius:10px; border:1.5px solid var(--line);
+    background:rgba(255,255,255,.04); color:var(--ink); font-size:15px; font-weight:700; font-family:inherit;
+  }
+  .manual-hint{font-size:10.5px; color:var(--ink-faint); text-align:center; margin-top:12px; line-height:1.6;}
+  .sheet-confirm{
+    margin-top:22px; width:100%; padding:15px; border-radius:14px; border:none;
+    background:linear-gradient(90deg,var(--violet),var(--pink)); color:#fff; font-weight:700; font-size:14.5px; cursor:pointer;
+  }
 </style>
 </head>
 <body>
@@ -565,33 +666,43 @@
       </div>
       <div class="field">
         <label>생년월일</label>
-        <div class="seg" id="inpCalSeg">
-          <button type="button" data-val="solar" class="active">양력</button>
-          <button type="button" data-val="lunar">음력</button>
-        </div>
-      </div>
-      <div class="field" id="inpDateSolarField">
-        <input type="date" id="inpDate" value="1995-08-20">
-      </div>
-      <div class="field" id="inpDateLunarField" hidden>
-        <div class="lunar-date-row">
-          <select id="inpLunarYear"></select>
-          <select id="inpLunarMonth"></select>
-          <select id="inpLunarDay"></select>
-        </div>
-        <div class="checkline">
-          <input type="checkbox" id="inpLunarLeap">
-          <label for="inpLunarLeap" style="margin:0;">윤달이에요</label>
-        </div>
-        <p class="partner-note" style="margin-top:8px; margin-bottom:0;">입력하신 음력 날짜는 계산할 때 자동으로 양력으로 변환돼요.</p>
+        <button type="button" class="picker-btn" id="dateBtn">
+          <span class="val" id="dateBtnVal">1995년 8월 20일 (양력)</span>
+          <span class="ic">📅</span>
+        </button>
       </div>
       <div class="field">
-        <label for="inpTime">태어난 시간</label>
-        <input type="time" id="inpTime" value="14:30">
+        <label for="timeBtn">태어난 시간</label>
+        <button type="button" class="picker-btn" id="timeBtn">
+          <span class="val" id="timeBtnVal">오후 2시 30분</span>
+          <span class="ic">🕐</span>
+        </button>
         <div class="checkline">
           <input type="checkbox" id="inpUnknown">
           <label for="inpUnknown" style="margin:0;">태어난 시간을 몰라요</label>
         </div>
+      </div>
+      <!-- 실제 계산에 쓰이는 데이터 저장용(화면에는 노출 안 함) — 위 휠 피커가 값을 채워 넣고, 기존 계산 로직은 그대로 이 값을 읽음 -->
+      <div hidden>
+        <div class="seg" id="inpCalSeg">
+          <button type="button" data-val="solar" class="active">양력</button>
+          <button type="button" data-val="lunar">음력</button>
+        </div>
+        <div id="inpDateSolarField">
+          <input type="date" id="inpDate" value="1995-08-20">
+        </div>
+        <div id="inpDateLunarField">
+          <div class="lunar-date-row">
+            <select id="inpLunarYear"></select>
+            <select id="inpLunarMonth"></select>
+            <select id="inpLunarDay"></select>
+          </div>
+          <div class="checkline">
+            <input type="checkbox" id="inpLunarLeap">
+            <label for="inpLunarLeap">윤달이에요</label>
+          </div>
+        </div>
+        <input type="time" id="inpTime" value="14:30">
       </div>
       <div class="field">
         <label>성별</label>
@@ -613,9 +724,76 @@
         두 체계를 나란히 비교해볼 수 있어요. 다만 이것도 명리학 여러 유파 중 하나의 방식을 따른 참고·재미용 도구이며, 정밀 상담은 전문가와 나누시길 권해요.
       </p>
     </section>
+    <!-- 생년월일 휠 스크롤 피커 바텀시트 -->
+    <div class="sheet-bg" id="dateSheetBg">
+      <div class="sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-title">태어난 날</div>
+        <div class="lunar-toggle-row">
+          <div class="seg" id="pkCalSeg">
+            <button type="button" class="active" data-val="solar">양력</button>
+            <button type="button" data-val="lunar">음력</button>
+          </div>
+        </div>
+        <div class="leap-row" id="pkLeapRow" hidden>
+          <input type="checkbox" id="pkLeap">
+          <label for="pkLeap">윤달이에요</label>
+        </div>
+        <div class="picker-tabs">
+          <button type="button" class="active" data-sheet="date" data-tab="wheel">선택해서 고르기</button>
+          <button type="button" data-sheet="date" data-tab="manual">직접 입력</button>
+        </div>
+        <div class="wheel-panel active" id="date-wheel">
+          <div class="wheel-row">
+            <div class="wheel-fade-top"></div><div class="wheel-fade-bot"></div>
+            <div class="wheel-highlight"></div>
+            <div class="wheel-col" id="col-year"></div>
+            <div class="wheel-col" id="col-month"></div>
+            <div class="wheel-col" id="col-day"></div>
+          </div>
+        </div>
+        <div class="manual-panel" id="date-manual">
+          <div class="manual-row">
+            <div class="mfield"><label>년</label><input type="text" inputmode="numeric" maxlength="4" id="pkManualYear"></div>
+            <div class="mfield"><label>월</label><input type="text" inputmode="numeric" maxlength="2" id="pkManualMonth"></div>
+            <div class="mfield"><label>일</label><input type="text" inputmode="numeric" maxlength="2" id="pkManualDay"></div>
+          </div>
+          <p class="manual-hint">숫자만 입력해주세요. 예: 1995 / 8 / 20 · 음력을 선택했다면 음력 기준 날짜예요.</p>
+        </div>
+        <button type="button" class="sheet-confirm" id="dateConfirmBtn">완료</button>
+      </div>
+    </div>
+    <!-- 태어난 시간 휠 스크롤 피커 바텀시트 -->
+    <div class="sheet-bg" id="timeSheetBg">
+      <div class="sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-title">태어난 시간</div>
+        <div class="picker-tabs">
+          <button type="button" class="active" data-sheet="time" data-tab="wheel">선택해서 고르기</button>
+          <button type="button" data-sheet="time" data-tab="manual">직접 입력</button>
+        </div>
+        <div class="wheel-panel active" id="time-wheel">
+          <div class="wheel-row">
+            <div class="wheel-fade-top"></div><div class="wheel-fade-bot"></div>
+            <div class="wheel-highlight"></div>
+            <div class="wheel-col" id="col-hour"></div>
+            <div class="wheel-col" id="col-minute"></div>
+          </div>
+        </div>
+        <div class="manual-panel" id="time-manual">
+          <div class="manual-row">
+            <div class="mfield"><label>시 (0~23)</label><input type="text" inputmode="numeric" maxlength="2" id="pkManualHour"></div>
+            <div class="mfield"><label>분 (0~59)</label><input type="text" inputmode="numeric" maxlength="2" id="pkManualMinute"></div>
+          </div>
+          <p class="manual-hint">24시간제로 입력해주세요. 예: 오후 2시 30분 → 14 / 30</p>
+        </div>
+        <button type="button" class="sheet-confirm" id="timeConfirmBtn">완료</button>
+      </div>
+    </div>
     <!-- RESULT VIEW -->
     <section id="view-result" hidden>
       <div class="summary" id="summaryBox"></div>
+      <div class="subtab-bar" id="subtabBar" hidden></div>
       <div class="panel active" data-panel="palja">
         <h2 class="section-title">사주팔자 <span class="en">FOUR PILLARS</span></h2>
         <p class="section-desc">태어난 년·월·일·시를 각각 천간(위)과 지지(아래)의 도장으로 나타낸 것입니다. 붉은 테두리는 '나'를 뜻하는 일간이에요.</p>
@@ -876,16 +1054,12 @@
     </section>
   </main>
   <nav id="tabbar" hidden>
-    <button data-panel="palja" class="active"><span class="ico">柱</span><span class="lb">사주</span></button>
-    <button data-panel="ohaeng"><span class="ico">行</span><span class="lb">오행</span></button>
-    <button data-panel="sipsung"><span class="ico">星</span><span class="lb">십성</span></button>
-    <button data-panel="simhwa"><span class="ico">深</span><span class="lb">심화</span></button>
-    <button data-panel="daeun"><span class="ico">運</span><span class="lb">대운</span></button>
-    <button data-panel="seun"><span class="ico">年</span><span class="lb">세운</span></button>
-    <button data-panel="ziwei"><span class="ico">紫</span><span class="lb">자미</span></button>
-    <button data-panel="cross"><span class="ico">合</span><span class="lb">종합</span></button>
-    <button data-panel="today"><span class="ico">☀</span><span class="lb">오늘</span></button>
-    <button data-panel="ai"><span class="ico">AI</span><span class="lb">해석</span></button>
+    <button data-group="palja_group" class="active"><span class="ico">柱</span><span class="lb">사주팔자</span></button>
+    <button data-group="unse_group"><span class="ico">運</span><span class="lb">운세흐름</span></button>
+    <button data-group="ziwei"><span class="ico">紫</span><span class="lb">자미</span></button>
+    <button data-group="cross"><span class="ico">合</span><span class="lb">종합</span></button>
+    <button data-group="today"><span class="ico">☀</span><span class="lb">오늘</span></button>
+    <button data-group="ai"><span class="ico">AI</span><span class="lb">해석</span></button>
   </nav>
 </div>
 <div id="payModal" class="modal-overlay" hidden>
@@ -2447,6 +2621,175 @@ const mainLunarInput = setupLunarDateInput({
   dateId: 'inpDate', yearId: 'inpLunarYear', monthId: 'inpLunarMonth', dayId: 'inpLunarDay', leapId: 'inpLunarLeap',
   defaultYear: 1995, defaultMonth: 7, defaultDay: 24,
 });
+/* =========================================================
+   생년월일/시간 휠 스크롤 피커 (시안0_v2 확정안 포트)
+   — 여기서 고른 값은 위 setupLunarDateInput()이 읽는 숨김 백업 요소
+     (#inpCalSeg / #inpDate / #inpLunarYear 등)에 그대로 반영되므로,
+     계산 로직(submitBtn 핸들러)은 전혀 손대지 않아도 됨.
+   ========================================================= */
+const pk = { calType:'solar', year:1995, month:8, day:20, leap:false, hour:14, minute:30 };
+function pkPad(n){ return String(n).padStart(2,'0'); }
+function pkLunarMaxDay(year, month, isLeap){ return lunarMonthDayCount(year, month, isLeap) || 30; }
+function pkSolarMaxDay(year, month){ return new Date(year, month, 0).getDate(); }
+function pkBuildWheel(colId, list, formatFn){
+  const old = $('#'+colId);
+  const col = old.cloneNode(false); // 리스너 누적 방지를 위해 노드를 새로 교체
+  old.parentNode.replaceChild(col, old);
+  list.forEach(v=>{
+    const d = document.createElement('div');
+    d.className = 'wheel-item';
+    d.textContent = formatFn ? formatFn(v) : v;
+    d.dataset.value = v;
+    col.appendChild(d);
+  });
+}
+function pkScrollTo(colId, index){ $('#'+colId).scrollTop = Math.max(0,index)*40; }
+function pkSelectInitial(colId, idx){ [...$('#'+colId).children].forEach((c,i)=>c.classList.toggle('sel', i===idx)); }
+function pkAttachSnap(colId, onChange){
+  const col = $('#'+colId);
+  let t;
+  col.addEventListener('scroll', ()=>{
+    clearTimeout(t);
+    t = setTimeout(()=>{
+      const idx = Math.round(col.scrollTop/40);
+      col.scrollTo({top: idx*40, behavior:'smooth'});
+      [...col.children].forEach((c,i)=>c.classList.toggle('sel', i===idx));
+      onChange(idx);
+    }, 90);
+  });
+}
+function pkInitDateWheels(){
+  const years = []; for(let y=new Date().getFullYear(); y>=1925; y--) years.push(y);
+  const months = []; for(let m=1;m<=12;m++) months.push(m);
+  const dayCount = pk.calType==='lunar' ? pkLunarMaxDay(pk.year, pk.month, pk.leap) : pkSolarMaxDay(pk.year, pk.month);
+  pk.day = Math.min(pk.day, dayCount);
+  const days = []; for(let d=1; d<=dayCount; d++) days.push(d);
+
+  pkBuildWheel('col-year', years, y=>y+'년');
+  pkBuildWheel('col-month', months, m=>m+'월');
+  pkBuildWheel('col-day', days, d=>d+'일');
+
+  const yi = years.indexOf(pk.year), mi = months.indexOf(pk.month), di = days.indexOf(pk.day);
+  pkScrollTo('col-year', yi); pkScrollTo('col-month', mi); pkScrollTo('col-day', di);
+  pkSelectInitial('col-year', yi); pkSelectInitial('col-month', mi); pkSelectInitial('col-day', di);
+
+  pkAttachSnap('col-year', idx=>{ pk.year = years[idx]; pkRefreshDayWheel(); });
+  pkAttachSnap('col-month', idx=>{ pk.month = months[idx]; pkRefreshDayWheel(); });
+  pkAttachSnap('col-day', idx=> pk.day = days[idx]);
+}
+function pkRefreshDayWheel(){
+  const dayCount = pk.calType==='lunar' ? pkLunarMaxDay(pk.year, pk.month, pk.leap) : pkSolarMaxDay(pk.year, pk.month);
+  pk.day = Math.min(pk.day, dayCount);
+  const days = []; for(let d=1; d<=dayCount; d++) days.push(d);
+  pkBuildWheel('col-day', days, d=>d+'일');
+  const di = days.indexOf(pk.day);
+  pkScrollTo('col-day', di);
+  pkSelectInitial('col-day', di);
+  pkAttachSnap('col-day', idx=> pk.day = days[idx]);
+}
+function pkInitTimeWheels(){
+  const hours=[]; for(let h=0;h<24;h++) hours.push(h);
+  const minutes=[]; for(let m=0;m<60;m++) minutes.push(m);
+  pkBuildWheel('col-hour', hours, h=>pkPad(h)+'시');
+  pkBuildWheel('col-minute', minutes, m=>pkPad(m)+'분');
+  const hi = hours.indexOf(pk.hour), mi = minutes.indexOf(pk.minute);
+  pkScrollTo('col-hour', hi); pkScrollTo('col-minute', mi);
+  pkSelectInitial('col-hour', hi); pkSelectInitial('col-minute', mi);
+  pkAttachSnap('col-hour', idx=> pk.hour = hours[idx]);
+  pkAttachSnap('col-minute', idx=> pk.minute = minutes[idx]);
+}
+$$('#pkCalSeg button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    $$('#pkCalSeg button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    pk.calType = btn.dataset.val;
+    $('#pkLeapRow').hidden = (pk.calType !== 'lunar');
+    pkInitDateWheels();
+  });
+});
+$('#pkLeap').addEventListener('change', (e)=>{
+  pk.leap = e.target.checked;
+  pkRefreshDayWheel();
+});
+function switchPickerTab(btn, sheet, tab){
+  const sheetEl = $(sheet==='date' ? '#dateSheetBg' : '#timeSheetBg');
+  sheetEl.querySelectorAll('.picker-tabs button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  sheetEl.querySelector('.wheel-panel').classList.toggle('active', tab==='wheel');
+  sheetEl.querySelector('.manual-panel').classList.toggle('active', tab==='manual');
+}
+// 바텀시트 안의 버튼들은 IIFE 스코프 안에 있어 인라인 onclick으로는 닿지 않으므로
+// addEventListener로 연결한다(이 파일의 다른 버튼들과 동일한 방식).
+$$('.picker-tabs button').forEach(btn=>{
+  btn.addEventListener('click', ()=> switchPickerTab(btn, btn.dataset.sheet, btn.dataset.tab));
+});
+$('#dateSheetBg').addEventListener('click', (e)=>{ if(e.target === e.currentTarget) closeSheet('date'); });
+$('#timeSheetBg').addEventListener('click', (e)=>{ if(e.target === e.currentTarget) closeSheet('time'); });
+function openSheet(type){
+  if(type === 'date'){
+    $('#pkManualYear').value = pk.year;
+    $('#pkManualMonth').value = pk.month;
+    $('#pkManualDay').value = pk.day;
+    $('#dateSheetBg').classList.add('open');
+    setTimeout(pkInitDateWheels, 10);
+  } else {
+    if($('#inpUnknown').checked) return;
+    $('#pkManualHour').value = pk.hour;
+    $('#pkManualMinute').value = pk.minute;
+    $('#timeSheetBg').classList.add('open');
+    setTimeout(pkInitTimeWheels, 10);
+  }
+}
+function closeSheet(type){
+  $(type==='date' ? '#dateSheetBg' : '#timeSheetBg').classList.remove('open');
+}
+$('#dateBtn').addEventListener('click', ()=> openSheet('date'));
+$('#timeBtn').addEventListener('click', ()=> openSheet('time'));
+function pkUpdateTimeLabel(){
+  const ap = pk.hour < 12 ? '오전' : '오후';
+  const h12 = pk.hour % 12 === 0 ? 12 : pk.hour % 12;
+  $('#timeBtnVal').textContent = `${ap} ${h12}시 ${pkPad(pk.minute)}분`;
+}
+function confirmDatePicker(){
+  const manualActive = $('#date-manual').classList.contains('active');
+  if(manualActive){
+    pk.year = parseInt($('#pkManualYear').value) || pk.year;
+    pk.month = parseInt($('#pkManualMonth').value) || pk.month;
+    pk.day = parseInt($('#pkManualDay').value) || pk.day;
+  }
+  // 기존 계산 로직(setupLunarDateInput)이 그대로 읽는 백업 요소에 값 반영
+  const targetSegBtn = $(`#inpCalSeg button[data-val="${pk.calType}"]`);
+  if(targetSegBtn && !targetSegBtn.classList.contains('active')) targetSegBtn.click();
+  if(pk.calType === 'lunar'){
+    $('#inpLunarLeap').checked = pk.leap;
+    $('#inpLunarYear').value = pk.year;
+    $('#inpLunarMonth').value = pk.month;
+    $('#inpLunarMonth').dispatchEvent(new Event('change'));
+    $('#inpLunarDay').value = pk.day;
+    $('#dateBtnVal').textContent = `${pk.year}년 ${pk.leap ? '윤' : ''}${pk.month}월 ${pk.day}일 (음력)`;
+  } else {
+    $('#inpDate').value = `${pk.year}-${pkPad(pk.month)}-${pkPad(pk.day)}`;
+    $('#dateBtnVal').textContent = `${pk.year}년 ${pk.month}월 ${pk.day}일 (양력)`;
+  }
+  closeSheet('date');
+}
+function confirmTimePicker(){
+  const manualActive = $('#time-manual').classList.contains('active');
+  if(manualActive){
+    pk.hour = Math.min(23, Math.max(0, parseInt($('#pkManualHour').value) || 0));
+    pk.minute = Math.min(59, Math.max(0, parseInt($('#pkManualMinute').value) || 0));
+  }
+  $('#inpTime').value = `${pkPad(pk.hour)}:${pkPad(pk.minute)}`;
+  pkUpdateTimeLabel();
+  closeSheet('time');
+}
+$('#dateConfirmBtn').addEventListener('click', confirmDatePicker);
+$('#timeConfirmBtn').addEventListener('click', confirmTimePicker);
+$('#inpUnknown').addEventListener('change', (e)=>{
+  $('#timeBtn').classList.toggle('disabled', e.target.checked);
+  if(e.target.checked){ $('#timeBtnVal').textContent = '시간 모름'; }
+  else{ pkUpdateTimeLabel(); }
+});
 $('#submitBtn').addEventListener('click', ()=>{
   let y, m, d;
   if(mainLunarInput.getCalType() === 'lunar'){
@@ -2496,6 +2839,7 @@ $('#submitBtn').addEventListener('click', ()=>{
   $('#view-result').hidden = false;
   $('#tabbar').hidden = false;
   $('#backBtn').hidden = false;
+  activateGroup('palja_group');
   window.scrollTo(0,0);
 });
 $('#backBtn').addEventListener('click', ()=>{
@@ -2504,13 +2848,52 @@ $('#backBtn').addEventListener('click', ()=>{
   $('#backBtn').hidden = true;
   $('#view-input').hidden = false;
 });
+/* 하단 탭 10개 → 6개 그룹으로 통합. 사주/오행/십성/심화는 "사주팔자" 그룹,
+   대운/세운은 "운세흐름" 그룹으로 묶고, 그룹 안에서는 서브탭(subtabBar)으로 전환한다. */
+const TAB_GROUPS = {
+  palja_group: {panels:[{id:'palja',label:'사주'},{id:'ohaeng',label:'오행'},{id:'sipsung',label:'십성'},{id:'simhwa',label:'심화'}]},
+  unse_group: {panels:[{id:'daeun',label:'대운'},{id:'seun',label:'세운'}]},
+  ziwei: {panels:[{id:'ziwei',label:'자미두수'}]},
+  cross: {panels:[{id:'cross',label:'종합'}]},
+  today: {panels:[{id:'today',label:'오늘'}]},
+  ai: {panels:[{id:'ai',label:'AI 해석'}]}
+};
+let lastSubPanel = {palja_group:'palja', unse_group:'daeun'};
+function activatePanel(panelId){
+  $$('.panel').forEach(p=>p.classList.remove('active'));
+  const target = $(`.panel[data-panel="${panelId}"]`);
+  if(target) target.classList.add('active');
+}
+function renderSubtabBar(groupKey){
+  const group = TAB_GROUPS[groupKey];
+  const bar = $('#subtabBar');
+  if(!group || group.panels.length <= 1){ bar.hidden = true; bar.innerHTML = ''; return; }
+  const activeSub = lastSubPanel[groupKey] || group.panels[0].id;
+  bar.innerHTML = group.panels.map(p=>
+    `<button type="button" data-group="${groupKey}" data-sub="${p.id}" class="${p.id===activeSub ? 'active' : ''}">${p.label}</button>`
+  ).join('');
+  bar.hidden = false;
+}
+function activateGroup(groupKey){
+  const group = TAB_GROUPS[groupKey];
+  if(!group) return;
+  $$('#tabbar button').forEach(b=>b.classList.remove('active'));
+  const btn = $(`#tabbar button[data-group="${groupKey}"]`);
+  if(btn) btn.classList.add('active');
+  const targetPanel = lastSubPanel[groupKey] || group.panels[0].id;
+  activatePanel(targetPanel);
+  renderSubtabBar(groupKey);
+}
 $$('#tabbar button').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    $$('#tabbar button').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    $$('.panel').forEach(p=>p.classList.remove('active'));
-    $(`.panel[data-panel="${btn.dataset.panel}"]`).classList.add('active');
-  });
+  btn.addEventListener('click', ()=> activateGroup(btn.dataset.group));
+});
+$('#subtabBar').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-sub]');
+  if(!btn) return;
+  const groupKey = btn.dataset.group;
+  lastSubPanel[groupKey] = btn.dataset.sub;
+  activatePanel(btn.dataset.sub);
+  renderSubtabBar(groupKey);
 });
 
 /* =========================================================
