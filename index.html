@@ -482,6 +482,16 @@
     font-size:12.5px; color:var(--seal); background:var(--fire-soft);
     border-radius:var(--radius-sm); padding:12px 14px; line-height:1.6;
   }
+  .ai-result-note{
+    margin-top:12px; padding:12px 14px; border:1px dashed var(--gold-line);
+    border-radius:var(--radius-sm); background:rgba(244,196,99,.08);
+    font-size:11.5px; line-height:1.6; color:var(--ink-soft);
+  }
+  .ai-result-note b{ color:var(--gold); }
+  .ai-result-note-btn{
+    display:block; margin-top:8px; background:none; border:none; padding:0;
+    color:var(--gold); font-size:11.5px; font-weight:800; cursor:pointer; font-family:"Noto Sans KR";
+  }
   .modal-overlay{
     position:fixed; inset:0; background:rgba(6,6,14,0.65);
     display:flex; align-items:center; justify-content:center; z-index:50; padding:20px;
@@ -1210,6 +1220,10 @@
         </div>
         <div id="aiResult" hidden>
           <div class="ai-result-text" id="aiResultText"></div>
+          <div class="ai-result-note">
+            📌 이 결과는 <b>마이페이지 &gt; 내 결제내역</b>에서 15일 동안 다시 볼 수 있고, PDF로도 저장할 수 있어요.
+            <button type="button" class="ai-result-note-btn" id="aiResultHistoryBtn">내 결제내역 바로가기 →</button>
+          </div>
         </div>
         <div id="aiError" hidden class="ai-error"></div>
       </div>
@@ -3627,6 +3641,7 @@ async function runAiInterpretation(){
     aiInterpretInFlight = false;
   }
 }
+$('#aiResultHistoryBtn').addEventListener('click', ()=>{ openHistoryModal(); });
 
 /* =========================================================
    계정 / 로그인 (Supabase Auth + 카카오 로그인)
