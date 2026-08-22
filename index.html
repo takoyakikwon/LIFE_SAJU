@@ -3785,23 +3785,30 @@ async function downloadPurchasePdf(row, btnEl){
   `;
   document.body.appendChild(wrap);
   try{
-    const canvas = await html2canvas(wrap, { scale:2, backgroundColor:'#ffffff' });
+    // scale 1.5면 인쇄해도 충분히 선명하면서 캔버스가 과도하게 커지지 않는다.
+    const canvas = await html2canvas(wrap, { scale:1.5, backgroundColor:'#ffffff' });
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF('p','pt','a4');
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
-    const imgW = pageW;
-    const imgH = canvas.height * (imgW / canvas.width);
-    const imgData = canvas.toDataURL('image/png');
-    let heightLeft = imgH;
-    let position = 0;
-    pdf.addImage(imgData, 'PNG', 0, position, imgW, imgH);
-    heightLeft -= pageH;
-    while(heightLeft > 0){
-      position = heightLeft - imgH;
-      pdf.addPage();
-      pdf.addImage(imgData, 'PNG', 0, position, imgW, imgH);
-      heightLeft -= pageH;
+    // 전체 이미지를 페이지마다 옵셋만 바꿔 통째로 다시 붙이면(예전 방식) 같은 이미지 데이터가
+    // 페이지 수만큼 중복 저장돼 파일이 비정상적으로 커진다(테스트 중 25MB짜리 PDF가 나온 원인).
+    // 대신 원본 캔버스를 페이지 분량만큼 실제로 잘라(slice) 각 페이지에 한 번씩만 넣는다.
+    const pxPerPage = Math.max(1, Math.floor(canvas.width * (pageH / pageW)));
+    const totalPages = Math.max(1, Math.ceil(canvas.height / pxPerPage));
+    for(let p=0; p<totalPages; p++){
+      const sliceHeight = Math.min(pxPerPage, canvas.height - p*pxPerPage);
+      const sliceCanvas = document.createElement('canvas');
+      sliceCanvas.width = canvas.width;
+      sliceCanvas.height = sliceHeight;
+      const ctx = sliceCanvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+      ctx.drawImage(canvas, 0, p*pxPerPage, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
+      const sliceImgH = pageW * (sliceHeight / canvas.width);
+      if(p>0) pdf.addPage();
+      // JPEG(품질 0.92)로 저장 — 흰 배경+검은 글씨 위주라 PNG보다 훨씬 작아지면서도 읽기엔 충분히 선명하다.
+      pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, pageW, sliceImgH);
     }
     const safeDate = formatDateTime(row.created_at).replace(/[.: ]/g,'');
     pdf.save(`사주풀이_${CATEGORY_LABEL[row.category]||row.category}_${safeDate}.pdf`);
