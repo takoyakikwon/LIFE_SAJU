@@ -325,6 +325,13 @@
     background:var(--paper-card); border:1px solid var(--line); border-radius:var(--radius-sm);
     padding:13px 14px;
   }
+  .cross-identity-headline{
+    margin-bottom:14px; padding:16px 16px; border-radius:var(--radius-md);
+    background:linear-gradient(135deg, rgba(244,196,99,.14), rgba(167,139,250,.10));
+    border:1px solid var(--gold-line);
+    font-family:"Noto Serif KR"; font-weight:800; font-size:14.5px; line-height:1.65; color:var(--ink);
+  }
+  .cross-identity-headline b{ color:var(--gold); }
   /* 십성 table */
   .sipsung-table{width:100%; border-collapse:collapse; margin-top:4px;}
   .sipsung-table th{
@@ -1338,6 +1345,11 @@ const TEN_GOD_GROUP = {
   "편관":"관성", "정관":"관성",
   "편인":"인성", "정인":"인성",
 };
+const ELEMENT_KEYWORD = ["성장과 도전정신", "열정과 표현력", "포용력과 안정감", "결단력과 절제력", "유연함과 통찰력"];
+// 오행 이름(목/화/토/금/수)에 붙는 조사 — 화/토/수는 받침이 없어 "가/를", 목/금은 받침이 있어 "이/을"
+const ELEMENT_JOSA_SUBJ = ["이", "가", "가", "이", "가"];
+const ELEMENT_JOSA_OBJ = ["을", "를", "를", "을", "를"];
+const TEN_GOD_GROUP_KEYWORD = { "비겁":"독립심과 뚝심", "식상":"상상력과 감각", "재성":"현실감각과 관리력", "관성":"책임감과 리더십", "인성":"학습력과 배려심" };
 const TEN_GOD_GROUP_DESC = {
   "비겁": "비견·겁재가 두드러져요. 남에게 기대기보다 스스로 판단하고 밀어붙이는 힘이 강한 편이에요. 자기 확신이 뚜렷하고 독립적으로 움직일 때 가장 힘을 내지만, 그만큼 남의 방식에 맞추거나 한발 물러서는 게 쉽지 않게 느껴질 수 있어요.",
   "식상": "식신·상관이 두드러져요. 머릿속에 있는 생각을 말이나 글, 행동으로 풀어내는 표현력이 좋은 편이에요. 아이디어가 많고 자기만의 방식을 만들어가는 걸 좋아하지만, 정해진 틀이나 규칙 안에 갇히면 유독 답답함을 느끼기 쉬워요.",
@@ -2471,11 +2483,28 @@ function render(result){
   });
   $('#ohaengBars').innerHTML = barsHtml;
   const maxEl = counts.indexOf(Math.max(...counts));
+  const maxVal = counts[maxEl];
   const minVal = Math.min(...counts);
   const missing = ELEMENT_NAME.filter((n,i)=>counts[i]===0);
-  $('#ohaengNote').innerHTML = `가장 강한 기운은 <b>${ELEMENT_NAME[maxEl]}(${ELEMENT_HANJA[maxEl]})</b> — ${ELEMENT_DESC[maxEl]}이에요. ` +
-    (missing.length ? `사주 안에 <b>${missing.join(", ")}</b> 기운이 보이지 않으니, 일상에서 그 기운을 채워보는 것도 균형을 잡는 방법이에요.` :
-    `여덟 글자에 다섯 기운이 고루 섞여 있어요.`);
+  let secondEl = -1, secondVal = -1;
+  ELEMENT_NAME.forEach((n,i)=>{ if(i!==maxEl && counts[i]>secondVal){ secondVal=counts[i]; secondEl=i; } });
+  const ELEMENT_PAIR_TEXT = {
+    'a-gen-b': (a,b)=>`그다음으로 강한 기운은 ${ELEMENT_NAME[b]}(${ELEMENT_HANJA[b]})인데, ${ELEMENT_NAME[a]}${ELEMENT_JOSA_SUBJ[a]} ${ELEMENT_NAME[b]}${ELEMENT_JOSA_OBJ[b]} 생(生)해주는 관계예요. 가장 강한 기운이 두 번째 기운에 자연스럽게 힘을 보태는 조합이라, 스스로도 뭘 잘하는지 비교적 뚜렷하게 아는 편이에요.`,
+    'b-gen-a': (a,b)=>`그다음으로 강한 기운은 ${ELEMENT_NAME[b]}(${ELEMENT_HANJA[b]})인데, ${ELEMENT_NAME[b]}${ELEMENT_JOSA_SUBJ[b]} ${ELEMENT_NAME[a]}${ELEMENT_JOSA_OBJ[a]} 생(生)해주는 관계예요. 서로 다른 두 힘이 한 방향으로 겹쳐 쌓이는 구조라, 한번 마음먹은 건 끝까지 밀어붙이는 뒷심이 좋은 편이에요.`,
+    'a-over-b': (a,b)=>`그다음으로 강한 기운은 ${ELEMENT_NAME[b]}(${ELEMENT_HANJA[b]})인데, ${ELEMENT_NAME[a]}${ELEMENT_JOSA_SUBJ[a]} ${ELEMENT_NAME[b]}${ELEMENT_JOSA_OBJ[b]} 극(剋)하는 관계예요. 겉으로 드러나는 성향과 안에서 스스로를 견제하는 성향이 함께 있어, 상반된 마음이 부딪히는 걸 자주 느낄 수 있어요.`,
+    'b-over-a': (a,b)=>`그다음으로 강한 기운은 ${ELEMENT_NAME[b]}(${ELEMENT_HANJA[b]})인데, ${ELEMENT_NAME[b]}${ELEMENT_JOSA_SUBJ[b]} ${ELEMENT_NAME[a]}${ELEMENT_JOSA_OBJ[a]} 극(剋)하는 관계예요. 겉으로는 강하게 드러나 보여도 안에서 스스로를 다잡는 힘도 함께 있어, 무턱대고 밀어붙이기보다 한 번 더 생각하고 움직이는 편이에요.`,
+  };
+  let ohaengHtml = `가장 강한 기운은 <b>${ELEMENT_NAME[maxEl]}(${ELEMENT_HANJA[maxEl]})</b> — ${ELEMENT_DESC[maxEl]}이에요.`;
+  if(secondVal > 0){
+    const rel = relationLabel(maxEl, secondEl);
+    if(ELEMENT_PAIR_TEXT[rel]) ohaengHtml += ` ${ELEMENT_PAIR_TEXT[rel](maxEl, secondEl)}`;
+  }
+  if(total>0 && maxVal/total >= 0.5){
+    ohaengHtml += ` 사주 ${total}자리 중 ${maxVal}자리가 이 기운 하나로 채워져 있을 만큼 뚜렷하게 치우쳐 있어요. 그만큼 색깔이 분명한 무기가 되지만, 다른 기운이 끼어들 틈이 적어서 상황에 따라 유연하게 대처하려면 조금 더 의식적인 노력이 필요할 수 있어요.`;
+  }
+  ohaengHtml += missing.length ? ` 사주 안에 <b>${missing.join(", ")}</b> 기운이 보이지 않으니, 일상에서 그 기운을 채워보는 것도 균형을 잡는 방법이에요.` :
+    ` 여덟 글자에 다섯 기운이 고루 섞여 있어요.`;
+  $('#ohaengNote').innerHTML = ohaengHtml;
   // 십성
   const rows = [
     {label:"년간", g:pillars.year.g, type:"gan"},
@@ -2683,6 +2712,21 @@ function renderCross(saju, zw){
   [saju.pillars.year, saju.pillars.month, saju.pillars.day].forEach(p=>{ counts[GAN_ELEMENT[p.g]]++; counts[ZHI_ELEMENT[p.z]]++; });
   if(saju.pillars.hour){ counts[GAN_ELEMENT[saju.pillars.hour.g]]++; counts[ZHI_ELEMENT[saju.pillars.hour.z]]++; }
   const maxEl = counts.indexOf(Math.max(...counts));
+  // 십성 그룹 집계(일간 제외 나머지 글자) — 종합 탭 첫 줄 정체성 헤드라인용
+  const crossSipsungRows = [
+    {g:saju.pillars.year.g, type:"gan"}, {z:saju.pillars.year.z, type:"zhi"},
+    {g:saju.pillars.month.g, type:"gan"}, {z:saju.pillars.month.z, type:"zhi"},
+    {z:saju.pillars.day.z, type:"zhi"},
+  ];
+  if(saju.pillars.hour){ crossSipsungRows.push({g:saju.pillars.hour.g, type:"gan"}, {z:saju.pillars.hour.z, type:"zhi"}); }
+  const crossGroupCount = {"비겁":0, "식상":0, "재성":0, "관성":0, "인성":0};
+  crossSipsungRows.forEach(r=>{
+    const el = r.type==="gan" ? GAN_ELEMENT[r.g] : ZHI_ELEMENT[r.z];
+    const yy = r.type==="gan" ? r.g%2 : r.z%2;
+    crossGroupCount[TEN_GOD_GROUP[tenGodOf(saju.pillars.day.g, el, yy)]]++;
+  });
+  const crossGroups = Object.keys(crossGroupCount);
+  const topGroup = crossGroups.reduce((a,b)=> crossGroupCount[b]>crossGroupCount[a] ? b : a);
   const bureauElMap = {'목3국':0,'화6국':1,'토5국':2,'금4국':3,'수2국':4};
   const bureauEl = bureauElMap[zw.bureau.name];
   const sameYear = (saju.pillars.year.g===zw.yearPillar.g && saju.pillars.year.z===zw.yearPillar.z);
@@ -2696,6 +2740,7 @@ function renderCross(saju, zw){
     '사주와 자미두수, 계산 원리도 만들어진 시대도 전혀 다른 두 체계인데 세 가지 비교가 전부 같은 방향을 가리키고 있어요. 이 정도로 겹치는 건 흔치 않은 일이라, 그만큼 태어날 때부터 뚜렷하게 새겨진 성향이라고 볼 수 있어요.',
   ][matchCount];
   let html = '';
+  html += `<div class="cross-identity-headline">오행상 <b>${ELEMENT_NAME[maxEl]}(${ELEMENT_HANJA[maxEl]})</b> 기운이 강하고, 십성상 <b>${topGroup}</b>이 두드러진 사람이에요 — 한마디로 <b>${ELEMENT_KEYWORD[maxEl]}</b>에 <b>${TEN_GOD_GROUP_KEYWORD[topGroup]}</b>까지 함께 가진 쪽에 가까워요.</div>`;
   html += `<div style="margin-bottom:14px; font-weight:700; line-height:1.6;">${HEADLINE}</div>`;
   html += `<div style="margin-bottom:10px;"><b>년주 비교</b> — 사주(입춘 기준) ${GAN[saju.pillars.year.g]}${ZHI[saju.pillars.year.z]} / 자미두수(설날 기준) ${GAN[zw.yearPillar.g]}${ZHI[zw.yearPillar.z]}${sameYear? ' → 두 체계의 연주가 정확히 일치해요.' : ' → 입춘과 음력설 사이에 태어나 두 체계의 연주가 갈려요. 이 경우 두 연주 모두를 참고할 가치가 있는, 흔치 않은 케이스예요.'}</div>`;
   html += `<div style="margin-bottom:10px;"><b>오행 비교</b> — 사주 여덟 글자 중 가장 강한 기운은 ${ELEMENT_NAME[maxEl]}(${ELEMENT_HANJA[maxEl]}), 자미두수 오행국은 ${zw.bureau.name}(${ELEMENT_NAME[bureauEl]} 기운)이에요.${maxEl===bureauEl? ` 두 체계가 똑같이 ${ELEMENT_NAME[maxEl]} 기운을 가리키고 있어요 — 우연이라 보기엔 너무 정확히 겹치는, 뚜렷한 성향이에요.` : ' 두 체계가 서로 다른 기운을 보여주고 있어요. 상황이나 관계에 따라 다른 얼굴이 나오는 사람일 가능성이 커요.'}</div>`;
