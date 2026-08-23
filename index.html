@@ -1282,6 +1282,14 @@
 <div id="loginModal" class="modal-overlay" hidden>
   <div class="modal-card" id="loginModalCard"></div>
 </div>
+<div id="exitConfirmModal" class="modal-overlay" hidden>
+  <div class="modal-card">
+    <div class="modal-title">종료할까요?</div>
+    <p class="modal-desc">뒤로가기를 한 번 더 누르면 이 페이지를 나가게 돼요.</p>
+    <button class="submit-btn" id="exitConfirmCancel">계속 볼게요</button>
+    <button class="modal-cancel" id="exitConfirmLeave">나가기</button>
+  </div>
+</div>
 <div id="historyModal" class="modal-overlay" hidden>
   <div class="modal-card modal-card-wide">
     <div class="modal-title">내 결제내역</div>
@@ -2865,6 +2873,12 @@ let partnerGenderVal = "남";
 // 유료 콘텐츠 목록으로 돌아가게 하기 위한 히스토리 상태 추적 플래그. 결과가 뜰 때 한 번만
 // pushState하고, 그 상태를 소비(뒤로가기 처리 또는 resetAiPanel)하면 다시 false로 돌아간다.
 let aiResultPushedState = false;
+// AI 결과 화면에서 뒤로가기로 카테고리 목록까지 돌아온 뒤, 그 자리에서 뒤로가기를 한 번 더
+// 누르면(연달아 두 번째) 곧장 사이트를 이탈시키는 대신 "종료할까요?" 확인을 먼저 보여주기
+// 위한 두 번째 히스토리 트랩 플래그. 카테고리 목록에 도착하는 시점에 한 번 더 pushState해서
+// 세팅하고, 확인 모달에서 "취소"를 누르면 다시 세팅(재무장), "나가기"를 누르면 소비하고 실제
+// 브라우저 뒤로가기를 한 번 더 실행해 이 페이지 이전 히스토리로 진짜 빠져나가게 한다.
+let aiBackTrapPushed = false;
 // 카카오 로그인은 페이지 전체를 리다이렉트하는 방식이라, 로그인 도중 입력해둔 내 정보가
 // 브라우저 메모리에서 전부 사라진다. 로그인 직전에 폼 스냅샷을 저장해두고, 로그인 후
 // 돌아왔을 때 자동으로 복원 + 재계산해서 사용자가 처음부터 다시 입력하지 않게 한다.
@@ -3873,14 +3887,38 @@ $('#aiResultHistoryBtn').addEventListener('click', ()=>{ openHistoryModal(); });
 // AI 결과를 본 뒤 브라우저/기기 뒤로가기를 누르면, 실제로 지금 AI 결과 화면을 보고 있을 때만
 // 유료 콘텐츠 목록(카테고리 선택)으로 되돌리고, 그 히스토리 상태를 소비한다. 이미 다른 탭으로
 // 넘어가 있는 상태라면(패널이 더 이상 active가 아니면) 평범한 브라우저 뒤로가기 동작에 맡긴다.
+// 카테고리 목록에 돌아온 자리에서 뒤로가기를 한 번 더(연달아 두 번째) 누르면, 곧장 사이트를
+// 이탈시키는 대신 "종료할까요?" 확인부터 보여준다(웹페이지는 스크립트로 탭을 강제로 닫을 수
+// 없으므로, "종료"는 실제로는 이 페이지 이전의 실제 브라우저 히스토리로 빠져나가는 것을 의미).
 window.addEventListener('popstate', ()=>{
   const aiPanelActive = $('.panel[data-panel="ai"]') && $('.panel[data-panel="ai"]').classList.contains('active');
   if(aiResultPushedState && aiPanelActive && !$('#aiResult').hidden){
+    // 1번째 뒤로가기: AI 결과 화면 → 카테고리 목록. 곧바로 두 번째 트랩 상태를 쌓아서
+    // 다음 뒤로가기를 "연달아 두 번째"로 잡아낼 수 있게 재무장한다.
     resetAiPanel();
     window.scrollTo(0,0);
+    history.pushState({ view: 'aiCategoryBackTrap' }, '');
+    aiBackTrapPushed = true;
+  } else if(aiBackTrapPushed && aiPanelActive){
+    // 2번째(연달아) 뒤로가기: 카테고리 목록에서 또 뒤로가기 → 종료 확인 모달
+    aiBackTrapPushed = false;
+    $('#exitConfirmModal').hidden = false;
   } else {
     aiResultPushedState = false;
+    aiBackTrapPushed = false;
   }
+});
+$('#exitConfirmCancel').addEventListener('click', ()=>{
+  // "취소": 이 페이지에 머무르고, 다음 뒤로가기를 다시 잡아낼 수 있도록 트랩을 재무장한다.
+  $('#exitConfirmModal').hidden = true;
+  history.pushState({ view: 'aiCategoryBackTrap' }, '');
+  aiBackTrapPushed = true;
+});
+$('#exitConfirmLeave').addEventListener('click', ()=>{
+  // "나가기": 트랩 상태는 이미 popstate에서 한 번 소비된 상태이므로, 뒤로가기를 한 번 더
+  // 실행해 이 페이지 이전의 실제 브라우저 히스토리로 빠져나가게 한다(사이트 이탈).
+  $('#exitConfirmModal').hidden = true;
+  history.back();
 });
 
 /* =========================================================
