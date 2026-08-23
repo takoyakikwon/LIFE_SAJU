@@ -19,6 +19,7 @@ const MODEL_BY_CATEGORY = {
   newyear: process.env.OPENAI_MODEL_NEWYEAR || DEFAULT_MODEL,
   today: process.env.OPENAI_MODEL_TODAY || DEFAULT_MODEL,
   wealth: process.env.OPENAI_MODEL_WEALTH || DEFAULT_MODEL,
+  pet: process.env.OPENAI_MODEL_PET || DEFAULT_MODEL,
 };
 
 // 결제 기록(purchases 테이블) 연동용. Vercel 환경변수에 아래 두 개가 등록되어 있어야 합니다.
@@ -34,6 +35,7 @@ const CATEGORY_AMOUNT_KRW = {
   compatibility: 4900,
   newyear: 9900,
   wealth: 3900,
+  pet: 1900,
 };
 
 // 클라이언트가 보낸 Supabase 액세스 토큰으로 실제 로그인한 사용자인지 서버에서 직접 확인한다.
@@ -170,6 +172,22 @@ function buildPrompt(payload) {
     lines.push(payload.오늘);
   }
 
+  return lines.join('\n');
+}
+
+// 반려동물궁합(pet) 카테고리 전용. 다른 카테고리와 달리 사주/자미두수 원문 데이터를 통째로
+// 넘기지 않는다 — PET_SYSTEM_PROMPT가 애초에 명리 용어를 쓰지 않도록 설계돼 있으므로, 무거운
+// 원국 데이터 대신 프론트에서 이미 계산해 보낸 "집사 일지 vs 반려동물 띠" 관계 문장 하나만 전달한다.
+function buildPetPrompt(payload) {
+  const pet = payload.pet || {};
+  const lines = [];
+  lines.push(`[집사] 이름: ${payload.name || '집사'}`);
+  lines.push('');
+  lines.push(`[반려동물] 이름: ${pet.name || '반려동물'}`);
+  lines.push(`[반려동물] 종류: ${pet.speciesLabel || pet.species || '(미입력)'}`);
+  lines.push(`[반려동물] 태어난 해: ${pet.birthYear || '(미입력)'}년생, ${pet.zodiac || ''}띠`);
+  lines.push('');
+  lines.push(`[집사와 반려동물의 전통 궁합 관계] ${pet.relationText || '정보 없음'}`);
   return lines.join('\n');
 }
 
@@ -317,10 +335,38 @@ const CATEGORY_PROMPTS = {
   wealth: CATEGORY_PROMPT_WEALTH,
 };
 
+// ============================================================
+// 반려동물궁합(pet) — BASE_PROMPT를 전혀 쓰지 않는 완전 독립 프롬프트.
+// 이 서비스의 "재미로 보는" 킥 콘텐츠라, BASE_PROMPT의 진지한 역술가 톤·상투어 금지·양면성
+// 필수 언급·확률적 어투 같은 규칙을 그대로 얹으면 오히려 딱딱해진다. 그래서 이 카테고리만
+// BASE_PROMPT + 오버레이 구조를 타지 않고, 처음부터 끝까지 독립된 SYSTEM_PROMPT를 쓴다
+// (module.exports 안의 분기 처리 참고). 다른 카테고리 프롬프트를 수정해도 이 프롬프트는
+// 영향받지 않고, 반대로 이 프롬프트를 수정해도 다른 카테고리에는 영향이 없다.
+// ============================================================
+const PET_SYSTEM_PROMPT = `당신은 반려동물과 집사의 케미를 유쾌하고 사랑스럽게 풀어주는 "반려동물 궁합 작가"입니다. 여기는 진지한 명리학 상담이 아니라, 읽는 사람이 웃음 짓고 반려동물에 대한 애정이 더 커지도록 만드는 재미있고 행복한 콘텐츠입니다.
+
+아래 규칙을 반드시 지켜 한국어로 작성하세요.
+
+- 밝고 유쾌하며 다정한 어투로 씁니다. 존댓말을 쓰되 딱딱하지 않고, 친한 친구가 신나서 이야기해주는 듯한 톤으로 씁니다.
+- 이모지를 자연스럽게 섞어 씁니다(문단당 1~2개 정도, 과하지 않게) — 🐾🐶🐱💛✨ 같은 반려동물·애정 관련 이모지를 활용하세요.
+- 사주명리학 전문 용어(십성, 공망, 대운, 지장간, 일간 등)는 절대 쓰지 않습니다. 오직 [집사와 반려동물의 전통 궁합 관계]로 제공된 문장(합/충/동일/무난 여부)만 가볍게 참고하고, 나머지는 전부 재미있는 상상과 캐릭터성으로 풀어냅니다.
+- 반려동물을 표정과 성격이 있는 캐릭터처럼 의인화해서 씁니다. 반려동물의 속마음을 상상해서 귀엽고 웃긴 대사로 따옴표 인용하는 것을 적극 활용하세요(예: "오늘도 집사 무릎은 내 자리야", "간식 내놔, 집사야").
+- 절대 부정적이거나 불안하게 느껴지는 내용을 쓰지 않습니다. 전통적으로 "충(沖)" 관계라 해도 나쁘게 풀이하지 말고 "티격태격하는 게 매력인 코미디 케미", "서로 자극을 주는 활발한 궁합"처럼 반드시 긍정적이고 유쾌한 방향으로 재해석합니다. 걱정되거나 조심하라는 식의 조언은 쓰지 않습니다.
+- 아래 5개 소제목을 이 순서대로, 각각 지정된 이모지+문구 그대로 사용해 다룹니다: "🎭 한마디로 이 조합은", "💭 [반려동물 이름]이의 속마음", "🌟 우리가 잘 맞는 이유", "🎁 더 친해지는 꿀팁", "🏆 총평 한 줄". ([반려동물 이름] 자리에는 실제 반려동물 이름을 넣으세요.)
+- "🎭 한마디로 이 조합은" 섹션: 집사와 반려동물의 띠 관계(합/충/동일/무난)를 재미있는 비유로 소개하며 이 조합의 전체적인 케미를 3~4문장으로 유쾌하게 그립니다.
+- "💭 [반려동물 이름]이의 속마음" 섹션: 반려동물의 시점에서 집사를 어떻게 생각하는지 귀엽고 웃긴 상상으로 풀어씁니다. 최소 2개 이상의 짧은 대사를 따옴표로 인용하세요.
+- "🌟 우리가 잘 맞는 이유" 섹션: 둘 사이에 통하는 지점, 함께 있으면 좋은 점을 구체적이고 훈훈하게 풀어씁니다.
+- "🎁 더 친해지는 꿀팁" 섹션: 함께 하면 좋은 활동이나 유대감을 높이는 재미있는 팁을 1~2가지 구체적으로 제안합니다(간식, 놀이, 산책, 스킨십 등 실제로 해볼 만한 것으로).
+- "🏆 총평 한 줄" 섹션: 이 조합에 어울리는 재치있는 별명이나 한 줄 캐치프레이즈로 유쾌하게 마무리합니다(예: "이 조합은 사랑둥이 콤비!").
+- 전체 분량은 900~1,300자 내외로, 짧고 산뜻하게 씁니다. 진지한 리포트처럼 길게 늘어지지 않습니다.
+- "이 해석은 참고용" 같은 안내·면책 문구는 절대 붙이지 않습니다.
+- 마크다운 문법(**, ##, - 목록 등)은 쓰지 않습니다. 소제목은 위에서 지정한 이모지+문구 형식만 그대로 쓰고, 별표나 샵 기호로 강조하지 않습니다.`;
+
 // 카테고리별 max_tokens 상한. 대부분은 긴 리포트라 4000을 그대로 쓰지만, 오늘의 사주는
 // 짧은 한 문단이라 낮게 잡아 출력 토큰 비용을 통제한다(구독자 수 × 365일 누적 구조).
 const MAX_TOKENS_BY_CATEGORY = {
   today: 700,
+  pet: 1800,
 };
 
 // ============================================================
@@ -436,13 +482,22 @@ module.exports = async (req, res) => {
     return;
   }
 
-  const userPrompt = buildPrompt(payload);
-  const categoryPrompt = payload.category === 'love'
-    ? buildCategoryPromptLove(payload.loveStatus)
-    : payload.category === 'compatibility'
-      ? buildCategoryPromptCompatibility(payload.name, payload.partner && payload.partner.name)
-      : (CATEGORY_PROMPTS[payload.category] || CATEGORY_PROMPT_COMPREHENSIVE);
-  const SYSTEM_PROMPT = BASE_PROMPT + '\n' + categoryPrompt;
+  // 반려동물궁합(pet)은 BASE_PROMPT + 오버레이 구조를 아예 타지 않는 완전 독립 프롬프트라
+  // (위 PET_SYSTEM_PROMPT 주석 참고) 여기서 따로 분기한다. userPrompt도 무거운 원국 데이터
+  // 대신 buildPetPrompt()가 만든 간단한 텍스트를 쓴다.
+  let userPrompt, SYSTEM_PROMPT;
+  if (payload.category === 'pet') {
+    userPrompt = buildPetPrompt(payload);
+    SYSTEM_PROMPT = PET_SYSTEM_PROMPT;
+  } else {
+    userPrompt = buildPrompt(payload);
+    const categoryPrompt = payload.category === 'love'
+      ? buildCategoryPromptLove(payload.loveStatus)
+      : payload.category === 'compatibility'
+        ? buildCategoryPromptCompatibility(payload.name, payload.partner && payload.partner.name)
+        : (CATEGORY_PROMPTS[payload.category] || CATEGORY_PROMPT_COMPREHENSIVE);
+    SYSTEM_PROMPT = BASE_PROMPT + '\n' + categoryPrompt;
+  }
 
   const maxTokens = MAX_TOKENS_BY_CATEGORY[payload.category] || 4000;
   const model = MODEL_BY_CATEGORY[payload.category] || DEFAULT_MODEL;
