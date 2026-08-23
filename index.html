@@ -3452,16 +3452,13 @@ function calcTodayFortune(sajuResult, birthY, birthM, birthD, bioRange){
   const sc = scoreToday(counts, dp.g, sajuResult.pillars.day.g);
   const bio = biorhythmToday(birthY, birthM, birthD, bioRange || 20);
   const dayElement = ELEMENT_NAME[GAN_ELEMENT[dp.g]];
-  const weakestIdx = counts.indexOf(Math.min(...counts));
-  const weakestElement = ELEMENT_NAME[weakestIdx];
-  const it = TODAY_ITEM_MAP[weakestElement];
+  const it = TODAY_ITEM_MAP[dayElement];
   return {
     iljin: { g: dp.g, z: dp.z, text: `${GAN[dp.g]}${ZHI[dp.z]}(${GAN_HANJA[dp.g]}${ZHI_HANJA[dp.z]})`, animal: ZHI_ANIMAL[dp.z], element: dayElement },
     score: sc,
     bio,
     ohaengCounts: counts,
-    weakestElement,
-    luckyColor: { name: TODAY_ELEMENT_COLOR_LABEL[weakestElement], hex: TODAY_ELEMENT_HEX[weakestElement] },
+    luckyColor: { name: TODAY_ELEMENT_COLOR_LABEL[dayElement], hex: TODAY_ELEMENT_HEX[dayElement] },
     luckyNumber: TODAY_NUMBER_MAP[dayElement],
     luckyItem: it.item,
     luckyCoordi: it.coordi,
@@ -3513,7 +3510,7 @@ function renderTodayPanel(sajuResult, birthY, birthM, birthD){
 
   $('#todayLuckSwatch').style.background = `linear-gradient(135deg, ${t.luckyColor.hex}, ${t.luckyColor.hex}bb)`;
   $('#todayLuckTitle').textContent = t.luckyColor.name;
-  $('#todayLuckDesc').textContent = `사주 오행 중 ${t.weakestElement} 기운이 가장 약해서, 오늘은 이 색으로 보완하면 좋은 날이에요.`;
+  $('#todayLuckDesc').textContent = `오늘은 ${t.iljin.text} 기운이 들어오는 날이라, ${t.luckyColor.name}로 힘을 실어주면 좋은 날이에요.`;
 
   $('#todayItemCoordi').textContent = t.luckyCoordi;
   $('#todayItemPlace').textContent = t.luckyPlace;
