@@ -2739,13 +2739,19 @@ function renderCross(saju, zw){
     '세 가지 비교 중 둘이 겹쳐요. 계산 방식이 전혀 다른 두 체계가 이 정도로 같은 곳을 가리킨다는 건, 그 성향이 꽤 뚜렷하게 굳어져 있다는 뜻이에요.',
     '사주와 자미두수, 계산 원리도 만들어진 시대도 전혀 다른 두 체계인데 세 가지 비교가 전부 같은 방향을 가리키고 있어요. 이 정도로 겹치는 건 흔치 않은 일이라, 그만큼 태어날 때부터 뚜렷하게 새겨진 성향이라고 볼 수 있어요.',
   ][matchCount];
+  const CLOSING = [
+    `겹치는 지점이 하나도 없다는 건 오히려 무기가 될 수 있어요. 상대·상황에 따라 꺼내 쓰는 얼굴이 다르다는 뜻이라, 어느 한 가지 틀에 갇히지 않고 유연하게 움직일 수 있는 사람이에요. 다만 그만큼 "진짜 나"를 스스로도 헷갈릴 때가 있을 텐데, 그럴 땐 지금까지 본 ${ELEMENT_KEYWORD[maxEl]}과(와) ${TEN_GOD_GROUP_KEYWORD[topGroup]} 쪽으로 무게중심을 되돌려보면 도움이 될 거예요.`,
+    `겹치는 한 지점이 두 체계가 공통으로 짚어준 만큼, 그 부분은 남들 앞에서도 스스로도 가장 먼저 드러나는 특징일 가능성이 커요. 나머지 두 지점은 상황에 따라 다르게 반응할 수 있는 여지로 열어두고 참고하면, 예상 밖의 순간에 나오는 낯선 내 모습도 덜 당황스러울 거예요.`,
+    `세 가지 중 둘이 겹친다는 건, 그 두 지점의 성향은 믿고 밀어붙여도 좋다는 뜻이에요. 반대로 겹치지 않는 한 지점은 평소와 다르게 반응하는 예외적인 상황에서 튀어나오는 또 다른 얼굴로 봐두면, 스스로를 더 정확하게 이해하는 데 도움이 될 거예요.`,
+    `세 가지 비교가 전부 같은 방향을 가리킨다는 건 이 정체성이 임기응변이 아니라 타고난 뼈대라는 뜻이에요. 앞으로 진로든 관계든 중요한 선택을 할 때, 이 성향을 거스르려 애쓰기보다 ${ELEMENT_KEYWORD[maxEl]}과(와) ${TEN_GOD_GROUP_KEYWORD[topGroup]}을(를) 있는 그대로 활용하는 쪽이 훨씬 수월하게 풀릴 거예요.`,
+  ][matchCount];
   let html = '';
   html += `<div class="cross-identity-headline">오행상 <b>${ELEMENT_NAME[maxEl]}(${ELEMENT_HANJA[maxEl]})</b> 기운이 강하고, 십성상 <b>${topGroup}</b>이 두드러진 사람이에요 — 한마디로 <b>${ELEMENT_KEYWORD[maxEl]}</b>에 <b>${TEN_GOD_GROUP_KEYWORD[topGroup]}</b>까지 함께 가진 쪽에 가까워요.</div>`;
   html += `<div style="margin-bottom:14px; font-weight:700; line-height:1.6;">${HEADLINE}</div>`;
   html += `<div style="margin-bottom:10px;"><b>년주 비교</b> — 사주(입춘 기준) ${GAN[saju.pillars.year.g]}${ZHI[saju.pillars.year.z]} / 자미두수(설날 기준) ${GAN[zw.yearPillar.g]}${ZHI[zw.yearPillar.z]}${sameYear? ' → 두 체계의 연주가 정확히 일치해요.' : ' → 입춘과 음력설 사이에 태어나 두 체계의 연주가 갈려요. 이 경우 두 연주 모두를 참고할 가치가 있는, 흔치 않은 케이스예요.'}</div>`;
   html += `<div style="margin-bottom:10px;"><b>오행 비교</b> — 사주 여덟 글자 중 가장 강한 기운은 ${ELEMENT_NAME[maxEl]}(${ELEMENT_HANJA[maxEl]}), 자미두수 오행국은 ${zw.bureau.name}(${ELEMENT_NAME[bureauEl]} 기운)이에요.${maxEl===bureauEl? ` 두 체계가 똑같이 ${ELEMENT_NAME[maxEl]} 기운을 가리키고 있어요 — 우연이라 보기엔 너무 정확히 겹치는, 뚜렷한 성향이에요.` : ' 두 체계가 서로 다른 기운을 보여주고 있어요. 상황이나 관계에 따라 다른 얼굴이 나오는 사람일 가능성이 커요.'}</div>`;
   html += `<div style="margin-bottom:10px;"><b>'나' 자리 비교</b> — 사주의 일간은 ${GAN[saju.pillars.day.g]}(${ELEMENT_NAME[dmElement]}), 자미두수 명궁의 지지는 ${ZHI[zw.soulZhiStd]}(${ELEMENT_NAME[mingElement]})이에요.${dmElement===mingElement? ' 두 자리의 오행이 같아요 — 남들 눈에 비치는 인상과 타고난 기질이 실제로 같은 방향이라는 뜻이에요.' : ' 두 자리의 오행이 달라요. 겉으로 보이는 인상(명궁)과 속마음(일간)이 다르게 느껴질 수 있는, 겉과 속이 다른 매력을 가진 사람이에요.'}</div>`;
-  html += `<div style="color:var(--ink-faint); font-size:11.5px; margin-top:14px;">두 체계는 만들어진 시대와 계산 방식이 달라 완전히 같은 결론을 내지는 않아요. 겹치는 부분은 특히 신뢰도 높은 특징으로, 어긋나는 부분은 상황에 따라 달라질 수 있는 여지로 참고하면 좋습니다.</div>`;
+  html += `<div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line); line-height:1.65;">${CLOSING}</div>`;
   $('#crossBox').innerHTML = html;
 }
 // 두 원소(0~4) 사이의 오행 관계를 판정 — same / a가 b를 생함 / b가 a를 생함 / a가 b를 극함 / b가 a를 극함
