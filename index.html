@@ -499,6 +499,19 @@
     display:block; margin-top:8px; background:none; border:none; padding:0;
     color:var(--gold); font-size:11.5px; font-weight:800; cursor:pointer; font-family:"Noto Sans KR";
   }
+  /* "이건 계산된 데이터가 아니라 그 데이터를 풀어 쓴 해석/풀이 문장입니다"를 시각적으로
+     구분해주는 공통 표시. 오행/십성/심화 개인화 해설, 종합풀이, AI 해석 본문, 궁합 무료
+     미리보기처럼 실제 해석 텍스트를 담는 박스에 함께 붙인다. 이미 카드 스타일이 있는 곳
+     (.ohaeng-note/.ziwei-summary/.ai-result-text)은 폰트는 그대로 두고 테두리·배경·여백만
+     이 클래스가 덮어써서 금색으로 강조하고, 스타일이 전혀 없던 곳(#compatFreeBox)은
+     이 클래스 하나로 카드 모양 전체를 만든다. 표·카드 등 순수 데이터 요소에는 붙이지 않는다.
+     선언 순서상 위의 각 카드 클래스들보다 뒤에 있어야 border/background/padding을 덮어쓴다. */
+  .interpret-box{
+    border:1.5px solid var(--gold-line);
+    border-radius:var(--radius-sm);
+    background:rgba(244,196,99,.06);
+    padding:14px 15px;
+  }
   .modal-overlay{
     position:fixed; inset:0; background:rgba(6,6,14,0.65);
     display:flex; align-items:center; justify-content:center; z-index:50; padding:20px;
@@ -978,20 +991,20 @@
         <h2 class="section-title">오행 분포 <span class="en">FIVE ELEMENTS</span></h2>
         <p class="section-desc">여덟 글자(천간 4 + 지지 4) 속 목·화·토·금·수의 균형입니다.</p>
         <div class="ohaeng-bars" id="ohaengBars"></div>
-        <div class="ohaeng-note" id="ohaengNote"></div>
+        <div class="ohaeng-note interpret-box" id="ohaengNote"></div>
       </div>
       <div class="panel" data-panel="sipsung">
         <h2 class="section-title">십성 <span class="en">TEN GODS</span></h2>
         <p class="section-desc">일간(나)을 기준으로 다른 일곱 글자가 어떤 관계인지 보여줍니다.</p>
         <table class="sipsung-table" id="sipsungTable"></table>
-        <div class="ohaeng-note" id="sipsungNote" style="margin-top:16px;"></div>
+        <div class="ohaeng-note interpret-box" id="sipsungNote" style="margin-top:16px;"></div>
       </div>
       <div class="panel" data-panel="simhwa">
         <h2 class="section-title">심화분석 <span class="en">DEEPER READING</span></h2>
         <p class="section-desc">지장간, 12운성, 공망을 함께 봅니다.</p>
         <table class="sipsung-table" id="simhwaTable"></table>
-        <div class="ohaeng-note" id="simhwaPersonalNote" style="margin-top:16px;"></div>
-        <div class="ohaeng-note" id="gongmangNote" style="margin-top:12px;"></div>
+        <div class="ohaeng-note interpret-box" id="simhwaPersonalNote" style="margin-top:16px;"></div>
+        <div class="ohaeng-note interpret-box" id="gongmangNote" style="margin-top:12px;"></div>
       </div>
       <div class="panel" data-panel="daeun">
         <h2 class="section-title">대운 <span class="en">10-YEAR CYCLES</span></h2>
@@ -1017,7 +1030,7 @@
       <div class="panel" data-panel="cross">
         <h2 class="section-title">종합풀이 <span class="en">CROSS-CHECK</span></h2>
         <p class="section-desc">사주팔자와 자미두수, 두 체계를 나란히 놓고 공통점과 차이점을 짚어봅니다.</p>
-        <div class="ziwei-summary" id="crossBox"></div>
+        <div class="ziwei-summary interpret-box" id="crossBox"></div>
         <div class="ai-cta-card">
           <div class="ai-cta-title">사주팔자·오행·십성·대운·자미두수, 여기까지 살펴보셨어요</div>
           <div class="ai-cta-desc">이 모든 정보를 하나의 이야기로 엮은 AI 해석으로 완성해보세요.</div>
@@ -1166,33 +1179,43 @@
             </div>
             <div class="field">
               <label>상대방 생년월일</label>
-              <div class="seg" id="partnerCalSeg">
-                <button type="button" data-val="solar" class="active">양력</button>
-                <button type="button" data-val="lunar">음력</button>
-              </div>
-            </div>
-            <div class="field" id="partnerDateSolarField">
-              <input type="date" id="partnerDate">
-            </div>
-            <div class="field" id="partnerDateLunarField" hidden>
-              <div class="lunar-date-row">
-                <select id="partnerLunarYear"></select>
-                <select id="partnerLunarMonth"></select>
-                <select id="partnerLunarDay"></select>
-              </div>
-              <div class="checkline">
-                <input type="checkbox" id="partnerLunarLeap">
-                <label for="partnerLunarLeap" style="margin:0;">윤달이에요</label>
-              </div>
-              <p class="partner-note" style="margin-top:8px; margin-bottom:0;">입력하신 음력 날짜는 계산할 때 자동으로 양력으로 변환돼요.</p>
+              <button type="button" class="picker-btn" id="partnerDateBtn">
+                <span class="val placeholder" id="partnerDateBtnVal">생년월일을 선택해주세요</span>
+                <span class="ic">📅</span>
+              </button>
             </div>
             <div class="field">
-              <label for="partnerTime">상대방 태어난 시간</label>
-              <input type="time" id="partnerTime">
+              <label for="partnerTimeBtn">상대방 태어난 시간</label>
+              <button type="button" class="picker-btn" id="partnerTimeBtn">
+                <span class="val placeholder" id="partnerTimeBtnVal">태어난 시간을 선택해주세요</span>
+                <span class="ic">🕐</span>
+              </button>
               <div class="checkline">
                 <input type="checkbox" id="partnerUnknown">
                 <label for="partnerUnknown" style="margin:0;">태어난 시간을 몰라요</label>
               </div>
+            </div>
+            <!-- 실제 계산에 쓰이는 데이터 저장용(화면에는 노출 안 함) — 위 휠 피커가 값을 채워 넣고, 기존 계산 로직은 그대로 이 값을 읽음 -->
+            <div hidden>
+              <div class="seg" id="partnerCalSeg">
+                <button type="button" data-val="solar" class="active">양력</button>
+                <button type="button" data-val="lunar">음력</button>
+              </div>
+              <div id="partnerDateSolarField">
+                <input type="date" id="partnerDate">
+              </div>
+              <div id="partnerDateLunarField">
+                <div class="lunar-date-row">
+                  <select id="partnerLunarYear"></select>
+                  <select id="partnerLunarMonth"></select>
+                  <select id="partnerLunarDay"></select>
+                </div>
+                <div class="checkline">
+                  <input type="checkbox" id="partnerLunarLeap">
+                  <label for="partnerLunarLeap">윤달이에요</label>
+                </div>
+              </div>
+              <input type="time" id="partnerTime">
             </div>
             <div class="field">
               <label>상대방 성별</label>
@@ -1208,7 +1231,7 @@
           <div id="aiStepCompatFree" hidden>
             <button type="button" class="cat-back" id="compatFreeBackBtn">← 다른 리포트 선택</button>
             <p class="section-desc" style="margin:14px 0 12px;">사주·자미두수 명식을 바탕으로 한 무료 궁합 미리보기예요. 더 깊은 풀이는 AI 리포트에서 확인할 수 있어요.</p>
-            <div id="compatFreeBox"></div>
+            <div id="compatFreeBox" class="interpret-box" style="font-size:12.5px; line-height:1.75; color:var(--ink-soft);"></div>
             <button class="submit-btn" id="compatFreeUnlockBtn" style="margin-top:16px;">AI로 더 자세히 풀어보기</button>
           </div>
 
@@ -1228,7 +1251,7 @@
           </div>
         </div>
         <div id="aiResult" hidden>
-          <div class="ai-result-text" id="aiResultText"></div>
+          <div class="ai-result-text interpret-box" id="aiResultText"></div>
           <div class="ai-result-note">
             📌 이 결과는 <b>마이페이지 &gt; 내 결제내역</b>에서 15일 동안 다시 볼 수 있고, PDF로도 저장할 수 있어요.
             <button type="button" class="ai-result-note-btn" id="aiResultHistoryBtn">내 결제내역 바로가기 →</button>
@@ -2838,6 +2861,10 @@ let aiInterpretInFlight = false;
 let selectedAiCategory = null;
 let selectedLoveStatus = null;
 let partnerGenderVal = "남";
+// AI 유료 결과 화면(#aiResult)에서 브라우저/기기 뒤로가기를 누르면 페이지를 이탈하는 대신
+// 유료 콘텐츠 목록으로 돌아가게 하기 위한 히스토리 상태 추적 플래그. 결과가 뜰 때 한 번만
+// pushState하고, 그 상태를 소비(뒤로가기 처리 또는 resetAiPanel)하면 다시 false로 돌아간다.
+let aiResultPushedState = false;
 // 카카오 로그인은 페이지 전체를 리다이렉트하는 방식이라, 로그인 도중 입력해둔 내 정보가
 // 브라우저 메모리에서 전부 사라진다. 로그인 직전에 폼 스냅샷을 저장해두고, 로그인 후
 // 돌아왔을 때 자동으로 복원 + 재계산해서 사용자가 처음부터 다시 입력하지 않게 한다.
@@ -3010,11 +3037,33 @@ function updateDayStemPreview(){
 updateDayStemPreview();
 /* =========================================================
    생년월일/시간 휠 스크롤 피커 (시안0_v2 확정안 포트)
-   — 여기서 고른 값은 위 setupLunarDateInput()이 읽는 숨김 백업 요소
-     (#inpCalSeg / #inpDate / #inpLunarYear 등)에 그대로 반영되므로,
-     계산 로직(submitBtn 핸들러)은 전혀 손대지 않아도 됨.
+   — 여기서 고른 값은 아래 PICKER_TARGETS가 가리키는 숨김 백업 요소
+     (#inpCalSeg / #inpDate / #inpLunarYear 등, 궁합 상대방은 #partnerCalSeg 등)에
+     그대로 반영되므로, 계산 로직(submitBtn/partnerNextBtn 핸들러)은 전혀 손대지 않아도 됨.
+   본인 입력과 궁합 상대방 입력이 바텀시트(#dateSheetBg/#timeSheetBg) 하나를 공유하되,
+   버튼을 열 때 pkTarget으로 "지금 어느 쪽을 채우는 중인지"를 표시하고 각자 독립된
+   상태(pkState.main / pkState.partner)를 유지해 서로 값을 덮어쓰지 않도록 한다.
    ========================================================= */
-const pk = { calType:'solar', year:new Date().getFullYear()-30, month:1, day:1, leap:false, hour:0, minute:0 };
+const PICKER_TARGETS = {
+  main: {
+    calSegId:'inpCalSeg', dateId:'inpDate', lunarYearId:'inpLunarYear', lunarMonthId:'inpLunarMonth',
+    lunarDayId:'inpLunarDay', lunarLeapId:'inpLunarLeap', dateBtnValId:'dateBtnVal',
+    timeId:'inpTime', timeBtnValId:'timeBtnVal', unknownId:'inpUnknown',
+    afterDateConfirm: ()=> updateDayStemPreview(),
+  },
+  partner: {
+    calSegId:'partnerCalSeg', dateId:'partnerDate', lunarYearId:'partnerLunarYear', lunarMonthId:'partnerLunarMonth',
+    lunarDayId:'partnerLunarDay', lunarLeapId:'partnerLunarLeap', dateBtnValId:'partnerDateBtnVal',
+    timeId:'partnerTime', timeBtnValId:'partnerTimeBtnVal', unknownId:'partnerUnknown',
+    afterDateConfirm: null,
+  },
+};
+const pkState = {
+  main: { calType:'solar', year:new Date().getFullYear()-30, month:1, day:1, leap:false, hour:0, minute:0 },
+  partner: { calType:'solar', year:new Date().getFullYear()-30, month:1, day:1, leap:false, hour:0, minute:0 },
+};
+let pkTarget = 'main';
+function pk(){ return pkState[pkTarget]; }
 function pkPad(n){ return String(n).padStart(2,'0'); }
 function pkLunarMaxDay(year, month, isLeap){ return lunarMonthDayCount(year, month, isLeap) || 30; }
 function pkSolarMaxDay(year, month){ return new Date(year, month, 0).getDate(); }
@@ -3046,56 +3095,59 @@ function pkAttachSnap(colId, onChange){
   });
 }
 function pkInitDateWheels(){
+  const p = pk();
   const years = []; for(let y=new Date().getFullYear(); y>=1925; y--) years.push(y);
   const months = []; for(let m=1;m<=12;m++) months.push(m);
-  const dayCount = pk.calType==='lunar' ? pkLunarMaxDay(pk.year, pk.month, pk.leap) : pkSolarMaxDay(pk.year, pk.month);
-  pk.day = Math.min(pk.day, dayCount);
+  const dayCount = p.calType==='lunar' ? pkLunarMaxDay(p.year, p.month, p.leap) : pkSolarMaxDay(p.year, p.month);
+  p.day = Math.min(p.day, dayCount);
   const days = []; for(let d=1; d<=dayCount; d++) days.push(d);
 
   pkBuildWheel('col-year', years, y=>y+'년');
   pkBuildWheel('col-month', months, m=>m+'월');
   pkBuildWheel('col-day', days, d=>d+'일');
 
-  const yi = years.indexOf(pk.year), mi = months.indexOf(pk.month), di = days.indexOf(pk.day);
+  const yi = years.indexOf(p.year), mi = months.indexOf(p.month), di = days.indexOf(p.day);
   pkScrollTo('col-year', yi); pkScrollTo('col-month', mi); pkScrollTo('col-day', di);
   pkSelectInitial('col-year', yi); pkSelectInitial('col-month', mi); pkSelectInitial('col-day', di);
 
-  pkAttachSnap('col-year', idx=>{ pk.year = years[idx]; pkRefreshDayWheel(); });
-  pkAttachSnap('col-month', idx=>{ pk.month = months[idx]; pkRefreshDayWheel(); });
-  pkAttachSnap('col-day', idx=> pk.day = days[idx]);
+  pkAttachSnap('col-year', idx=>{ pk().year = years[idx]; pkRefreshDayWheel(); });
+  pkAttachSnap('col-month', idx=>{ pk().month = months[idx]; pkRefreshDayWheel(); });
+  pkAttachSnap('col-day', idx=> pk().day = days[idx]);
 }
 function pkRefreshDayWheel(){
-  const dayCount = pk.calType==='lunar' ? pkLunarMaxDay(pk.year, pk.month, pk.leap) : pkSolarMaxDay(pk.year, pk.month);
-  pk.day = Math.min(pk.day, dayCount);
+  const p = pk();
+  const dayCount = p.calType==='lunar' ? pkLunarMaxDay(p.year, p.month, p.leap) : pkSolarMaxDay(p.year, p.month);
+  p.day = Math.min(p.day, dayCount);
   const days = []; for(let d=1; d<=dayCount; d++) days.push(d);
   pkBuildWheel('col-day', days, d=>d+'일');
-  const di = days.indexOf(pk.day);
+  const di = days.indexOf(p.day);
   pkScrollTo('col-day', di);
   pkSelectInitial('col-day', di);
-  pkAttachSnap('col-day', idx=> pk.day = days[idx]);
+  pkAttachSnap('col-day', idx=> pk().day = days[idx]);
 }
 function pkInitTimeWheels(){
+  const p = pk();
   const hours=[]; for(let h=0;h<24;h++) hours.push(h);
   const minutes=[]; for(let m=0;m<60;m++) minutes.push(m);
   pkBuildWheel('col-hour', hours, h=>pkPad(h)+'시');
   pkBuildWheel('col-minute', minutes, m=>pkPad(m)+'분');
-  const hi = hours.indexOf(pk.hour), mi = minutes.indexOf(pk.minute);
+  const hi = hours.indexOf(p.hour), mi = minutes.indexOf(p.minute);
   pkScrollTo('col-hour', hi); pkScrollTo('col-minute', mi);
   pkSelectInitial('col-hour', hi); pkSelectInitial('col-minute', mi);
-  pkAttachSnap('col-hour', idx=> pk.hour = hours[idx]);
-  pkAttachSnap('col-minute', idx=> pk.minute = minutes[idx]);
+  pkAttachSnap('col-hour', idx=> pk().hour = hours[idx]);
+  pkAttachSnap('col-minute', idx=> pk().minute = minutes[idx]);
 }
 $$('#pkCalSeg button').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     $$('#pkCalSeg button').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
-    pk.calType = btn.dataset.val;
-    $('#pkLeapRow').hidden = (pk.calType !== 'lunar');
+    pk().calType = btn.dataset.val;
+    $('#pkLeapRow').hidden = (pk().calType !== 'lunar');
     pkInitDateWheels();
   });
 });
 $('#pkLeap').addEventListener('change', (e)=>{
-  pk.leap = e.target.checked;
+  pk().leap = e.target.checked;
   pkRefreshDayWheel();
 });
 function switchPickerTab(btn, sheet, tab){
@@ -3112,17 +3164,25 @@ $$('.picker-tabs button').forEach(btn=>{
 });
 $('#dateSheetBg').addEventListener('click', (e)=>{ if(e.target === e.currentTarget) closeSheet('date'); });
 $('#timeSheetBg').addEventListener('click', (e)=>{ if(e.target === e.currentTarget) closeSheet('time'); });
-function openSheet(type){
+function openSheet(type, target){
+  pkTarget = target || 'main';
+  const t = PICKER_TARGETS[pkTarget];
+  const p = pk();
   if(type === 'date'){
-    $('#pkManualYear').value = pk.year;
-    $('#pkManualMonth').value = pk.month;
-    $('#pkManualDay').value = pk.day;
+    // 바텀시트의 양력/음력 토글·윤달 체크박스를, 지금 열려는 대상(본인/상대방)이 마지막으로
+    // 남겨둔 값으로 맞춰준다 — 두 대상이 서로 다른 calType/leap을 갖고 있을 수 있어서 필요함.
+    $$('#pkCalSeg button').forEach(b=> b.classList.toggle('active', b.dataset.val === p.calType));
+    $('#pkLeapRow').hidden = (p.calType !== 'lunar');
+    $('#pkLeap').checked = p.leap;
+    $('#pkManualYear').value = p.year;
+    $('#pkManualMonth').value = p.month;
+    $('#pkManualDay').value = p.day;
     $('#dateSheetBg').classList.add('open');
     setTimeout(pkInitDateWheels, 10);
   } else {
-    if($('#inpUnknown').checked) return;
-    $('#pkManualHour').value = pk.hour;
-    $('#pkManualMinute').value = pk.minute;
+    if($('#'+t.unknownId).checked) return;
+    $('#pkManualHour').value = p.hour;
+    $('#pkManualMinute').value = p.minute;
     $('#timeSheetBg').classList.add('open');
     setTimeout(pkInitTimeWheels, 10);
   }
@@ -3130,46 +3190,55 @@ function openSheet(type){
 function closeSheet(type){
   $(type==='date' ? '#dateSheetBg' : '#timeSheetBg').classList.remove('open');
 }
-$('#dateBtn').addEventListener('click', ()=> openSheet('date'));
-$('#timeBtn').addEventListener('click', ()=> openSheet('time'));
-function pkUpdateTimeLabel(){
-  const ap = pk.hour < 12 ? '오전' : '오후';
-  const h12 = pk.hour % 12 === 0 ? 12 : pk.hour % 12;
-  $('#timeBtnVal').textContent = `${ap} ${h12}시 ${pkPad(pk.minute)}분`;
-  $('#timeBtnVal').classList.remove('placeholder');
+$('#dateBtn').addEventListener('click', ()=> openSheet('date', 'main'));
+$('#timeBtn').addEventListener('click', ()=> openSheet('time', 'main'));
+$('#partnerDateBtn').addEventListener('click', ()=> openSheet('date', 'partner'));
+$('#partnerTimeBtn').addEventListener('click', ()=> openSheet('time', 'partner'));
+function pkUpdateTimeLabel(target){
+  const tgt = target || pkTarget;
+  const t = PICKER_TARGETS[tgt];
+  const p = pkState[tgt];
+  const ap = p.hour < 12 ? '오전' : '오후';
+  const h12 = p.hour % 12 === 0 ? 12 : p.hour % 12;
+  $(`#${t.timeBtnValId}`).textContent = `${ap} ${h12}시 ${pkPad(p.minute)}분`;
+  $(`#${t.timeBtnValId}`).classList.remove('placeholder');
 }
 function confirmDatePicker(){
+  const t = PICKER_TARGETS[pkTarget];
+  const p = pk();
   const manualActive = $('#date-manual').classList.contains('active');
   if(manualActive){
-    pk.year = parseInt($('#pkManualYear').value) || pk.year;
-    pk.month = parseInt($('#pkManualMonth').value) || pk.month;
-    pk.day = parseInt($('#pkManualDay').value) || pk.day;
+    p.year = parseInt($('#pkManualYear').value) || p.year;
+    p.month = parseInt($('#pkManualMonth').value) || p.month;
+    p.day = parseInt($('#pkManualDay').value) || p.day;
   }
   // 기존 계산 로직(setupLunarDateInput)이 그대로 읽는 백업 요소에 값 반영
-  const targetSegBtn = $(`#inpCalSeg button[data-val="${pk.calType}"]`);
+  const targetSegBtn = $(`#${t.calSegId} button[data-val="${p.calType}"]`);
   if(targetSegBtn && !targetSegBtn.classList.contains('active')) targetSegBtn.click();
-  if(pk.calType === 'lunar'){
-    $('#inpLunarLeap').checked = pk.leap;
-    $('#inpLunarYear').value = pk.year;
-    $('#inpLunarMonth').value = pk.month;
-    $('#inpLunarMonth').dispatchEvent(new Event('change'));
-    $('#inpLunarDay').value = pk.day;
-    $('#dateBtnVal').textContent = `${pk.year}년 ${pk.leap ? '윤' : ''}${pk.month}월 ${pk.day}일 (음력)`;
+  if(p.calType === 'lunar'){
+    $(`#${t.lunarLeapId}`).checked = p.leap;
+    $(`#${t.lunarYearId}`).value = p.year;
+    $(`#${t.lunarMonthId}`).value = p.month;
+    $(`#${t.lunarMonthId}`).dispatchEvent(new Event('change'));
+    $(`#${t.lunarDayId}`).value = p.day;
+    $(`#${t.dateBtnValId}`).textContent = `${p.year}년 ${p.leap ? '윤' : ''}${p.month}월 ${p.day}일 (음력)`;
   } else {
-    $('#inpDate').value = `${pk.year}-${pkPad(pk.month)}-${pkPad(pk.day)}`;
-    $('#dateBtnVal').textContent = `${pk.year}년 ${pk.month}월 ${pk.day}일 (양력)`;
+    $(`#${t.dateId}`).value = `${p.year}-${pkPad(p.month)}-${pkPad(p.day)}`;
+    $(`#${t.dateBtnValId}`).textContent = `${p.year}년 ${p.month}월 ${p.day}일 (양력)`;
   }
-  $('#dateBtnVal').classList.remove('placeholder');
+  $(`#${t.dateBtnValId}`).classList.remove('placeholder');
   closeSheet('date');
-  updateDayStemPreview();
+  if(t.afterDateConfirm) t.afterDateConfirm();
 }
 function confirmTimePicker(){
+  const t = PICKER_TARGETS[pkTarget];
+  const p = pk();
   const manualActive = $('#time-manual').classList.contains('active');
   if(manualActive){
-    pk.hour = Math.min(23, Math.max(0, parseInt($('#pkManualHour').value) || 0));
-    pk.minute = Math.min(59, Math.max(0, parseInt($('#pkManualMinute').value) || 0));
+    p.hour = Math.min(23, Math.max(0, parseInt($('#pkManualHour').value) || 0));
+    p.minute = Math.min(59, Math.max(0, parseInt($('#pkManualMinute').value) || 0));
   }
-  $('#inpTime').value = `${pkPad(pk.hour)}:${pkPad(pk.minute)}`;
+  $(`#${t.timeId}`).value = `${pkPad(p.hour)}:${pkPad(p.minute)}`;
   pkUpdateTimeLabel();
   closeSheet('time');
 }
@@ -3196,10 +3265,22 @@ $('#inpUnknown').addEventListener('change', (e)=>{
     $('#timeBtnVal').textContent = '시간 모름';
     $('#timeBtnVal').classList.remove('placeholder');
   } else if($('#inpTime').value){
-    pkUpdateTimeLabel();
+    pkUpdateTimeLabel('main');
   } else {
     $('#timeBtnVal').textContent = '태어난 시간을 선택해주세요';
     $('#timeBtnVal').classList.add('placeholder');
+  }
+});
+$('#partnerUnknown').addEventListener('change', (e)=>{
+  $('#partnerTimeBtn').classList.toggle('disabled', e.target.checked);
+  if(e.target.checked){
+    $('#partnerTimeBtnVal').textContent = '시간 모름';
+    $('#partnerTimeBtnVal').classList.remove('placeholder');
+  } else if($('#partnerTime').value){
+    pkUpdateTimeLabel('partner');
+  } else {
+    $('#partnerTimeBtnVal').textContent = '태어난 시간을 선택해주세요';
+    $('#partnerTimeBtnVal').classList.add('placeholder');
   }
 });
 $('#submitBtn').addEventListener('click', ()=>{
@@ -3279,6 +3360,7 @@ const TAB_GROUPS = {
   ai: {panels:[{id:'ai',label:'AI 해석'}]}
 };
 let lastSubPanel = {palja_group:'palja', unse_group:'daeun'};
+let currentGroupKey = 'palja_group';
 function activatePanel(panelId){
   $$('.panel').forEach(p=>p.classList.remove('active'));
   const target = $(`.panel[data-panel="${panelId}"]`);
@@ -3297,6 +3379,7 @@ function renderSubtabBar(groupKey){
 function activateGroup(groupKey){
   const group = TAB_GROUPS[groupKey];
   if(!group) return;
+  currentGroupKey = groupKey;
   $$('#tabbar button').forEach(b=>b.classList.remove('active'));
   const btn = $(`#tabbar button[data-group="${groupKey}"]`);
   if(btn) btn.classList.add('active');
@@ -3322,6 +3405,41 @@ $('#subtabBar').addEventListener('click', (e)=>{
   activatePanel(btn.dataset.sub);
   renderSubtabBar(groupKey);
 });
+/* 서브탭이 여러 개인 그룹(사주팔자: 사주/오행/십성/심화, 운세흐름: 대운/세운)에서는 서브탭
+   버튼을 누르지 않고도 화면을 좌우로 스와이프해서 이전/다음 서브탭으로 전환할 수 있게 한다.
+   세로 스크롤과 헷갈리지 않도록 touchmove 중에는 아무것도 막지 않고(preventDefault 없음),
+   손을 뗀 순간(touchend)의 총 이동량만 보고 "가로 이동이 세로 이동보다 뚜렷하게 크고 일정
+   거리 이상"일 때만 반응한다. 서브탭이 하나뿐인 그룹(자미/종합/오늘/AI 해석)에서는 그냥
+   아무 동작도 하지 않는다. */
+let swipeStartX = null, swipeStartY = null;
+const SWIPE_MIN_DIST = 60;      // 이 정도는 움직여야 "스와이프"로 인정
+const SWIPE_MAX_VERTICAL = 60;  // 세로로 이만큼 넘게 움직였으면 스크롤 의도로 보고 무시
+$('#view-result').addEventListener('touchstart', (e)=>{
+  if(e.touches.length !== 1) return;
+  swipeStartX = e.touches[0].clientX;
+  swipeStartY = e.touches[0].clientY;
+}, {passive:true});
+$('#view-result').addEventListener('touchend', (e)=>{
+  if(swipeStartX === null) return;
+  const t = e.changedTouches[0];
+  const dx = (t ? t.clientX : swipeStartX) - swipeStartX;
+  const dy = (t ? t.clientY : swipeStartY) - swipeStartY;
+  swipeStartX = null; swipeStartY = null;
+  if(Math.abs(dx) < SWIPE_MIN_DIST) return;
+  if(Math.abs(dy) > SWIPE_MAX_VERTICAL) return;
+  if(Math.abs(dx) < Math.abs(dy) * 1.5) return; // 세로 스크롤과 확실히 구분되는 경우만 반응
+  const group = TAB_GROUPS[currentGroupKey];
+  if(!group || group.panels.length <= 1) return;
+  const curSub = lastSubPanel[currentGroupKey] || group.panels[0].id;
+  const idx = group.panels.findIndex(p=>p.id===curSub);
+  if(idx === -1) return;
+  const nextIdx = dx < 0 ? idx + 1 : idx - 1; // 왼쪽으로 스와이프 → 다음 서브탭, 오른쪽으로 → 이전 서브탭
+  if(nextIdx < 0 || nextIdx >= group.panels.length) return; // 양 끝에서는 넘어가지 않음
+  const nextSub = group.panels[nextIdx].id;
+  lastSubPanel[currentGroupKey] = nextSub;
+  activatePanel(nextSub);
+  renderSubtabBar(currentGroupKey);
+}, {passive:true});
 
 /* =========================================================
    4. AI 해석 (결제 게이트 + 백엔드 호출)
@@ -3333,6 +3451,7 @@ function resetAiPanel(){
   selectedAiCategory = null;
   selectedLoveStatus = null;
   partnerData = null;
+  aiResultPushedState = false;
   $('#aiLocked').hidden = false;
   $('#aiLoading').hidden = true;
   $('#aiResult').hidden = true;
@@ -3731,6 +3850,13 @@ async function runAiInterpretation(){
     $('#aiLoading').hidden = true;
     $('#aiResultText').textContent = data.interpretation || '해석 결과를 받아오지 못했어요.';
     $('#aiResult').hidden = false;
+    // 뒤로가기(브라우저/기기 back)를 누르면 이 결과 화면에서 페이지 자체를 이탈하는 대신
+    // 유료 콘텐츠 목록으로 돌아가도록 히스토리에 상태를 하나 쌓아둔다. 같은 결과를 보는 동안
+    // 중복으로 쌓이지 않도록 한 번만 push한다(popstate에서 소비되면 다시 false로 리셋됨).
+    if(!aiResultPushedState){
+      history.pushState({ view: 'aiResult' }, '');
+      aiResultPushedState = true;
+    }
   } catch(err){
     $('#aiLoading').hidden = true;
     $('#aiError').hidden = false;
@@ -3744,6 +3870,18 @@ async function runAiInterpretation(){
   }
 }
 $('#aiResultHistoryBtn').addEventListener('click', ()=>{ openHistoryModal(); });
+// AI 결과를 본 뒤 브라우저/기기 뒤로가기를 누르면, 실제로 지금 AI 결과 화면을 보고 있을 때만
+// 유료 콘텐츠 목록(카테고리 선택)으로 되돌리고, 그 히스토리 상태를 소비한다. 이미 다른 탭으로
+// 넘어가 있는 상태라면(패널이 더 이상 active가 아니면) 평범한 브라우저 뒤로가기 동작에 맡긴다.
+window.addEventListener('popstate', ()=>{
+  const aiPanelActive = $('.panel[data-panel="ai"]') && $('.panel[data-panel="ai"]').classList.contains('active');
+  if(aiResultPushedState && aiPanelActive && !$('#aiResult').hidden){
+    resetAiPanel();
+    window.scrollTo(0,0);
+  } else {
+    aiResultPushedState = false;
+  }
+});
 
 /* =========================================================
    계정 / 로그인 (Supabase Auth + 카카오 로그인)
