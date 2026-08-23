@@ -1159,6 +1159,11 @@
                 <div class="cat-option-desc">돈을 대하는 태도부터 지금 시기의 재물 흐름까지, 이 사람만의 돈 이야기를 풀어드려요.</div>
                 <div class="cat-option-price">3,900원</div>
               </button>
+              <button type="button" class="cat-option" data-cat="pet">
+                <div class="cat-option-name">반려동물궁합 🐾</div>
+                <div class="cat-option-desc">우리 아이와 나, 얼마나 잘 통하는 콤비일까요? 유쾌하고 행복한 궁합 이야기예요.</div>
+                <div class="cat-option-price">1,900원</div>
+              </button>
             </div>
           </div>
 
@@ -1231,6 +1236,33 @@
             </div>
             <div id="partnerError" hidden class="ai-error" style="margin-bottom:10px;"></div>
             <button class="submit-btn" id="partnerNextBtn">다음</button>
+          </div>
+
+          <div id="aiStepPet" hidden>
+            <button type="button" class="cat-back" id="petBackBtn">← 다른 리포트 선택</button>
+            <p class="section-desc" style="margin:14px 0 6px;">우리 아이 정보를 알려주세요. 🐾</p>
+            <div class="field">
+              <label for="petName">반려동물 이름 (선택)</label>
+              <input type="text" id="petName" placeholder="예: 코코">
+            </div>
+            <div class="field">
+              <label>어떤 아이인가요?</label>
+              <div class="seg" id="petSpeciesSeg">
+                <button type="button" data-val="강아지" class="active">강아지</button>
+                <button type="button" data-val="고양이">고양이</button>
+                <button type="button" data-val="기타">기타</button>
+              </div>
+            </div>
+            <div class="field" id="petSpeciesOtherField" hidden>
+              <label for="petSpeciesOther">어떤 동물인지 알려주세요</label>
+              <input type="text" id="petSpeciesOther" placeholder="예: 토끼, 앵무새">
+            </div>
+            <div class="field">
+              <label for="petBirthYear">태어난 해 (모르면 대략적으로)</label>
+              <select id="petBirthYear"></select>
+            </div>
+            <div id="petError" hidden class="ai-error" style="margin-bottom:10px;"></div>
+            <button class="submit-btn" id="petNextBtn">다음</button>
           </div>
 
           <div id="aiStepCompatFree" hidden>
@@ -2890,12 +2922,15 @@ let aiBackTrapPushed = false;
 let pendingRestoreGroup = null;
 let pendingRestoreCategory = null;
 let partnerData = null; // { name, gender, saju(calcSaju 결과), ziwei(calcZiwei 결과) }
+let petData = null; // { name, species, speciesLabel, birthYear, zodiac, ownerDayZhi, relationText }
+let petSpeciesVal = '강아지';
 const AI_CATEGORY_META = {
   comprehensive: { price: '3,900원', desc: '1회 결제로 이 사주의 종합 해석 리포트를 확인할 수 있어요.' },
   love: { price: '2,900원', desc: '1회 결제로 연애·재회운 리포트를 확인할 수 있어요.' },
   compatibility: { price: '4,900원', desc: '1회 결제로 두 분의 궁합 리포트를 확인할 수 있어요.' },
   newyear: { price: '9,900원', desc: '1회 결제로 2027 신년운세 리포트를 확인할 수 있어요.' },
   wealth: { price: '3,900원', desc: '1회 결제로 재물운 리포트를 확인할 수 있어요.' },
+  pet: { price: '1,900원', desc: '1회 결제로 반려동물궁합 리포트를 확인할 수 있어요.' },
 };
 $$('#genderSeg button').forEach(btn=>{
   btn.addEventListener('click', ()=>{
@@ -3471,6 +3506,7 @@ function resetAiPanel(){
   selectedAiCategory = null;
   selectedLoveStatus = null;
   partnerData = null;
+  petData = null;
   aiResultPushedState = false;
   $('#aiLocked').hidden = false;
   $('#aiLoading').hidden = true;
@@ -3479,10 +3515,11 @@ function resetAiPanel(){
   showAiStep('aiStepCategory');
   $$('#loveStatusSeg button').forEach(b=>b.classList.remove('active'));
   $('#partnerError').hidden = true;
+  $('#petError').hidden = true;
 }
 // AI 패널 내부의 단계(카테고리 선택 → 부가입력 → 결제) 전환
 function showAiStep(stepId){
-  ['aiStepCategory','aiStepLove','aiStepPartner','aiStepCompatFree','aiStepPay'].forEach(id=>{
+  ['aiStepCategory','aiStepLove','aiStepPartner','aiStepPet','aiStepCompatFree','aiStepPay'].forEach(id=>{
     $('#'+id).hidden = (id !== stepId);
   });
 }
@@ -3720,6 +3757,24 @@ function buildSeunText(s, targetYear){
   const god = tenGodOf(dmG, GAN_ELEMENT[yp.g], yp.g % 2);
   return `${targetYear}년 세운: ${GAN[yp.g]}${ZHI[yp.z]}(${GAN_HANJA[yp.g]}${ZHI_HANJA[yp.z]})년, ${ELEMENT_NAME[GAN_ELEMENT[yp.g]]}${ELEMENT_NAME[ZHI_ELEMENT[yp.z]]} 기운. 일간 ${GAN[dmG]}(${ELEMENT_NAME[GAN_ELEMENT[dmG]]})과의 십성 관계: ${god}.`;
 }
+// 반려동물궁합(pet) 카테고리용. 태어난 해(연도)만으로 띠(12지)를 구하고, 집사의 일지와
+// 전통 육합(六合)/충(沖) 관계인지 판정해 짧은 사실 문장으로 만든다. 판정 자체는 담백한
+// 사실 문장이고, 이걸 유쾌하게 재해석하는 건 전적으로 PET_SYSTEM_PROMPT(백엔드)의 몫이다.
+function zodiacFromYear(year){
+  return ((year - 4) % 12 + 12) % 12; // 2020년(경자년, 쥐띠) 기준 보정 — ZHI/ZHI_ANIMAL 인덱스와 그대로 대응
+}
+function buildPetRelationText(ownerDayZ, petZ){
+  const ownerLabel = `${ZHI[ownerDayZ]}(${ZHI_ANIMAL[ownerDayZ]})`;
+  const petLabel = `${ZHI[petZ]}(${ZHI_ANIMAL[petZ]})`;
+  if(ZHI_YUKHAP[ownerDayZ] === petZ){
+    return `집사의 일지 ${ownerLabel}와 반려동물의 띠 ${petLabel}는 육합(六合) 관계예요 — 전통적으로 서로 끌어당기는 조합으로 봐요.`;
+  } else if(ZHI_CHUNG[ownerDayZ] === petZ){
+    return `집사의 일지 ${ownerLabel}와 반려동물의 띠 ${petLabel}는 충(沖) 관계예요 — 전통적으로 정반대 기운이 부딪히는 조합으로 봐요.`;
+  } else if(ownerDayZ === petZ){
+    return `집사의 일지와 반려동물의 띠가 똑같이 ${ownerLabel}예요 — 같은 기운을 공유하는 조합이에요.`;
+  }
+  return `집사의 일지 ${ownerLabel}와 반려동물의 띠 ${petLabel}는 합이나 충처럼 뚜렷하게 두드러지는 관계는 아니에요 — 무난하게 각자 속도를 지키는 조합이에요.`;
+}
 function buildAiPayload(){
   const s = lastSajuResult, z = lastZiweiResult;
   if(!s) return null;
@@ -3748,6 +3803,9 @@ function buildAiPayload(){
   if(selectedAiCategory === 'newyear'){
     payload.세운 = buildSeunText(s, 2027);
   }
+  if(selectedAiCategory === 'pet' && petData){
+    payload.pet = petData;
+  }
   if(currentSession && currentSession.access_token){
     payload.access_token = currentSession.access_token;
   }
@@ -3767,8 +3825,47 @@ $$('.cat-option').forEach(btn=>{
     selectedAiCategory = btn.dataset.cat;
     if(selectedAiCategory === 'love'){ showAiStep('aiStepLove'); }
     else if(selectedAiCategory === 'compatibility'){ showAiStep('aiStepPartner'); }
-    else { goToAiPayStep(); } // comprehensive, newyear는 바로 결제 단계
+    else if(selectedAiCategory === 'pet'){ showAiStep('aiStepPet'); }
+    else { goToAiPayStep(); } // comprehensive, newyear, wealth는 바로 결제 단계
   });
+});
+$('#petBackBtn').addEventListener('click', ()=>{ showAiStep('aiStepCategory'); });
+$$('#petSpeciesSeg button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    $$('#petSpeciesSeg button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    petSpeciesVal = btn.dataset.val;
+    $('#petSpeciesOtherField').hidden = (petSpeciesVal !== '기타');
+  });
+});
+(function initPetBirthYearSelect(){
+  const sel = $('#petBirthYear');
+  const nowYear = new Date().getFullYear();
+  for(let y = nowYear; y >= nowYear - 30; y--){
+    const opt = document.createElement('option');
+    opt.value = y;
+    opt.textContent = `${y}년`;
+    sel.appendChild(opt);
+  }
+  sel.value = nowYear - 3; // 반려동물 평균 연령대를 감안한 기본값
+})();
+$('#petNextBtn').addEventListener('click', ()=>{
+  if(!lastSajuResult){ $('#petError').hidden = false; $('#petError').textContent = '먼저 내 사주 정보를 입력해주세요.'; return; }
+  const speciesLabel = petSpeciesVal === '기타' ? (($('#petSpeciesOther').value||'').trim() || '기타') : petSpeciesVal;
+  const birthYear = parseInt($('#petBirthYear').value, 10);
+  const petZ = zodiacFromYear(birthYear);
+  const ownerDayZ = lastSajuResult.pillars.day.z;
+  petData = {
+    name: ($('#petName').value||'').trim() || '반려동물',
+    species: petSpeciesVal,
+    speciesLabel,
+    birthYear,
+    zodiac: ZHI_ANIMAL[petZ],
+    ownerDayZhi: ZHI[ownerDayZ],
+    relationText: buildPetRelationText(ownerDayZ, petZ),
+  };
+  $('#petError').hidden = true;
+  goToAiPayStep();
 });
 $$('#loveStatusSeg button').forEach(btn=>{
   btn.addEventListener('click', ()=>{
@@ -4311,8 +4408,8 @@ function saveFormSnapshot(){
       gender: selectedGender,
       cityLon: citySelect.value,
       cityLabel: $('#cityBtnVal').textContent,
-      // 궁합은 상대방 정보까지 복원해야 해서 범위 밖 — 카테고리 복원은 단독 리포트만 지원
-      aiCategory: (selectedAiCategory && selectedAiCategory !== 'compatibility') ? selectedAiCategory : null,
+      // 궁합/반려동물궁합은 상대방·반려동물 정보까지 복원해야 해서 범위 밖 — 카테고리 복원은 단독 리포트만 지원
+      aiCategory: (selectedAiCategory && selectedAiCategory !== 'compatibility' && selectedAiCategory !== 'pet') ? selectedAiCategory : null,
     };
     localStorage.setItem(FORM_SNAPSHOT_KEY, JSON.stringify(snapshot));
   } catch(err){ /* localStorage를 못 쓰는 환경이어도 로그인 자체는 계속 진행 */ }
