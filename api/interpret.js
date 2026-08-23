@@ -133,7 +133,7 @@ function buildPrompt(payload) {
   const { name, gender, birth, saju, ziwei, partner } = payload;
 
   const lines = [];
-  lines.push(`${partner ? '[사람 A] ' : ''}이름: ${name || '(비공개)'}`);
+  lines.push(`${partner ? '[본인] ' : ''}이름: ${name || '(비공개)'}`);
   lines.push(`성별: ${gender}`);
   lines.push(`생년월일시: ${birth}`);
   lines.push('');
@@ -144,7 +144,7 @@ function buildPrompt(payload) {
   if (partner) {
     lines.push('');
     lines.push('====================');
-    lines.push(`[사람 B / 상대방] 이름: ${partner.name || '(비공개)'}`);
+    lines.push(`[상대방] 이름: ${partner.name || '(비공개)'}`);
     lines.push(`성별: ${partner.gender}`);
     lines.push(`생년월일시: ${partner.birth}`);
     lines.push('');
@@ -247,10 +247,18 @@ function buildCategoryPromptLove(loveStatus) {
 - 마지막 소주제("다가오는 시기와 총평")에서 앞선 내용을 종합해 마무리합니다.`;
 }
 
-const CATEGORY_PROMPT_COMPATIBILITY = `
+// 궁합&결혼은 실제 제출된 이름을 프롬프트 지시문에 직접 박아 넣어야, 모델이 본문에서
+// "사람 A"/"사람 B" 같은 익명 표현 대신 실제 이름으로 두 사람을 지칭한다(과거엔 정적 문자열이라
+// 이름을 지시문에 넣을 방법이 없어 예시 문장이 "사람 A"/"사람 B"였고, 모델이 그 예시를 그대로
+// 따라 써서 결과물에도 "사람 A"/"사람 B"가 나오는 문제가 있었음). 이름이 비어있으면(선택 입력이라
+// 생략 가능) 무료 궁합 미리보기와 동일한 관례로 "나"/"상대방"을 대신 사용한다.
+function buildCategoryPromptCompatibility(myName, partnerName) {
+  const a = (myName || '').trim() || '나';
+  const b = (partnerName || '').trim() || '상대방';
+  return `
 [이 리포트는 "궁합&결혼" 카테고리입니다 — 아래 규칙을 추가로 지키세요]
 
-- 이 리포트는 두 사람(사람 A, 사람 B/상대방)의 사주·자미두수 데이터를 모두 받았습니다. 반드시 두 사람의 실제 데이터를 함께 근거로 사용해 비교·해석하세요. 한쪽 데이터만 보고 쓰거나 상대방을 막연하게 묘사하지 않습니다. 예를 들어 "사람 A의 일간은 계수, 사람 B의 일간은 정화라 물과 불처럼 대조적인 조합입니다"처럼 두 사람을 항상 나란히 인용합니다.
+- 이 리포트는 두 사람(본인 "${a}", 상대방 "${b}")의 사주·자미두수 데이터를 모두 받았습니다. 반드시 두 사람의 실제 데이터를 함께 근거로 사용해 비교·해석하세요. 한쪽 데이터만 보고 쓰거나 상대방을 막연하게 묘사하지 않습니다. 본문 전체에서 "사람 A", "사람 B" 같은 익명 표현은 절대 쓰지 말고, 반드시 "${a}님", "${b}님"처럼 실제 이름 뒤에 "님"을 붙여서 지칭합니다. 예를 들어 "${a}님의 일간은 계수, ${b}님의 일간은 정화라 물과 불처럼 대조적인 조합입니다"처럼 두 사람을 항상 이름으로 나란히 인용합니다.
 - 아래 5개 소주제를 이 순서대로 다룹니다: "두 사람의 기질 비교", "함께 있을 때의 케미", "마찰이 생기기 쉬운 지점", "관계가 좋아지는 방법", "총평".
 - "두 사람의 기질 비교" 섹션: 두 사람의 일간·오행, 명궁의 별 등을 나란히 대조하며 각자의 기본 성향을 짚습니다.
 - "함께 있을 때의 케미" 섹션: 두 사람의 조합이 만들어내는 강점 — 서로 잘 맞물리는 지점, 함께 있을 때 시너지가 나는 부분 — 을 구체적으로 짚습니다.
@@ -259,6 +267,7 @@ const CATEGORY_PROMPT_COMPATIBILITY = `
 - "결혼 궁합"을 자동으로 전제하지 말고 기본적으로는 "이 두 사람이 관계를 맺을 때"의 궁합으로 다루되, 자연스러운 흐름에서 결혼 이후를 함께 언급하는 것은 괜찮습니다.
 - 각 소주제는 충분히 구체적으로, 두 사람 모두를 근거로 인용하며 씁니다. 전체 분량은 3,000~4,000자 내외로 작성합니다.
 - 마지막 "총평" 소주제에서 앞선 내용을 종합해 두 사람 관계의 핵심을 한 문장으로 정리하며 마무리합니다.`;
+}
 
 const CATEGORY_PROMPT_NEWYEAR = `
 [이 리포트는 "2027 신년운세" 카테고리입니다 — 아래 규칙을 추가로 지키세요]
@@ -286,7 +295,6 @@ const CATEGORY_PROMPT_TODAY = `
 
 const CATEGORY_PROMPTS = {
   comprehensive: CATEGORY_PROMPT_COMPREHENSIVE,
-  compatibility: CATEGORY_PROMPT_COMPATIBILITY,
   newyear: CATEGORY_PROMPT_NEWYEAR,
   today: CATEGORY_PROMPT_TODAY,
 };
@@ -412,7 +420,9 @@ module.exports = async (req, res) => {
   const userPrompt = buildPrompt(payload);
   const categoryPrompt = payload.category === 'love'
     ? buildCategoryPromptLove(payload.loveStatus)
-    : (CATEGORY_PROMPTS[payload.category] || CATEGORY_PROMPT_COMPREHENSIVE);
+    : payload.category === 'compatibility'
+      ? buildCategoryPromptCompatibility(payload.name, payload.partner && payload.partner.name)
+      : (CATEGORY_PROMPTS[payload.category] || CATEGORY_PROMPT_COMPREHENSIVE);
   const SYSTEM_PROMPT = BASE_PROMPT + '\n' + categoryPrompt;
 
   const maxTokens = MAX_TOKENS_BY_CATEGORY[payload.category] || 4000;
