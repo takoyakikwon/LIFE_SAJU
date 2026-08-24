@@ -344,11 +344,12 @@
   /* 결과 화면 맨 위, 요약 카드 바로 아래에 오는 훅 티저 — 오행/십성/자미를 다 안 봐도
      생년월일 입력 직후 바로 눈에 띄도록 배치(2026-08-24, 결제 동선 단축 논의로 추가).
      타 사주앱 벤치마킹 후(같은 날 재작업) 주변 카드와 톤이 비슷해서 위계가 안 느껴진다는
-     피드백을 받아 — 카드를 훨씬 크고 화려하게, 큰 숫자(%)와 유형 뱃지를 얹어서 "이게 제일
-     중요한 결과다"라는 게 스크롤 없이 한눈에 느껴지도록 재설계함. */
+     피드백을 받아 카드를 훨씬 크고 화려하게 재설계함. 처음엔 큰 숫자(오행 비중 %)를 얹었으나
+     사용자가 "숫자보다 실제 풀이 문장 자체가 눈에 띄는 게 낫다"고 피드백해 숫자는 빼고,
+     대신 유형 뱃지 + 인용부호 스타일로 풀이 문장 자체를 카드의 주인공으로 키움. */
   .hook-teaser{
     position:relative; overflow:hidden;
-    margin-bottom:20px; padding:22px 20px 20px; border-radius:20px;
+    margin-bottom:20px; padding:24px 22px 22px; border-radius:20px;
     background:linear-gradient(160deg, rgba(167,139,250,.28), rgba(244,114,182,.14) 55%, rgba(244,196,99,.10));
     border:1.5px solid var(--gold-line);
     box-shadow:0 14px 36px rgba(167,139,250,.28), 0 0 0 1px rgba(244,196,99,.08) inset;
@@ -359,27 +360,25 @@
     background:radial-gradient(circle, rgba(244,196,99,.16), transparent 65%);
     pointer-events:none;
   }
-  .hook-teaser-type-row{ display:flex; align-items:center; gap:8px; margin-bottom:14px; }
-  .hook-teaser-icon{ font-size:22px; line-height:1; }
+  .hook-teaser-type-row{ display:flex; align-items:center; gap:8px; margin-bottom:16px; }
+  .hook-teaser-icon{ font-size:24px; line-height:1; }
   .hook-teaser-type{
-    font-family:"Noto Serif KR"; font-weight:900; font-size:16px; color:var(--ink);
+    font-family:"Noto Serif KR"; font-weight:900; font-size:17px; color:var(--ink);
     letter-spacing:0.2px;
   }
-  .hook-teaser-score-row{
-    display:flex; align-items:baseline; gap:10px; margin-bottom:16px;
-    padding-bottom:16px; border-bottom:1px dashed rgba(244,196,99,.35);
+  .hook-teaser-label{
+    font-size:11px; font-weight:800; color:var(--gold); letter-spacing:0.3px; margin-bottom:2px;
   }
-  .hook-teaser-score-num{
-    font-family:"JetBrains Mono", "Noto Serif KR"; font-weight:800; font-size:40px; line-height:1;
+  .hook-teaser-quote-mark{
+    font-family:Georgia,"Noto Serif KR",serif; font-weight:900; font-size:46px; line-height:1;
     background:linear-gradient(135deg,var(--gold),var(--pink));
     -webkit-background-clip:text; background-clip:text; color:transparent;
+    opacity:.6; height:26px; margin-bottom:-4px;
   }
-  .hook-teaser-score-num .pct{ font-size:20px; }
-  .hook-teaser-score-label{ font-size:12px; color:var(--ink-soft); line-height:1.5; }
-  .hook-teaser-label{
-    font-size:11px; font-weight:800; color:var(--gold); letter-spacing:0.3px; margin-bottom:8px;
+  .hook-teaser-text{
+    font-family:"Noto Serif KR"; font-weight:700; font-size:16.5px; line-height:1.75;
+    color:var(--ink); margin-bottom:16px;
   }
-  .hook-teaser-text{ font-size:13.5px; line-height:1.7; color:var(--ink); margin-bottom:14px; }
   .hook-teaser-btn{
     display:inline-block; background:none; border:none; padding:0;
     color:var(--gold); font-size:13px; font-weight:800; cursor:pointer; font-family:"Noto Sans KR";
@@ -1051,11 +1050,8 @@
           <span class="hook-teaser-icon" id="hookTeaserIcon">✦</span>
           <span class="hook-teaser-type" id="hookTeaserType"></span>
         </div>
-        <div class="hook-teaser-score-row">
-          <div class="hook-teaser-score-num" id="hookTeaserScoreNum">--<span class="pct">%</span></div>
-          <div class="hook-teaser-score-label" id="hookTeaserScoreLabel"></div>
-        </div>
         <div class="hook-teaser-label">✦ 지금 나온 결과, 한눈에 보면</div>
+        <div class="hook-teaser-quote-mark">"</div>
         <div class="hook-teaser-text" id="hookTeaserText"></div>
         <button type="button" class="hook-teaser-btn" id="hookTeaserBtn">이 성향, 더 깊이 풀어보기 →</button>
       </div>
@@ -2929,16 +2925,12 @@ function computeCrossIdentity(saju, zw){
 function renderHookTeaser(saju, zw){
   const textBox = $('#hookTeaserText');
   if(!textBox) return;
-  const {maxEl, topGroup, elPercent} = computeCrossIdentity(saju, zw);
+  const {maxEl, topGroup} = computeCrossIdentity(saju, zw);
   textBox.innerHTML = `${ELEMENT_SCENARIO[maxEl]} 거기다 ${TEN_GOD_GROUP_SCENARIO[topGroup]}`;
   const iconEl = $('#hookTeaserIcon');
   if(iconEl) iconEl.textContent = ELEMENT_EMOJI[maxEl];
   const typeEl = $('#hookTeaserType');
   if(typeEl) typeEl.textContent = `${ELEMENT_TYPE_LABEL[maxEl]} × ${TEN_GOD_GROUP_TYPE_LABEL[topGroup]}`;
-  const scoreNumEl = $('#hookTeaserScoreNum');
-  if(scoreNumEl) scoreNumEl.innerHTML = `${elPercent}<span class="pct">%</span>`;
-  const scoreLabelEl = $('#hookTeaserScoreLabel');
-  if(scoreLabelEl) scoreLabelEl.textContent = `내 여덟 글자 중 ${ELEMENT_NAME[maxEl]}(${ELEMENT_HANJA[maxEl]}) 기운 비중`;
 }
 function renderCross(saju, zw){
   const {maxEl, topGroup, matchCount} = computeCrossIdentity(saju, zw);
