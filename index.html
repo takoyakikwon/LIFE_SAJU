@@ -1159,6 +1159,11 @@
                 <div class="cat-option-desc">돈을 대하는 태도부터 지금 시기의 재물 흐름까지, 이 사람만의 돈 이야기를 풀어드려요.</div>
                 <div class="cat-option-price">3,900원</div>
               </button>
+              <button type="button" class="cat-option" data-cat="career">
+                <div class="cat-option-name">취업·사업·이동운 🧭</div>
+                <div class="cat-option-desc">지금이 움직일 때인지 자리를 지킬 때인지, 일과 이동의 타이밍을 짚어드려요.</div>
+                <div class="cat-option-price">3,900원</div>
+              </button>
               <button type="button" class="cat-option" data-cat="pet">
                 <div class="cat-option-name">반려동물궁합 🐾</div>
                 <div class="cat-option-desc">우리 아이와 나, 얼마나 잘 통하는 콤비일까요? 유쾌하고 행복한 궁합 이야기예요.</div>
@@ -2931,6 +2936,7 @@ const AI_CATEGORY_META = {
   newyear: { price: '9,900원', desc: '1회 결제로 2027 신년운세 리포트를 확인할 수 있어요.' },
   wealth: { price: '3,900원', desc: '1회 결제로 재물운 리포트를 확인할 수 있어요.' },
   pet: { price: '1,900원', desc: '1회 결제로 반려동물궁합 리포트를 확인할 수 있어요.' },
+  career: { price: '3,900원', desc: '1회 결제로 취업·사업·이동운 리포트를 확인할 수 있어요.' },
 };
 $$('#genderSeg button').forEach(btn=>{
   btn.addEventListener('click', ()=>{
@@ -3826,7 +3832,7 @@ $$('.cat-option').forEach(btn=>{
     if(selectedAiCategory === 'love'){ showAiStep('aiStepLove'); }
     else if(selectedAiCategory === 'compatibility'){ showAiStep('aiStepPartner'); }
     else if(selectedAiCategory === 'pet'){ showAiStep('aiStepPet'); }
-    else { goToAiPayStep(); } // comprehensive, newyear, wealth는 바로 결제 단계
+    else { goToAiPayStep(); } // comprehensive, newyear, wealth, career는 바로 결제 단계
   });
 });
 $('#petBackBtn').addEventListener('click', ()=>{ showAiStep('aiStepCategory'); });
