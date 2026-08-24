@@ -1271,6 +1271,24 @@
             <button class="submit-btn" id="loveNextBtn" style="margin-top:18px;">다음</button>
           </div>
 
+          <!-- 취업·사업·이동운 부가입력: 리포트가 직장인 위주로만 풀이된다는 피드백을 받아
+               (2026-08-24, 25-3차에서 프롬프트만 먼저 조정했다가 25-5차에서 실제 신분 선택지를
+               추가) 위 loveStatusSeg와 동일한 패턴으로 지금 신분을 물어 AI 프롬프트에 직접 넘긴다. -->
+          <div id="aiStepCareer" hidden>
+            <button type="button" class="cat-back" id="careerBackBtn">← 다른 리포트 선택</button>
+            <p class="section-desc" style="margin:14px 0;">지금 어떤 상황에 가장 가까운지 골라주시면, 그 상황에 맞게 더 구체적으로 풀어드려요.</p>
+            <div class="seg love-status-grid" id="jobStatusSeg">
+              <button type="button" data-val="employee">직장인</button>
+              <button type="button" data-val="business">자영업·사업가</button>
+              <button type="button" data-val="freelance">프리랜서·전문직</button>
+              <button type="button" data-val="military">군인·공무원</button>
+              <button type="button" data-val="student">학생</button>
+              <button type="button" data-val="jobseeking">구직 중</button>
+              <button type="button" data-val="general">선택 안 함</button>
+            </div>
+            <button class="submit-btn" id="careerNextBtn" style="margin-top:18px;">다음</button>
+          </div>
+
           <div id="aiStepPartner" hidden>
             <button type="button" class="cat-back" id="partnerBackBtn">← 다른 리포트 선택</button>
             <p class="section-desc" style="margin:14px 0 6px;">상대방 정보를 입력해주세요.</p>
@@ -3048,6 +3066,7 @@ let aiUnlocked = false;
 let aiInterpretInFlight = false;
 let selectedAiCategory = null;
 let selectedLoveStatus = null;
+let selectedJobStatus = null; // 취업·사업·이동운 카테고리에서 고른 현재 신분(직장인/자영업/프리랜서 등)
 let partnerGenderVal = "남";
 // AI 유료 결과 화면(#aiResult)에서 브라우저/기기 뒤로가기를 누르면 페이지를 이탈하는 대신
 // 유료 콘텐츠 목록으로 돌아가게 하기 위한 히스토리 상태 추적 플래그. 결과가 뜰 때 한 번만
@@ -3720,6 +3739,7 @@ function resetAiPanel(){
   aiUnlocked = false;
   selectedAiCategory = null;
   selectedLoveStatus = null;
+  selectedJobStatus = null;
   partnerData = null;
   petData = null;
   aiResultPushedState = false;
@@ -3729,12 +3749,13 @@ function resetAiPanel(){
   $('#aiError').hidden = true;
   showAiStep('aiStepCategory');
   $$('#loveStatusSeg button').forEach(b=>b.classList.remove('active'));
+  $$('#jobStatusSeg button').forEach(b=>b.classList.remove('active'));
   $('#partnerError').hidden = true;
   $('#petError').hidden = true;
 }
 // AI 패널 내부의 단계(카테고리 선택 → 부가입력 → 결제) 전환
 function showAiStep(stepId){
-  ['aiStepCategory','aiStepLove','aiStepPartner','aiStepPet','aiStepCompatFree','aiStepPay'].forEach(id=>{
+  ['aiStepCategory','aiStepLove','aiStepCareer','aiStepPartner','aiStepPet','aiStepCompatFree','aiStepPay'].forEach(id=>{
     $('#'+id).hidden = (id !== stepId);
   });
 }
@@ -4005,6 +4026,9 @@ function buildAiPayload(){
   if(selectedAiCategory === 'love'){
     payload.loveStatus = selectedLoveStatus || 'general';
   }
+  if(selectedAiCategory === 'career'){
+    payload.jobStatus = selectedJobStatus || 'general';
+  }
   if(selectedAiCategory === 'compatibility' && partnerData){
     const pPerson = buildPersonBlock(partnerData.saju, partnerData.ziwei);
     payload.partner = {
@@ -4039,9 +4063,10 @@ $$('.cat-option').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     selectedAiCategory = btn.dataset.cat;
     if(selectedAiCategory === 'love'){ showAiStep('aiStepLove'); }
+    else if(selectedAiCategory === 'career'){ showAiStep('aiStepCareer'); }
     else if(selectedAiCategory === 'compatibility'){ showAiStep('aiStepPartner'); }
     else if(selectedAiCategory === 'pet'){ showAiStep('aiStepPet'); }
-    else { goToAiPayStep(); } // comprehensive, newyear, wealth, career는 바로 결제 단계
+    else { goToAiPayStep(); } // comprehensive, newyear, wealth는 바로 결제 단계
   });
 });
 $('#petBackBtn').addEventListener('click', ()=>{ showAiStep('aiStepCategory'); });
@@ -4090,6 +4115,15 @@ $$('#loveStatusSeg button').forEach(btn=>{
   });
 });
 $('#loveNextBtn').addEventListener('click', ()=>{ goToAiPayStep(); });
+$$('#jobStatusSeg button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    $$('#jobStatusSeg button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedJobStatus = btn.dataset.val;
+  });
+});
+$('#careerNextBtn').addEventListener('click', ()=>{ goToAiPayStep(); });
+$('#careerBackBtn').addEventListener('click', ()=>{ showAiStep('aiStepCategory'); });
 $$('#partnerGenderSeg button').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     $$('#partnerGenderSeg button').forEach(b=>b.classList.remove('active'));
