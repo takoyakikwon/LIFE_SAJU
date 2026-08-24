@@ -341,6 +341,21 @@
     font-family:"Noto Serif KR"; font-weight:800; font-size:14.5px; line-height:1.65; color:var(--ink);
   }
   .cross-identity-headline b{ color:var(--gold); }
+  /* 결과 화면 맨 위, 요약 카드 바로 아래에 오는 훅 티저 — 오행/십성/자미를 다 안 봐도
+     생년월일 입력 직후 바로 눈에 띄도록 배치(2026-08-24, 결제 동선 단축 논의로 추가). */
+  .hook-teaser{
+    margin-bottom:18px; padding:16px 16px 15px; border-radius:var(--radius-md);
+    background:linear-gradient(135deg, rgba(167,139,250,.18), rgba(244,114,182,.10));
+    border:1px solid var(--gold-line);
+  }
+  .hook-teaser-label{
+    font-size:11px; font-weight:800; color:var(--gold); letter-spacing:0.3px; margin-bottom:8px;
+  }
+  .hook-teaser-text{ font-size:13.5px; line-height:1.7; color:var(--ink); margin-bottom:12px; }
+  .hook-teaser-btn{
+    display:inline-block; background:none; border:none; padding:0;
+    color:var(--gold); font-size:12.5px; font-weight:800; cursor:pointer; font-family:"Noto Sans KR";
+  }
   /* 십성 table */
   .sipsung-table{width:100%; border-collapse:collapse; margin-top:4px;}
   .sipsung-table th{
@@ -792,6 +807,18 @@
   }
   .ai-cta-title{font-family:"Noto Serif KR"; font-weight:800; font-size:14.5px; color:var(--ink); line-height:1.55; margin-bottom:6px;}
   .ai-cta-desc{font-size:12px; color:var(--ink-soft); line-height:1.6; margin-bottom:16px;}
+  /* 결과 화면의 어느 서브탭을 보고 있든 하단에 항상 떠 있는 CTA — 사주팔자/오행/십성/자미를
+     다 봐야만 결제 유도를 만나던 문제를 줄이기 위해 추가(2026-08-24). AI 해석 탭에서는
+     이미 그 화면 안에 있으니 중복이라 activateGroup()에서 숨긴다. */
+  .floating-ai-cta{
+    position:sticky; bottom:0; z-index:5;
+    margin:14px -20px -8px; padding:12px 20px calc(12px + env(safe-area-inset-bottom));
+    background:linear-gradient(180deg, transparent, var(--paper) 26%);
+  }
+  .floating-ai-cta .submit-btn{
+    margin-top:0; padding:14px 0; font-size:14px;
+    box-shadow:0 8px 22px rgba(167,139,250,.45);
+  }
   #tabbar button{position:relative;}
   .tab-badge-dot{
     position:absolute; top:3px; right:20px; width:7px; height:7px; border-radius:50%;
@@ -991,6 +1018,11 @@
     <!-- RESULT VIEW -->
     <section id="view-result" hidden>
       <div class="summary" id="summaryBox"></div>
+      <div class="hook-teaser" id="hookTeaserBox">
+        <div class="hook-teaser-label">✦ 지금 나온 결과, 한눈에 보면</div>
+        <div class="hook-teaser-text" id="hookTeaserText"></div>
+        <button type="button" class="hook-teaser-btn" id="hookTeaserBtn">이 성향, 더 깊이 풀어보기 →</button>
+      </div>
       <div class="subtab-bar" id="subtabBar" hidden></div>
       <div class="panel active" data-panel="palja">
         <h2 class="section-title">사주팔자 <span class="en">FOUR PILLARS</span></h2>
@@ -1312,6 +1344,9 @@
         </div>
         <div id="aiError" hidden class="ai-error"></div>
       </div>
+      <div class="floating-ai-cta" id="floatingAiCta">
+        <button type="button" class="submit-btn" id="floatingAiCtaBtn">✦ AI 해석으로 자세히 보기</button>
+      </div>
     </section>
   </main>
   <nav id="tabbar" hidden>
@@ -1440,6 +1475,25 @@ const TEN_GOD_GROUP_DESC = {
   "재성": "편재·정재가 두드러져요. 현실 감각이 좋고, 눈에 보이는 결과나 성과로 이어지는 일에 강한 편이에요. 자원(돈·시간·기회)을 계획적으로 다루는 힘이 있어서 관리자·실무형 역할에서 빛을 발하지만, 손에 잡히지 않는 막연한 일에는 흥미를 덜 느낄 수 있어요.",
   "관성": "편관·정관이 두드러져요. 맡은 역할과 책임을 무겁게 여기고, 조직이나 관계 안에서 질서를 지키려는 힘이 강한 편이에요. 신뢰받는 위치에 있을 때 안정감을 느끼지만, 그만큼 스스로에게도 엄격해서 쉬어가는 걸 어려워할 수 있어요.",
   "인성": "편인·정인이 두드러져요. 배우고 받아들이는 힘이 좋고, 새로운 지식이나 관점에 마음이 잘 열리는 편이에요. 든든한 지지 기반이 있을 때 안정적으로 실력을 쌓아가지만, 스스로 결정하고 밀어붙이기보다 먼저 확인하고 검토하는 데 시간이 걸릴 수 있어요.",
+};
+// ---- 종합풀이 "훅" 문장용 — 오행/십성 그룹을 추상적 트레잇 나열이 아니라 구체적 행동·장면
+// 묘사로 표현해, "어? 이거 내 얘기 같은데?" 하는 순간을 만드는 게 목적. 2026-08-24, 사용자
+// 피드백(카카오톡 인앱 배너 롤백 직후)으로 종합 탭의 기술적 비교(년주/오행/'나'자리) 문단을
+// 없애고 이 문장으로 대체함 — computeCrossIdentity()가 고른 maxEl/topGroup 조합으로 두 문장을
+// 이어붙여 한 사람에 대한 구체적인 성향 묘사를 만든다.
+const ELEMENT_SCENARIO = [
+  "새로운 걸 벌일 때 눈이 반짝이고, 제자리에 멈춰 있는 걸 못 견디는 편이에요. 계획이 완벽하지 않아도 일단 움직이면서 길을 찾아가는 쪽이죠.",
+  "좋아하는 일 앞에서는 에너지가 확 붙고, 감정이 표정과 말투에 그대로 드러나는 편이에요. 하고 싶은 말은 참지 못하고 결국 하고야 마는 스타일이죠.",
+  "누가 힘들어하면 제일 먼저 챙기고, 갈등이 생기면 자연스럽게 중재자 역할을 맡게 돼요. 겉으론 무던해 보여도 속으로는 원칙을 잘 안 굽히는 편이에요.",
+  "일 처리가 깔끔하고 맺고 끊는 게 확실한 편이에요. 마음이 흔들려도 겉으로는 잘 드러내지 않고, 아니다 싶으면 미련 없이 정리하는 쪽이죠.",
+  "겉으로는 조용해 보여도 머릿속으로는 이미 몇 수 앞을 계산하고 있는 편이에요. 눈치가 빠르고, 필요하면 태세를 유연하게 바꿀 줄 알아요."
+];
+const TEN_GOD_GROUP_SCENARIO = {
+  "비겁": "누가 뭐라 하든 내 판단을 믿고 밀어붙이는 힘이 있어요. 팀보다 내 페이스가 편하고, 한번 결심하면 웬만해선 안 꺾이는 편이죠.",
+  "식상": "아이디어가 끊임없이 떠오르고, 남들과는 다른 방식으로 표현하는 걸 좋아해요. 틀에 박힌 방식보다 내 스타일대로 하는 게 훨씬 편해요.",
+  "재성": "돈이든 시간이든 계산이 빠르고, 실속을 챙기는 감각이 좋은 편이에요. 손해 보는 선택은 본능적으로 피하게 돼요.",
+  "관성": "맡은 일은 끝까지 책임지려 하고, 자연스럽게 남들을 이끄는 자리에 서게 돼요. 규칙과 질서를 중요하게 여기는 편이죠.",
+  "인성": "새로운 걸 배우는 데 거부감이 없고, 남 얘기를 잘 들어주는 편이에요. 혼자 조용히 생각을 정리하는 시간이 꼭 필요한 타입이죠.",
 };
 function mod(n,m){ return ((n%m)+m)%m; }
 function toUTCDate(y,m,d){ return new Date(Date.UTC(y, m-1, d)); }
@@ -2791,7 +2845,10 @@ function renderZiwei(zw, curAge){
   });
   $('#ziweiDaehanScroll').innerHTML = daehanHtml;
 }
-function renderCross(saju, zw){
+// 사주(saju) × 자미두수(zw)를 비교해 "이 사람의 정체성" 데이터를 계산한다 — 종합풀이 탭의
+// crossBox와, 결과 화면 맨 위에서 바로 보이는 훅 티저(hookTeaserBox)가 이 함수 하나를 공유해서
+// 두 곳의 내용이 서로 어긋나지 않게 한다.
+function computeCrossIdentity(saju, zw){
   const counts = [0,0,0,0,0];
   [saju.pillars.year, saju.pillars.month, saju.pillars.day].forEach(p=>{ counts[GAN_ELEMENT[p.g]]++; counts[ZHI_ELEMENT[p.z]]++; });
   if(saju.pillars.hour){ counts[GAN_ELEMENT[saju.pillars.hour.g]]++; counts[ZHI_ELEMENT[saju.pillars.hour.z]]++; }
@@ -2817,11 +2874,24 @@ function renderCross(saju, zw){
   const mingElement = ZHI_ELEMENT[zw.soulZhiStd];
   const dmElement = GAN_ELEMENT[saju.pillars.day.g];
   const matchCount = (sameYear?1:0) + (maxEl===bureauEl?1:0) + (dmElement===mingElement?1:0);
+  return {maxEl, topGroup, bureauEl, sameYear, mingElement, dmElement, matchCount};
+}
+// 결과 화면 맨 위(요약 카드 바로 아래) — 오행/십성/자미두수를 다 안 봐도 생년월일 입력 직후
+// 바로 눈에 띄는 자리에 짧은 훅 문장 + AI 해석 CTA를 배치한다. 종합풀이 탭까지 가야만 훅을
+// 만나던 기존 동선이 너무 길다는 2026-08-24 피드백으로 추가.
+function renderHookTeaser(saju, zw){
+  const textBox = $('#hookTeaserText');
+  if(!textBox) return;
+  const {maxEl, topGroup} = computeCrossIdentity(saju, zw);
+  textBox.innerHTML = `${ELEMENT_SCENARIO[maxEl]} 거기다 ${TEN_GOD_GROUP_SCENARIO[topGroup]}`;
+}
+function renderCross(saju, zw){
+  const {maxEl, topGroup, matchCount} = computeCrossIdentity(saju, zw);
   const HEADLINE = [
-    '사주와 자미두수, 서로 다른 시대에 만들어진 두 체계가 지금은 다른 결을 보여주고 있어요. 하나의 얼굴로 정의되지 않는, 상황에 따라 여러 모습이 나오는 사람이라는 뜻이에요.',
-    '세 가지 비교 중 하나가 겹쳐요. 완전히 같지는 않아도, 두 체계가 공통으로 짚어주는 지점은 특히 눈여겨볼 만해요.',
-    '세 가지 비교 중 둘이 겹쳐요. 계산 방식이 전혀 다른 두 체계가 이 정도로 같은 곳을 가리킨다는 건, 그 성향이 꽤 뚜렷하게 굳어져 있다는 뜻이에요.',
-    '사주와 자미두수, 계산 원리도 만들어진 시대도 전혀 다른 두 체계인데 세 가지 비교가 전부 같은 방향을 가리키고 있어요. 이 정도로 겹치는 건 흔치 않은 일이라, 그만큼 태어날 때부터 뚜렷하게 새겨진 성향이라고 볼 수 있어요.',
+    '이 성향, 사실 사주와 자미두수 두 체계의 계산 결과가 서로 다른 방향을 가리키고 있어요. 하나로 정의되지 않는, 상황에 따라 다른 얼굴이 나오는 사람이라는 뜻이에요.',
+    '이 중 한 가지는 계산 방식이 전혀 다른 사주와 자미두수 두 체계에서 공통으로 나온 결과예요. 우연이라기엔 꽤 의미 있게 겹치는 지점이죠.',
+    '이 중 두 가지가 사주와 자미두수 두 체계에서 동일하게 나왔어요. 계산 원리가 완전히 다른 두 체계가 이 정도로 같은 곳을 가리킨다는 건, 꽤 뚜렷하게 굳어진 성향이라는 뜻이에요.',
+    '이 정체성은 사주와 자미두수, 계산 원리도 만들어진 시대도 전혀 다른 두 체계가 전부 동일하게 가리키고 있어요. 흔치 않은 일치도라, 타고난 뼈대에 가까운 성향으로 봐도 좋아요.',
   ][matchCount];
   const CLOSING = [
     `겹치는 지점이 하나도 없다는 건 오히려 무기가 될 수 있어요. 상대·상황에 따라 꺼내 쓰는 얼굴이 다르다는 뜻이라, 어느 한 가지 틀에 갇히지 않고 유연하게 움직일 수 있는 사람이에요. 다만 그만큼 "진짜 나"를 스스로도 헷갈릴 때가 있을 텐데, 그럴 땐 지금까지 본 ${ELEMENT_KEYWORD[maxEl]}과(와) ${TEN_GOD_GROUP_KEYWORD[topGroup]} 쪽으로 무게중심을 되돌려보면 도움이 될 거예요.`,
@@ -2831,10 +2901,8 @@ function renderCross(saju, zw){
   ][matchCount];
   let html = '';
   html += `<div class="cross-identity-headline">오행상 <b>${ELEMENT_NAME[maxEl]}(${ELEMENT_HANJA[maxEl]})</b> 기운이 강하고, 십성상 <b>${topGroup}</b>이 두드러진 사람이에요 — 한마디로 <b>${ELEMENT_KEYWORD[maxEl]}</b>에 <b>${TEN_GOD_GROUP_KEYWORD[topGroup]}</b>까지 함께 가진 쪽에 가까워요.</div>`;
+  html += `<div style="margin-bottom:10px; font-size:12px; color:var(--ink-faint);">위에서 본 성향, 사주와 자미두수 두 체계에서 실제로 얼마나 겹치는지 살펴볼게요.</div>`;
   html += `<div style="margin-bottom:14px; font-weight:700; line-height:1.6;">${HEADLINE}</div>`;
-  html += `<div style="margin-bottom:10px;"><b>년주 비교</b> — 사주(입춘 기준) ${GAN[saju.pillars.year.g]}${ZHI[saju.pillars.year.z]} / 자미두수(설날 기준) ${GAN[zw.yearPillar.g]}${ZHI[zw.yearPillar.z]}${sameYear? ' → 두 체계의 연주가 정확히 일치해요.' : ' → 입춘과 음력설 사이에 태어나 두 체계의 연주가 갈려요. 이 경우 두 연주 모두를 참고할 가치가 있는, 흔치 않은 케이스예요.'}</div>`;
-  html += `<div style="margin-bottom:10px;"><b>오행 비교</b> — 사주 여덟 글자 중 가장 강한 기운은 ${ELEMENT_NAME[maxEl]}(${ELEMENT_HANJA[maxEl]}), 자미두수 오행국은 ${zw.bureau.name}(${ELEMENT_NAME[bureauEl]} 기운)이에요.${maxEl===bureauEl? ` 두 체계가 똑같이 ${ELEMENT_NAME[maxEl]} 기운을 가리키고 있어요 — 우연이라 보기엔 너무 정확히 겹치는, 뚜렷한 성향이에요.` : ' 두 체계가 서로 다른 기운을 보여주고 있어요. 상황이나 관계에 따라 다른 얼굴이 나오는 사람일 가능성이 커요.'}</div>`;
-  html += `<div style="margin-bottom:10px;"><b>'나' 자리 비교</b> — 사주의 일간은 ${GAN[saju.pillars.day.g]}(${ELEMENT_NAME[dmElement]}), 자미두수 명궁의 지지는 ${ZHI[zw.soulZhiStd]}(${ELEMENT_NAME[mingElement]})이에요.${dmElement===mingElement? ' 두 자리의 오행이 같아요 — 남들 눈에 비치는 인상과 타고난 기질이 실제로 같은 방향이라는 뜻이에요.' : ' 두 자리의 오행이 달라요. 겉으로 보이는 인상(명궁)과 속마음(일간)이 다르게 느껴질 수 있는, 겉과 속이 다른 매력을 가진 사람이에요.'}</div>`;
   html += `<div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line); line-height:1.65;">${CLOSING}</div>`;
   $('#crossBox').innerHTML = html;
 }
@@ -3423,6 +3491,7 @@ $('#submitBtn').addEventListener('click', ()=>{
       if(!hadBirthday) curAge -= 1;
       renderZiwei(ziweiResult, curAge);
       renderCross(result, ziweiResult);
+      renderHookTeaser(result, ziweiResult);
     }
     lastSajuResult = result;
     lastZiweiResult = ziweiResult;
@@ -3492,12 +3561,25 @@ function activateGroup(groupKey){
   renderSubtabBar(groupKey);
   // 사용자가 AI 해석 탭을 한 번이라도 열어봤다면, 결제 유도용 강조 배지는 더 이상 보여줄 필요가 없음
   if(groupKey === 'ai'){ $('#aiTabBadge').hidden = true; }
+  // 상시 플로팅 CTA — 이미 AI 해석 탭 안에 있을 때는 같은 화면에 중복이라 숨긴다
+  const floatCta = $('#floatingAiCta');
+  if(floatCta){ floatCta.hidden = (groupKey === 'ai'); }
 }
 $$('#tabbar button').forEach(btn=>{
   btn.addEventListener('click', ()=> activateGroup(btn.dataset.group));
 });
 // 종합 탭 끝의 CTA 카드 → AI 해석 탭으로 바로 이동
 $('#crossAiCtaBtn').addEventListener('click', ()=>{
+  activateGroup('ai');
+  window.scrollTo(0,0);
+});
+// 결과 화면 맨 위 훅 티저 버튼 → AI 해석 탭으로 바로 이동
+$('#hookTeaserBtn')?.addEventListener('click', ()=>{
+  activateGroup('ai');
+  window.scrollTo(0,0);
+});
+// 결과 화면 하단에 상시 떠 있는 플로팅 CTA → AI 해석 탭으로 바로 이동
+$('#floatingAiCtaBtn')?.addEventListener('click', ()=>{
   activateGroup('ai');
   window.scrollTo(0,0);
 });
