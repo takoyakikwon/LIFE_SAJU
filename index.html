@@ -748,6 +748,16 @@
     background:rgba(255,255,255,.04); color:var(--ink); font-size:15px; font-weight:700; font-family:inherit;
   }
   .manual-hint{font-size:10.5px; color:var(--ink-faint); text-align:center; margin-top:12px; line-height:1.6;}
+  /* 시간 피커에서 지금 고른 시각이 전통 12시진 중 어디에 해당하는지 보여주는 라벨
+     (2026-08-24, 타 사주앱의 12시진 목록형 UI 벤치마킹 논의 후 추가 — 분 단위 정밀 입력은
+     그대로 유지하면서, "자시/축시..." 같은 친숙한 이름만 곁들이는 절충안). */
+  .sijin-hint{
+    display:inline-block; margin:12px auto 0; padding:6px 14px; border-radius:999px;
+    background:rgba(244,196,99,.12); border:1px solid var(--gold-line);
+    color:var(--gold); font-size:12.5px; font-weight:700; letter-spacing:0.2px;
+    text-align:center; width:fit-content;
+  }
+  .wheel-panel .sijin-hint{ display:block; margin-left:auto; margin-right:auto; }
   .sheet-confirm{
     margin-top:22px; width:100%; padding:15px; border-radius:14px; border:none;
     background:linear-gradient(90deg,var(--violet),var(--pink)); color:#fff; font-weight:700; font-size:14.5px; cursor:pointer;
@@ -1022,6 +1032,7 @@
             <div class="wheel-col" id="col-hour"></div>
             <div class="wheel-col" id="col-minute"></div>
           </div>
+          <div class="sijin-hint" id="wheelSijinLabel"></div>
         </div>
         <div class="manual-panel" id="time-manual">
           <div class="manual-row">
@@ -1029,6 +1040,7 @@
             <div class="mfield"><label>분 (0~59)</label><input type="text" inputmode="numeric" maxlength="2" id="pkManualMinute" placeholder="30"></div>
           </div>
           <p class="manual-hint">24시간제로 입력해주세요. 예: 오후 2시 30분 → 14 / 30</p>
+          <div class="sijin-hint" id="manualSijinLabel"></div>
           <div id="pkManualTimeError" hidden class="ai-error" style="margin-top:8px;"></div>
         </div>
         <button type="button" class="sheet-confirm" id="timeConfirmBtn">완료</button>
@@ -3316,6 +3328,18 @@ function pkRefreshDayWheel(){
   pkSelectInitial('col-day', di);
   pkAttachSnap('col-day', idx=> pk().day = days[idx]);
 }
+// 전통 12시진(자시~해시) 이름·범위 — 우리 앱의 시주 계산과 동일한 경계(자시=23:00~00:59
+// 시작)를 그대로 따른다. 분 단위 정밀 입력(휠/직접입력)은 그대로 두고, 지금 고른 시각이
+// 어느 시진에 해당하는지만 라벨로 곁들여준다(2026-08-24, 타 사주앱 벤치마킹 논의 결과).
+const SIJIN_RANGES = ['23:00~00:59','01:00~02:59','03:00~04:59','05:00~06:59','07:00~08:59','09:00~10:59','11:00~12:59','13:00~14:59','15:00~16:59','17:00~18:59','19:00~20:59','21:00~22:59'];
+function sijinIdxOfHour(h){ return (h>=23 || h<1) ? 0 : Math.floor((h+1)/2); }
+function pkUpdateSijinLabel(h){
+  if(!Number.isInteger(h) || h<0 || h>23) return;
+  const i = sijinIdxOfHour(h);
+  const label = `${ZHI[i]}시(${ZHI_HANJA[i]}時) · ${SIJIN_RANGES[i]}`;
+  const w = $('#wheelSijinLabel'); if(w) w.textContent = label;
+  const m = $('#manualSijinLabel'); if(m) m.textContent = label;
+}
 function pkInitTimeWheels(){
   const p = pk();
   const hours=[]; for(let h=0;h<24;h++) hours.push(h);
@@ -3325,8 +3349,9 @@ function pkInitTimeWheels(){
   const hi = hours.indexOf(p.hour), mi = minutes.indexOf(p.minute);
   pkScrollTo('col-hour', hi); pkScrollTo('col-minute', mi);
   pkSelectInitial('col-hour', hi); pkSelectInitial('col-minute', mi);
-  pkAttachSnap('col-hour', idx=> pk().hour = hours[idx]);
+  pkAttachSnap('col-hour', idx=>{ pk().hour = hours[idx]; pkUpdateSijinLabel(hours[idx]); });
   pkAttachSnap('col-minute', idx=> pk().minute = minutes[idx]);
+  pkUpdateSijinLabel(p.hour);
 }
 $$('#pkCalSeg button').forEach(btn=>{
   btn.addEventListener('click', ()=>{
@@ -3378,6 +3403,7 @@ function openSheet(type, target){
     $('#pkManualHour').value = p.timeSet ? p.hour : '';
     $('#pkManualMinute').value = p.timeSet ? p.minute : '';
     $('#pkManualTimeError').hidden = true;
+    pkUpdateSijinLabel(p.hour);
     $('#timeSheetBg').classList.add('open');
     setTimeout(pkInitTimeWheels, 10);
   }
@@ -3463,6 +3489,10 @@ function confirmTimePicker(){
 }
 $('#dateConfirmBtn').addEventListener('click', confirmDatePicker);
 $('#timeConfirmBtn').addEventListener('click', confirmTimePicker);
+$('#pkManualHour').addEventListener('input', ()=>{
+  const h = parseInt($('#pkManualHour').value.trim(), 10);
+  if(Number.isInteger(h) && h>=0 && h<=23) pkUpdateSijinLabel(h);
+});
 // 제출 직후 계산 결과를 곧바로 보여주지 않고, 사주 여덟 글자가 도장처럼 하나씩
 // 찍히는 리빌 연출을 짧게 보여준 다음 실제 렌더링(onComplete)을 실행한다.
 function playRevealSequence(onComplete){
