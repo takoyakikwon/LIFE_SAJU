@@ -3561,9 +3561,11 @@ function activateGroup(groupKey){
   renderSubtabBar(groupKey);
   // 사용자가 AI 해석 탭을 한 번이라도 열어봤다면, 결제 유도용 강조 배지는 더 이상 보여줄 필요가 없음
   if(groupKey === 'ai'){ $('#aiTabBadge').hidden = true; }
-  // 상시 플로팅 CTA — 이미 AI 해석 탭 안에 있을 때는 같은 화면에 중복이라 숨긴다
+  // 상시 플로팅 CTA — AI 해석 탭은 물론, 종합풀이·오늘의 사주 탭도 스크롤 맨 끝에 이미 자기
+  // 전용 CTA 카드(crossAiCtaBtn 등)를 갖고 있어서 플로팅 CTA까지 뜨면 바로 아래에 같은 버튼이
+  // 두 번 겹쳐 보이는 문제가 있었음(2026-08-24 사용자 피드백) — 이 세 탭에서는 숨긴다.
   const floatCta = $('#floatingAiCta');
-  if(floatCta){ floatCta.hidden = (groupKey === 'ai'); }
+  if(floatCta){ floatCta.hidden = (groupKey === 'ai' || groupKey === 'cross' || groupKey === 'today'); }
 }
 $$('#tabbar button').forEach(btn=>{
   btn.addEventListener('click', ()=> activateGroup(btn.dataset.group));
