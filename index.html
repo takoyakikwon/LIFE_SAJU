@@ -342,19 +342,47 @@
   }
   .cross-identity-headline b{ color:var(--gold); }
   /* 결과 화면 맨 위, 요약 카드 바로 아래에 오는 훅 티저 — 오행/십성/자미를 다 안 봐도
-     생년월일 입력 직후 바로 눈에 띄도록 배치(2026-08-24, 결제 동선 단축 논의로 추가). */
+     생년월일 입력 직후 바로 눈에 띄도록 배치(2026-08-24, 결제 동선 단축 논의로 추가).
+     타 사주앱 벤치마킹 후(같은 날 재작업) 주변 카드와 톤이 비슷해서 위계가 안 느껴진다는
+     피드백을 받아 — 카드를 훨씬 크고 화려하게, 큰 숫자(%)와 유형 뱃지를 얹어서 "이게 제일
+     중요한 결과다"라는 게 스크롤 없이 한눈에 느껴지도록 재설계함. */
   .hook-teaser{
-    margin-bottom:18px; padding:16px 16px 15px; border-radius:var(--radius-md);
-    background:linear-gradient(135deg, rgba(167,139,250,.18), rgba(244,114,182,.10));
-    border:1px solid var(--gold-line);
+    position:relative; overflow:hidden;
+    margin-bottom:20px; padding:22px 20px 20px; border-radius:20px;
+    background:linear-gradient(160deg, rgba(167,139,250,.28), rgba(244,114,182,.14) 55%, rgba(244,196,99,.10));
+    border:1.5px solid var(--gold-line);
+    box-shadow:0 14px 36px rgba(167,139,250,.28), 0 0 0 1px rgba(244,196,99,.08) inset;
+    animation:dmPop .65s cubic-bezier(.34,1.56,.64,1) backwards;
   }
+  .hook-teaser::before{
+    content:''; position:absolute; top:-40%; right:-20%; width:70%; height:140%;
+    background:radial-gradient(circle, rgba(244,196,99,.16), transparent 65%);
+    pointer-events:none;
+  }
+  .hook-teaser-type-row{ display:flex; align-items:center; gap:8px; margin-bottom:14px; }
+  .hook-teaser-icon{ font-size:22px; line-height:1; }
+  .hook-teaser-type{
+    font-family:"Noto Serif KR"; font-weight:900; font-size:16px; color:var(--ink);
+    letter-spacing:0.2px;
+  }
+  .hook-teaser-score-row{
+    display:flex; align-items:baseline; gap:10px; margin-bottom:16px;
+    padding-bottom:16px; border-bottom:1px dashed rgba(244,196,99,.35);
+  }
+  .hook-teaser-score-num{
+    font-family:"JetBrains Mono", "Noto Serif KR"; font-weight:800; font-size:40px; line-height:1;
+    background:linear-gradient(135deg,var(--gold),var(--pink));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .hook-teaser-score-num .pct{ font-size:20px; }
+  .hook-teaser-score-label{ font-size:12px; color:var(--ink-soft); line-height:1.5; }
   .hook-teaser-label{
     font-size:11px; font-weight:800; color:var(--gold); letter-spacing:0.3px; margin-bottom:8px;
   }
-  .hook-teaser-text{ font-size:13.5px; line-height:1.7; color:var(--ink); margin-bottom:12px; }
+  .hook-teaser-text{ font-size:13.5px; line-height:1.7; color:var(--ink); margin-bottom:14px; }
   .hook-teaser-btn{
     display:inline-block; background:none; border:none; padding:0;
-    color:var(--gold); font-size:12.5px; font-weight:800; cursor:pointer; font-family:"Noto Sans KR";
+    color:var(--gold); font-size:13px; font-weight:800; cursor:pointer; font-family:"Noto Sans KR";
   }
   /* 십성 table */
   .sipsung-table{width:100%; border-collapse:collapse; margin-top:4px;}
@@ -1019,6 +1047,14 @@
     <section id="view-result" hidden>
       <div class="summary" id="summaryBox"></div>
       <div class="hook-teaser" id="hookTeaserBox">
+        <div class="hook-teaser-type-row">
+          <span class="hook-teaser-icon" id="hookTeaserIcon">✦</span>
+          <span class="hook-teaser-type" id="hookTeaserType"></span>
+        </div>
+        <div class="hook-teaser-score-row">
+          <div class="hook-teaser-score-num" id="hookTeaserScoreNum">--<span class="pct">%</span></div>
+          <div class="hook-teaser-score-label" id="hookTeaserScoreLabel"></div>
+        </div>
         <div class="hook-teaser-label">✦ 지금 나온 결과, 한눈에 보면</div>
         <div class="hook-teaser-text" id="hookTeaserText"></div>
         <button type="button" class="hook-teaser-btn" id="hookTeaserBtn">이 성향, 더 깊이 풀어보기 →</button>
@@ -1495,6 +1531,13 @@ const TEN_GOD_GROUP_SCENARIO = {
   "관성": "맡은 일은 끝까지 책임지려 하고, 자연스럽게 남들을 이끄는 자리에 서게 돼요. 규칙과 질서를 중요하게 여기는 편이죠.",
   "인성": "새로운 걸 배우는 데 거부감이 없고, 남 얘기를 잘 들어주는 편이에요. 혼자 조용히 생각을 정리하는 시간이 꼭 필요한 타입이죠.",
 };
+// ---- 훅 티저 카드용 짧은 "유형" 뱃지 + 아이콘 — 타 사주앱 벤치마킹(2026-08-24) 후 추가.
+// 긴 설명형 문장(ELEMENT_KEYWORD 등) 대신, MBTI처럼 한눈에 스캔되는 2~4글자 라벨로
+// "결과지"처럼 보이게 하는 게 목적. ELEMENT_SCENARIO/TEN_GOD_GROUP_SCENARIO와 같은 축(오행,
+// 십성 그룹)을 쓰되 badge용으로 훨씬 짧게 압축한 표현.
+const ELEMENT_EMOJI = ["🌱","🔥","⛰️","⚔️","🌊"]; // 목화토금수
+const ELEMENT_TYPE_LABEL = ["도전가","열정가","조율가","결단가","전략가"];
+const TEN_GOD_GROUP_TYPE_LABEL = { "비겁":"독립형", "식상":"크리에이터형", "재성":"관리형", "관성":"리더형", "인성":"학습형" };
 function mod(n,m){ return ((n%m)+m)%m; }
 function toUTCDate(y,m,d){ return new Date(Date.UTC(y, m-1, d)); }
 function daysBetween(a,b){ return (a-b)/86400000; }
@@ -2874,7 +2917,11 @@ function computeCrossIdentity(saju, zw){
   const mingElement = ZHI_ELEMENT[zw.soulZhiStd];
   const dmElement = GAN_ELEMENT[saju.pillars.day.g];
   const matchCount = (sameYear?1:0) + (maxEl===bureauEl?1:0) + (dmElement===mingElement?1:0);
-  return {maxEl, topGroup, bureauEl, sameYear, mingElement, dmElement, matchCount};
+  // 훅 티저의 "큰 숫자" 연출용 — 실제 계산된 값(여덟 글자 중 가장 강한 오행이 차지하는 비중)을
+  // 그대로 퍼센트로 보여준다. 임의로 만든 점수가 아니라 위 counts 집계에서 바로 나온 숫자.
+  const totalChars = counts.reduce((a,b)=>a+b, 0);
+  const elPercent = Math.round((counts[maxEl] / totalChars) * 100);
+  return {maxEl, topGroup, bureauEl, sameYear, mingElement, dmElement, matchCount, elPercent};
 }
 // 결과 화면 맨 위(요약 카드 바로 아래) — 오행/십성/자미두수를 다 안 봐도 생년월일 입력 직후
 // 바로 눈에 띄는 자리에 짧은 훅 문장 + AI 해석 CTA를 배치한다. 종합풀이 탭까지 가야만 훅을
@@ -2882,8 +2929,16 @@ function computeCrossIdentity(saju, zw){
 function renderHookTeaser(saju, zw){
   const textBox = $('#hookTeaserText');
   if(!textBox) return;
-  const {maxEl, topGroup} = computeCrossIdentity(saju, zw);
+  const {maxEl, topGroup, elPercent} = computeCrossIdentity(saju, zw);
   textBox.innerHTML = `${ELEMENT_SCENARIO[maxEl]} 거기다 ${TEN_GOD_GROUP_SCENARIO[topGroup]}`;
+  const iconEl = $('#hookTeaserIcon');
+  if(iconEl) iconEl.textContent = ELEMENT_EMOJI[maxEl];
+  const typeEl = $('#hookTeaserType');
+  if(typeEl) typeEl.textContent = `${ELEMENT_TYPE_LABEL[maxEl]} × ${TEN_GOD_GROUP_TYPE_LABEL[topGroup]}`;
+  const scoreNumEl = $('#hookTeaserScoreNum');
+  if(scoreNumEl) scoreNumEl.innerHTML = `${elPercent}<span class="pct">%</span>`;
+  const scoreLabelEl = $('#hookTeaserScoreLabel');
+  if(scoreLabelEl) scoreLabelEl.textContent = `내 여덟 글자 중 ${ELEMENT_NAME[maxEl]}(${ELEMENT_HANJA[maxEl]}) 기운 비중`;
 }
 function renderCross(saju, zw){
   const {maxEl, topGroup, matchCount} = computeCrossIdentity(saju, zw);
