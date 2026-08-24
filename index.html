@@ -3566,6 +3566,11 @@ function activateGroup(groupKey){
   // 두 번 겹쳐 보이는 문제가 있었음(2026-08-24 사용자 피드백) — 이 세 탭에서는 숨긴다.
   const floatCta = $('#floatingAiCta');
   if(floatCta){ floatCta.hidden = (groupKey === 'ai' || groupKey === 'cross' || groupKey === 'today'); }
+  // 결과 화면 맨 위 훅 티저 — summaryBox 바로 아래에 있어 원래는 모든 탭에서 그대로 보였는데,
+  // 사용자가 실제로 모든 탭(운세흐름·자미·종합·오늘)에 똑같은 문장이 반복 노출되는 걸 확인하고
+  // "사주팔자 탭에만 나오면 된다"고 피드백(2026-08-24) — 사주팔자 그룹에서만 보이게 한다.
+  const hookBox = $('#hookTeaserBox');
+  if(hookBox){ hookBox.hidden = (groupKey !== 'palja_group'); }
 }
 $$('#tabbar button').forEach(btn=>{
   btn.addEventListener('click', ()=> activateGroup(btn.dataset.group));
