@@ -942,11 +942,12 @@
         </div>
         <div class="manual-panel" id="date-manual">
           <div class="manual-row">
-            <div class="mfield"><label>년</label><input type="text" inputmode="numeric" maxlength="4" id="pkManualYear"></div>
-            <div class="mfield"><label>월</label><input type="text" inputmode="numeric" maxlength="2" id="pkManualMonth"></div>
-            <div class="mfield"><label>일</label><input type="text" inputmode="numeric" maxlength="2" id="pkManualDay"></div>
+            <div class="mfield"><label>년</label><input type="text" inputmode="numeric" maxlength="4" id="pkManualYear" placeholder="1995"></div>
+            <div class="mfield"><label>월</label><input type="text" inputmode="numeric" maxlength="2" id="pkManualMonth" placeholder="8"></div>
+            <div class="mfield"><label>일</label><input type="text" inputmode="numeric" maxlength="2" id="pkManualDay" placeholder="20"></div>
           </div>
           <p class="manual-hint">숫자만 입력해주세요. 예: 1995 / 8 / 20 · 음력을 선택했다면 음력 기준 날짜예요.</p>
+          <div id="pkManualDateError" hidden class="ai-error" style="margin-top:8px;"></div>
         </div>
         <button type="button" class="sheet-confirm" id="dateConfirmBtn">완료</button>
       </div>
@@ -970,10 +971,11 @@
         </div>
         <div class="manual-panel" id="time-manual">
           <div class="manual-row">
-            <div class="mfield"><label>시 (0~23)</label><input type="text" inputmode="numeric" maxlength="2" id="pkManualHour"></div>
-            <div class="mfield"><label>분 (0~59)</label><input type="text" inputmode="numeric" maxlength="2" id="pkManualMinute"></div>
+            <div class="mfield"><label>시 (0~23)</label><input type="text" inputmode="numeric" maxlength="2" id="pkManualHour" placeholder="14"></div>
+            <div class="mfield"><label>분 (0~59)</label><input type="text" inputmode="numeric" maxlength="2" id="pkManualMinute" placeholder="30"></div>
           </div>
           <p class="manual-hint">24시간제로 입력해주세요. 예: 오후 2시 30분 → 14 / 30</p>
+          <div id="pkManualTimeError" hidden class="ai-error" style="margin-top:8px;"></div>
         </div>
         <button type="button" class="sheet-confirm" id="timeConfirmBtn">완료</button>
       </div>
@@ -3128,9 +3130,13 @@ const PICKER_TARGETS = {
     afterDateConfirm: null,
   },
 };
+// dateSet/timeSet: 사용자가 실제로 날짜·시간을 한 번이라도 확정(완료)했는지 여부.
+// false인 동안은 "직접 입력" 탭의 년/월/일, 시/분 입력창을 비워둔다(아래 openSheet 참고) —
+// 내부적으로는 휠 피커 초기 위치를 위해 연도-30년 같은 기본값을 들고 있지만, 사용자가 그
+// 기본값을 직접 입력창에서 지우고 다시 써야 하는 불편함이 있다는 피드백을 받아 수정함.
 const pkState = {
-  main: { calType:'solar', year:new Date().getFullYear()-30, month:1, day:1, leap:false, hour:0, minute:0 },
-  partner: { calType:'solar', year:new Date().getFullYear()-30, month:1, day:1, leap:false, hour:0, minute:0 },
+  main: { calType:'solar', year:new Date().getFullYear()-30, month:1, day:1, leap:false, hour:0, minute:0, dateSet:false, timeSet:false },
+  partner: { calType:'solar', year:new Date().getFullYear()-30, month:1, day:1, leap:false, hour:0, minute:0, dateSet:false, timeSet:false },
 };
 let pkTarget = 'main';
 function pk(){ return pkState[pkTarget]; }
@@ -3244,15 +3250,19 @@ function openSheet(type, target){
     $$('#pkCalSeg button').forEach(b=> b.classList.toggle('active', b.dataset.val === p.calType));
     $('#pkLeapRow').hidden = (p.calType !== 'lunar');
     $('#pkLeap').checked = p.leap;
-    $('#pkManualYear').value = p.year;
-    $('#pkManualMonth').value = p.month;
-    $('#pkManualDay').value = p.day;
+    // 아직 한 번도 확정한 적 없으면(dateSet=false) 직접입력 칸을 비워둔다 — 내부 기본값(연도-30년)을
+    // 그대로 채워 넣으면 사용자가 지우고 다시 써야 해서 불편하다는 피드백을 반영.
+    $('#pkManualYear').value = p.dateSet ? p.year : '';
+    $('#pkManualMonth').value = p.dateSet ? p.month : '';
+    $('#pkManualDay').value = p.dateSet ? p.day : '';
+    $('#pkManualDateError').hidden = true;
     $('#dateSheetBg').classList.add('open');
     setTimeout(pkInitDateWheels, 10);
   } else {
     if($('#'+t.unknownId).checked) return;
-    $('#pkManualHour').value = p.hour;
-    $('#pkManualMinute').value = p.minute;
+    $('#pkManualHour').value = p.timeSet ? p.hour : '';
+    $('#pkManualMinute').value = p.timeSet ? p.minute : '';
+    $('#pkManualTimeError').hidden = true;
     $('#timeSheetBg').classList.add('open');
     setTimeout(pkInitTimeWheels, 10);
   }
@@ -3278,10 +3288,24 @@ function confirmDatePicker(){
   const p = pk();
   const manualActive = $('#date-manual').classList.contains('active');
   if(manualActive){
-    p.year = parseInt($('#pkManualYear').value) || p.year;
-    p.month = parseInt($('#pkManualMonth').value) || p.month;
-    p.day = parseInt($('#pkManualDay').value) || p.day;
+    // 직접입력 칸이 비어있거나(위 openSheet에서 dateSet=false면 비워두므로) 값이 이상하면,
+    // 예전처럼 기존 기본값으로 조용히 대체하지 않고 명확히 에러를 보여주고 완료를 막는다 —
+    // 안 그러면 사용자가 아무것도 안 쓰고 완료를 눌러도 내부 기본 날짜로 조용히 제출될 수 있음.
+    const yRaw = $('#pkManualYear').value.trim();
+    const mRaw = $('#pkManualMonth').value.trim();
+    const dRaw = $('#pkManualDay').value.trim();
+    const y = parseInt(yRaw, 10), m = parseInt(mRaw, 10), d = parseInt(dRaw, 10);
+    const valid = yRaw && mRaw && dRaw && Number.isInteger(y) && Number.isInteger(m) && Number.isInteger(d) &&
+      y >= 1900 && y <= new Date().getFullYear() && m >= 1 && m <= 12 && d >= 1 && d <= 31;
+    if(!valid){
+      $('#pkManualDateError').textContent = '년/월/일을 모두 정확히 입력해주세요.';
+      $('#pkManualDateError').hidden = false;
+      return;
+    }
+    $('#pkManualDateError').hidden = true;
+    p.year = y; p.month = m; p.day = d;
   }
+  p.dateSet = true;
   // 기존 계산 로직(setupLunarDateInput)이 그대로 읽는 백업 요소에 값 반영
   const targetSegBtn = $(`#${t.calSegId} button[data-val="${p.calType}"]`);
   if(targetSegBtn && !targetSegBtn.classList.contains('active')) targetSegBtn.click();
@@ -3305,9 +3329,19 @@ function confirmTimePicker(){
   const p = pk();
   const manualActive = $('#time-manual').classList.contains('active');
   if(manualActive){
-    p.hour = Math.min(23, Math.max(0, parseInt($('#pkManualHour').value) || 0));
-    p.minute = Math.min(59, Math.max(0, parseInt($('#pkManualMinute').value) || 0));
+    const hRaw = $('#pkManualHour').value.trim();
+    const minRaw = $('#pkManualMinute').value.trim();
+    const h = parseInt(hRaw, 10), mi = parseInt(minRaw, 10);
+    const valid = hRaw && minRaw && Number.isInteger(h) && Number.isInteger(mi) && h >= 0 && h <= 23 && mi >= 0 && mi <= 59;
+    if(!valid){
+      $('#pkManualTimeError').textContent = '시/분을 모두 정확히 입력해주세요(0~23시, 0~59분).';
+      $('#pkManualTimeError').hidden = false;
+      return;
+    }
+    $('#pkManualTimeError').hidden = true;
+    p.hour = h; p.minute = mi;
   }
+  p.timeSet = true;
   $(`#${t.timeId}`).value = `${pkPad(p.hour)}:${pkPad(p.minute)}`;
   pkUpdateTimeLabel();
   closeSheet('time');
