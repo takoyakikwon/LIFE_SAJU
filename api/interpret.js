@@ -417,6 +417,22 @@ const CONTINUATION_PROMPT = `방금 작성한 리포트가 목표 분량에 못 
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
+// gpt-4o-mini가 긴 한국어 텍스트를 생성할 때, 드물게 문장 중간에 한글과 전혀 무관한
+// 스크립트(아랍어·키릴 문자·타이 문자 등) 토큰 하나를 잘못 골라 끼워 넣는 결함이 있다는
+// 사용자 신고가 반복됨(2026-08-24). 이 서비스 결과물에는 한글·한자(사주 용어 병기)·라틴
+// 문자/숫자·일반 문장부호만 정상적으로 등장하므로, 응답을 사용자에게 보여주기 전에
+// 그 외 스크립트 범위를 후처리로 걸러낸다 — 근본 원인(모델의 토큰 선택 자체)은 고칠 수
+// 없지만, 사용자가 실제로 보는 화면에 이런 글자가 노출되는 것은 이 안전망으로 막는다.
+const UNEXPECTED_SCRIPT_RE = /[\u0590-\u05FF\u0600-\u06FF\u0700-\u074F\uFB50-\uFDFF\uFE70-\uFEFF\u0900-\u097F\u0980-\u09FF\u0A00-\u0A7F\u0E00-\u0E7F\u0400-\u04FF\u0500-\u052F\u0530-\u058F\u10A0-\u10FF\u1200-\u137F]/g;
+function sanitizeAiText(text) {
+  if (!text) return text;
+  const cleaned = text.replace(UNEXPECTED_SCRIPT_RE, '').replace(/[ \t]{2,}/g, ' ');
+  if (cleaned !== text) {
+    console.warn('AI 응답에서 예상치 못한 문자셋(아랍어/키릴/타이 등) 발견 — 제거 후 반환:', text);
+  }
+  return cleaned;
+}
+
 // 트래픽이 몰릴 때 OpenAI가 일시적으로 429(요청 과다)나 5xx(서버 오류)를 반환하는 경우가 있다.
 // 이런 경우는 보통 몇 초 뒤 재시도하면 성공하므로, 최대 3번까지 지수 백오프(1초→2초)로
 // 재시도한다. 400/401처럼 재시도해도 똑같이 실패할 요청 오류는 재시도하지 않고 바로 반환한다.
@@ -430,7 +446,9 @@ async function callOpenAIOnce(apiKey, messages, maxTokens, model) {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({ model, max_tokens: maxTokens, messages }),
+    // temperature를 기본값(1.0)보다 살짝 낮춰(0.8) 저확률·엉뚱한 토큰이 뽑힐 여지를 줄인다.
+    // 문체의 다양성을 크게 해치지 않으면서, 위 sanitizeAiText와 함께 이중 안전장치 역할.
+    body: JSON.stringify({ model, max_tokens: maxTokens, temperature: 0.8, messages }),
   });
   if (!openaiRes.ok) {
     const errText = await openaiRes.text();
@@ -438,7 +456,8 @@ async function callOpenAIOnce(apiKey, messages, maxTokens, model) {
     return { ok: false, status: openaiRes.status };
   }
   const data = await openaiRes.json();
-  const text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '').trim();
+  const rawText = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '').trim();
+  const text = sanitizeAiText(rawText);
   return { ok: true, text };
 }
 
