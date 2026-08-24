@@ -4,6 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>사주풀이 · 나의 사주팔자</title>
+<!-- PWA: 홈 화면에 추가/설치 -->
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0a0a14">
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="사주풀이">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700;900&family=Noto+Sans+KR:wght@400;500;700;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -4513,6 +4522,17 @@ $('#accountBtn').addEventListener('click', openLoginModal);
 initAuth();
 restoreFormSnapshotIfAny();
 })();
+</script>
+<script>
+// PWA: 서비스워커 등록 — 위 메인 앱 로직과는 독립적으로 동작하도록 별도 스크립트로 분리했다.
+// 여기서 에러가 나더라도(구형 브라우저 등) 앱 본연의 기능에는 영향을 주지 않는다.
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(err => {
+      console.warn('서비스워커 등록 실패(PWA 설치에는 영향 있을 수 있으나 앱 사용에는 지장 없음):', err);
+    });
+  });
+}
 </script>
 </body>
 </html>
