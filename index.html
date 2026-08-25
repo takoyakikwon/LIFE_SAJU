@@ -449,6 +449,12 @@
   #tabbar button .ico{font-family:"Noto Serif KR"; font-weight:900; font-size:15px;}
   #tabbar button .lb{font-size:10px; font-weight:700;}
   #tabbar button.active{color:var(--seal);}
+  #tabbar button[data-group="today"],
+  #tabbar button[data-group="today"].active{color:var(--gold);}
+  #tabbar button[data-group="ai"],
+  #tabbar button[data-group="ai"].active{color:var(--pink);}
+  #tabbar button[data-group="today"].active .ico,
+  #tabbar button[data-group="ai"].active .ico{text-shadow:0 0 10px currentColor;}
   [hidden]{display:none !important;}
   /* 자미두수 */
   .ziwei-summary{
