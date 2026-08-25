@@ -361,19 +361,12 @@
     pointer-events:none;
   }
   .hook-teaser-type-row{ display:flex; align-items:center; gap:8px; margin-bottom:16px; }
-  .hook-teaser-icon{ font-size:24px; line-height:1; }
   .hook-teaser-type{
     font-family:"Noto Serif KR"; font-weight:900; font-size:17px; color:var(--ink);
     letter-spacing:0.2px;
   }
   .hook-teaser-label{
-    font-size:11px; font-weight:800; color:var(--gold); letter-spacing:0.3px; margin-bottom:2px;
-  }
-  .hook-teaser-quote-mark{
-    font-family:Georgia,"Noto Serif KR",serif; font-weight:900; font-size:46px; line-height:1;
-    background:linear-gradient(135deg,var(--gold),var(--pink));
-    -webkit-background-clip:text; background-clip:text; color:transparent;
-    opacity:.6; height:26px; margin-bottom:-4px;
+    font-size:11px; font-weight:800; color:var(--gold); letter-spacing:0.3px; margin-bottom:10px;
   }
   .hook-teaser-text{
     font-family:"Noto Serif KR"; font-weight:700; font-size:16.5px; line-height:1.75;
@@ -1059,11 +1052,9 @@
       <div class="summary" id="summaryBox"></div>
       <div class="hook-teaser" id="hookTeaserBox">
         <div class="hook-teaser-type-row">
-          <span class="hook-teaser-icon" id="hookTeaserIcon">✦</span>
           <span class="hook-teaser-type" id="hookTeaserType"></span>
         </div>
         <div class="hook-teaser-label">✦ 지금 나온 결과, 한눈에 보면</div>
-        <div class="hook-teaser-quote-mark">"</div>
         <div class="hook-teaser-text" id="hookTeaserText"></div>
         <button type="button" class="hook-teaser-btn" id="hookTeaserBtn">이 성향, 더 깊이 풀어보기 →</button>
       </div>
@@ -1561,7 +1552,6 @@ const TEN_GOD_GROUP_SCENARIO = {
 // 긴 설명형 문장(ELEMENT_KEYWORD 등) 대신, MBTI처럼 한눈에 스캔되는 2~4글자 라벨로
 // "결과지"처럼 보이게 하는 게 목적. ELEMENT_SCENARIO/TEN_GOD_GROUP_SCENARIO와 같은 축(오행,
 // 십성 그룹)을 쓰되 badge용으로 훨씬 짧게 압축한 표현.
-const ELEMENT_EMOJI = ["🌱","🔥","⛰️","⚔️","🌊"]; // 목화토금수
 const ELEMENT_TYPE_LABEL = ["도전가","열정가","조율가","결단가","전략가"];
 const TEN_GOD_GROUP_TYPE_LABEL = { "비겁":"독립형", "식상":"크리에이터형", "재성":"관리형", "관성":"리더형", "인성":"학습형" };
 function mod(n,m){ return ((n%m)+m)%m; }
@@ -2957,8 +2947,6 @@ function renderHookTeaser(saju, zw){
   if(!textBox) return;
   const {maxEl, topGroup} = computeCrossIdentity(saju, zw);
   textBox.innerHTML = `${ELEMENT_SCENARIO[maxEl]} 거기다 ${TEN_GOD_GROUP_SCENARIO[topGroup]}`;
-  const iconEl = $('#hookTeaserIcon');
-  if(iconEl) iconEl.textContent = ELEMENT_EMOJI[maxEl];
   const typeEl = $('#hookTeaserType');
   if(typeEl) typeEl.textContent = `${ELEMENT_TYPE_LABEL[maxEl]} × ${TEN_GOD_GROUP_TYPE_LABEL[topGroup]}`;
 }
