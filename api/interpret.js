@@ -31,11 +31,11 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // 카테고리별 실제 결제 금액(원 단위 정수). AI_CATEGORY_META의 표시용 문자열과 반드시 일치시켜야 합니다.
 const CATEGORY_AMOUNT_KRW = {
-  comprehensive: 3900,
-  love: 2900,
+  comprehensive: 9900,
+  love: 3900,
   compatibility: 4900,
-  newyear: 9900,
-  wealth: 3900,
+  newyear: 14900,
+  wealth: 4900,
   pet: 1900,
   career: 3900,
 };
