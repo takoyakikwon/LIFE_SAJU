@@ -1110,20 +1110,7 @@
           <input type="checkbox" id="pkLeap">
           <label for="pkLeap">윤달이에요</label>
         </div>
-        <div class="picker-tabs">
-          <button type="button" class="active" data-sheet="date" data-tab="wheel">선택해서 고르기</button>
-          <button type="button" data-sheet="date" data-tab="manual">직접 입력</button>
-        </div>
-        <div class="wheel-panel active" id="date-wheel">
-          <div class="wheel-row">
-            <div class="wheel-fade-top"></div><div class="wheel-fade-bot"></div>
-            <div class="wheel-highlight"></div>
-            <div class="wheel-col" id="col-year"></div>
-            <div class="wheel-col" id="col-month"></div>
-            <div class="wheel-col" id="col-day"></div>
-          </div>
-        </div>
-        <div class="manual-panel" id="date-manual">
+        <div class="manual-panel active" id="date-manual">
           <div class="manual-row">
             <div class="mfield"><label>년</label><input type="text" inputmode="numeric" maxlength="4" id="pkManualYear" placeholder="1995"></div>
             <div class="mfield"><label>월</label><input type="text" inputmode="numeric" maxlength="2" id="pkManualMonth" placeholder="8"></div>
@@ -1140,20 +1127,7 @@
       <div class="sheet">
         <div class="sheet-handle"></div>
         <div class="sheet-title">태어난 시간</div>
-        <div class="picker-tabs">
-          <button type="button" class="active" data-sheet="time" data-tab="wheel">선택해서 고르기</button>
-          <button type="button" data-sheet="time" data-tab="manual">직접 입력</button>
-        </div>
-        <div class="wheel-panel active" id="time-wheel">
-          <div class="wheel-row">
-            <div class="wheel-fade-top"></div><div class="wheel-fade-bot"></div>
-            <div class="wheel-highlight"></div>
-            <div class="wheel-col" id="col-hour"></div>
-            <div class="wheel-col" id="col-minute"></div>
-          </div>
-          <div class="sijin-hint" id="wheelSijinLabel"></div>
-        </div>
-        <div class="manual-panel" id="time-manual">
+        <div class="manual-panel active" id="time-manual">
           <div class="manual-row">
             <div class="mfield"><label>시 (0~23)</label><input type="text" inputmode="numeric" maxlength="2" id="pkManualHour" placeholder="14"></div>
             <div class="mfield"><label>분 (0~59)</label><input type="text" inputmode="numeric" maxlength="2" id="pkManualMinute" placeholder="30"></div>
@@ -3534,6 +3508,7 @@ function pkAttachSnap(colId, onChange){
   });
 }
 function pkInitDateWheels(){
+  if(!$('#col-year')) return; // 휠 피커 UI 제거(2026-08-25, 직접입력 단일화) — 해당 DOM이 없으면 아무 것도 하지 않음
   const p = pk();
   const years = []; for(let y=new Date().getFullYear(); y>=1925; y--) years.push(y);
   const months = []; for(let m=1;m<=12;m++) months.push(m);
@@ -3554,6 +3529,7 @@ function pkInitDateWheels(){
   pkAttachSnap('col-day', idx=> pk().day = days[idx]);
 }
 function pkRefreshDayWheel(){
+  if(!$('#col-year')) return; // 휠 피커 UI 제거(2026-08-25, 직접입력 단일화)
   const p = pk();
   const dayCount = p.calType==='lunar' ? pkLunarMaxDay(p.year, p.month, p.leap) : pkSolarMaxDay(p.year, p.month);
   p.day = Math.min(p.day, dayCount);
@@ -3577,6 +3553,7 @@ function pkUpdateSijinLabel(h){
   const m = $('#manualSijinLabel'); if(m) m.textContent = label;
 }
 function pkInitTimeWheels(){
+  if(!$('#col-hour')) return; // 휠 피커 UI 제거(2026-08-25, 직접입력 단일화)
   const p = pk();
   const hours=[]; for(let h=0;h<24;h++) hours.push(h);
   const minutes=[]; for(let m=0;m<60;m++) minutes.push(m);
