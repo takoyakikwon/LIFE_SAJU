@@ -408,7 +408,7 @@
   .mascot-bubble b{ color:var(--gold); }
   .hook-quote{
     margin-top:10px; padding:9px 0 9px 12px; border-left:3px solid var(--gold-line);
-    font-family:"Noto Serif KR",serif; font-style:italic; font-size:12.5px; line-height:1.7; color:var(--ink);
+    font-family:"Noto Serif KR",serif; font-style:italic; font-weight:700; font-size:12.5px; line-height:1.7; color:var(--ink);
   }
   .hook-quote:empty{ display:none; }
   /* 자미두수 그리드에 은은한 별빛 배경 + 명궁 글로우를 더해 화면이 비어 보이지 않게 한다. */
@@ -635,12 +635,16 @@
      (.ohaeng-note/.ziwei-summary/.ai-result-text)은 폰트는 그대로 두고 테두리·배경·여백만
      이 클래스가 덮어써서 금색으로 강조하고, 스타일이 전혀 없던 곳(#compatFreeBox)은
      이 클래스 하나로 카드 모양 전체를 만든다. 표·카드 등 순수 데이터 요소에는 붙이지 않는다.
-     선언 순서상 위의 각 카드 클래스들보다 뒤에 있어야 border/background/padding을 덮어쓴다. */
+     선언 순서상 위의 각 카드 클래스들보다 뒤에 있어야 border/background/padding을 덮어쓴다.
+     2026-08-26: 해석 텍스트가 --ink-soft(어두운 회보라)를 물려받아 잘 안 보인다는 피드백 —
+     글자 크기는 그대로 두고 색상을 밝게, 굵기를 살짝 올려 가독성/존재감을 높인다. */
   .interpret-box{
     border:1.5px solid var(--gold-line);
     border-radius:var(--radius-sm);
     background:rgba(244,196,99,.06);
     padding:14px 15px;
+    color:var(--ink);
+    font-weight:500;
   }
   .modal-overlay{
     position:fixed; inset:0; background:rgba(6,6,14,0.65);
@@ -1526,7 +1530,7 @@
           <div id="aiStepCompatFree" hidden>
             <button type="button" class="cat-back" id="compatFreeBackBtn">← 다른 리포트 선택</button>
             <p class="section-desc" style="margin:14px 0 12px;">사주·자미두수 명식을 바탕으로 한 무료 궁합 미리보기예요. 더 깊은 풀이는 심층풀이에서 확인할 수 있어요.</p>
-            <div id="compatFreeBox" class="interpret-box" style="font-size:12.5px; line-height:1.75; color:var(--ink-soft);"></div>
+            <div id="compatFreeBox" class="interpret-box" style="font-size:12.5px; line-height:1.75;"></div>
             <button class="submit-btn" id="compatFreeUnlockBtn" style="margin-top:16px;">더 깊이 풀어보기</button>
           </div>
 
