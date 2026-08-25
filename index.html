@@ -1114,8 +1114,8 @@
         <div class="ziwei-summary interpret-box" id="crossBox"></div>
         <div class="ai-cta-card">
           <div class="ai-cta-title">사주팔자·오행·십성·대운·자미두수, 여기까지 살펴보셨어요</div>
-          <div class="ai-cta-desc">이 모든 정보를 하나의 이야기로 엮은 AI 해석으로 완성해보세요.</div>
-          <button type="button" class="submit-btn" id="crossAiCtaBtn">AI로 더 자세히 풀어보기</button>
+          <div class="ai-cta-desc">이 모든 정보를 하나의 이야기로 엮은 심층풀이로 완성해보세요.</div>
+          <button type="button" class="submit-btn" id="crossAiCtaBtn">더 깊이 풀어보기</button>
         </div>
       </div>
       <div class="panel" data-panel="today">
@@ -1129,7 +1129,7 @@
             <div class="iljin-tag" id="todayIljinTag">오늘의 일진 · 계산 중...</div>
           </div>
           <div class="card">
-            <div class="card-head">✦ 오늘의 종합운<span class="badge-mini" id="todayAiBadge">임시문구 · AI는 다음 단계</span></div>
+            <div class="card-head">✦ 오늘의 종합운</div>
             <div class="score-row">
               <div class="score-ring">
                 <svg width="84" height="84">
@@ -1209,8 +1209,8 @@
         </div>
       </div>
       <div class="panel" data-panel="ai">
-        <h2 class="section-title">AI 종합 해석 <span class="en">AI READING</span></h2>
-        <p class="section-desc">지금까지 계산된 사주·자미두수 데이터를 바탕으로, AI가 성격과 기질, 지금 흐름을 글로 풀어드려요.</p>
+        <h2 class="section-title">심층풀이 <span class="en">DEEP READING</span></h2>
+        <p class="section-desc">지금까지 계산된 사주·자미두수 데이터를 바탕으로 성격과 기질, 지금의 흐름을 자세히 풀어드려요.</p>
         <div id="aiLocked">
           <div id="aiStepCategory">
             <p class="section-desc" style="margin-bottom:14px;">원하는 리포트를 선택해주세요.</p>
@@ -1371,24 +1371,24 @@
 
           <div id="aiStepCompatFree" hidden>
             <button type="button" class="cat-back" id="compatFreeBackBtn">← 다른 리포트 선택</button>
-            <p class="section-desc" style="margin:14px 0 12px;">사주·자미두수 명식을 바탕으로 한 무료 궁합 미리보기예요. 더 깊은 풀이는 AI 리포트에서 확인할 수 있어요.</p>
+            <p class="section-desc" style="margin:14px 0 12px;">사주·자미두수 명식을 바탕으로 한 무료 궁합 미리보기예요. 더 깊은 풀이는 심층풀이에서 확인할 수 있어요.</p>
             <div id="compatFreeBox" class="interpret-box" style="font-size:12.5px; line-height:1.75; color:var(--ink-soft);"></div>
-            <button class="submit-btn" id="compatFreeUnlockBtn" style="margin-top:16px;">AI로 더 자세히 풀어보기</button>
+            <button class="submit-btn" id="compatFreeUnlockBtn" style="margin-top:16px;">더 깊이 풀어보기</button>
           </div>
 
           <div id="aiStepPay" hidden>
             <button type="button" class="cat-back" id="payBackBtn">← 다른 리포트 선택</button>
             <div class="ai-price-card" style="margin-top:14px;">
               <div class="ai-price-amt" id="aiPriceAmt">3,900원</div>
-              <div class="ai-price-desc" id="aiPriceDesc">1회 결제로 이 사주의 AI 해석 리포트를 확인할 수 있어요.</div>
-              <button class="submit-btn" id="aiUnlockBtn" style="margin-top:14px;">AI 해석 보기</button>
+              <div class="ai-price-desc" id="aiPriceDesc">1회 결제로 이 사주의 심층풀이 리포트를 확인할 수 있어요.</div>
+              <button class="submit-btn" id="aiUnlockBtn" style="margin-top:14px;">심층풀이 보기</button>
             </div>
           </div>
         </div>
         <div id="aiLoading" hidden>
           <div class="ai-loading-box">
             <div class="ai-spinner"></div>
-            <div>AI가 사주를 읽고 있어요…</div>
+            <div>사주를 읽고 있어요…</div>
           </div>
         </div>
         <div id="aiResult" hidden>
@@ -1401,7 +1401,7 @@
         <div id="aiError" hidden class="ai-error"></div>
       </div>
       <div class="floating-ai-cta" id="floatingAiCta">
-        <button type="button" class="submit-btn" id="floatingAiCtaBtn">✦ AI 해석으로 자세히 보기</button>
+        <button type="button" class="submit-btn" id="floatingAiCtaBtn">✦ 심층풀이로 자세히 보기</button>
       </div>
     </section>
   </main>
@@ -1411,7 +1411,7 @@
     <button data-group="ziwei"><span class="ico">紫</span><span class="lb">자미</span></button>
     <button data-group="cross"><span class="ico">合</span><span class="lb">종합</span></button>
     <button data-group="today"><span class="ico">☀</span><span class="lb">오늘</span></button>
-    <button data-group="ai"><span class="ico">AI</span><span class="lb">해석</span><span class="tab-badge-dot" id="aiTabBadge" hidden></span></button>
+    <button data-group="ai"><span class="ico">深</span><span class="lb">심층풀이</span><span class="tab-badge-dot" id="aiTabBadge" hidden></span></button>
   </nav>
 </div>
 <div id="payModal" class="modal-overlay" hidden>
@@ -1437,7 +1437,7 @@
 <div id="historyModal" class="modal-overlay" hidden>
   <div class="modal-card modal-card-wide">
     <div class="modal-title">내 결제내역</div>
-    <p class="modal-desc">결제한 리포트를 다시 눌러보면 그때 받은 AI 해석을 다시 볼 수 있어요 (재호출 없이 저장된 내용을 그대로 보여줘요). 결제일로부터 15일 동안 다시 볼 수 있고, 그 안에 PDF로 저장해두면 기간이 지나도 계속 보관할 수 있어요.</p>
+    <p class="modal-desc">결제한 리포트를 다시 눌러보면 그때 받은 심층풀이를 다시 볼 수 있어요 (재호출 없이 저장된 내용을 그대로 보여줘요). 결제일로부터 15일 동안 다시 볼 수 있고, 그 안에 PDF로 저장해두면 기간이 지나도 계속 보관할 수 있어요.</p>
     <div class="history-list" id="historyList"></div>
     <button class="modal-cancel" id="historyModalCancel">닫기</button>
   </div>
@@ -3617,7 +3617,7 @@ const TAB_GROUPS = {
   ziwei: {panels:[{id:'ziwei',label:'자미두수'}]},
   cross: {panels:[{id:'cross',label:'종합'}]},
   today: {panels:[{id:'today',label:'오늘'}]},
-  ai: {panels:[{id:'ai',label:'AI 해석'}]}
+  ai: {panels:[{id:'ai',label:'심층풀이'}]}
 };
 let lastSubPanel = {palja_group:'palja', unse_group:'daeun'};
 let currentGroupKey = 'palja_group';
@@ -4220,7 +4220,7 @@ async function runAiInterpretation(){
     const isLoginError = /로그인/.test(err.message);
     $('#aiError').textContent = isLoginError
       ? err.message
-      : 'AI 해석을 불러오지 못했어요. (' + err.message + ') 이 기능은 배포 후 /api/interpret 서버 함수가 연결되어 있어야 동작합니다.';
+      : '심층풀이를 불러오지 못했어요. (' + err.message + ') 이 기능은 배포 후 /api/interpret 서버 함수가 연결되어 있어야 동작합니다.';
     $('#aiLocked').hidden = false;
   } finally {
     aiInterpretInFlight = false;
@@ -4414,7 +4414,7 @@ async function downloadPurchasePdf(row, btnEl){
   wrap.style.color = '#1a1420';
   wrap.style.fontFamily = "'Noto Sans KR', sans-serif";
   wrap.innerHTML = `
-    <div style="font-family:'Noto Serif KR',serif; font-weight:900; font-size:12px; letter-spacing:.14em; color:#a78bfa; margin-bottom:8px;">사주풀이 · AI 해석</div>
+    <div style="font-family:'Noto Serif KR',serif; font-weight:900; font-size:12px; letter-spacing:.14em; color:#a78bfa; margin-bottom:8px;">사주풀이 · 심층풀이</div>
     <div style="font-family:'Noto Serif KR',serif; font-weight:900; font-size:24px; margin-bottom:10px;">${escapeHtml(CATEGORY_LABEL[row.category]||row.category)}</div>
     <div style="font-size:12px; color:#6b6480; margin-bottom:28px; padding-bottom:16px; border-bottom:1px solid #e7e2f5;">결제일 ${formatDateTime(row.created_at)} · 결제금액 ${formatKRW(row.amount)}</div>
     <div style="white-space:pre-wrap; font-size:13.5px; line-height:1.9; color:#26202e;">${escapeHtml(row.result_text||'저장된 해석 내용이 없어요.')}</div>
