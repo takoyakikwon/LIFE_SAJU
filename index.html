@@ -1415,10 +1415,7 @@
         </div>
         <div id="aiResult" hidden>
           <div class="ai-result-text interpret-box" id="aiResultText"></div>
-          <div class="ai-result-note">
-            📌 이 결과는 <b>마이페이지 &gt; 내 결제내역</b>에서 15일 동안 다시 볼 수 있고, PDF로도 저장할 수 있어요.
-            <button type="button" class="ai-result-note-btn" id="aiResultHistoryBtn">내 결제내역 바로가기 →</button>
-          </div>
+          <div class="ai-result-note" id="aiResultNote"></div>
         </div>
         <div id="aiError" hidden class="ai-error"></div>
       </div>
@@ -1439,7 +1436,7 @@
 <div id="payModal" class="modal-overlay" hidden>
   <div class="modal-card">
     <div class="modal-title">결제 확인</div>
-    <p class="modal-desc">실제 결제 수단은 아직 연동 전이에요. 아래 버튼으로 결제 완료 상태를 임시로 체험할 수 있어요.</p>
+    <p class="modal-desc" id="payModalDesc">실제 결제 수단은 아직 연동 전이에요. 아래 버튼으로 결제 완료 상태를 임시로 체험할 수 있어요.</p>
     <div class="modal-price" id="modalPrice">3,900원</div>
     <button class="submit-btn" id="mockPayBtn">결제 완료</button>
     <button class="modal-cancel" id="payModalCancel">닫기</button>
@@ -3077,6 +3074,9 @@ let aiUnlocked = false;
 // 결제 버튼 중복 클릭/이중 요청 방지용 플래그. 이게 없으면 버튼을 빠르게 두 번 누르거나
 // 네트워크가 느릴 때 AI 호출(OpenAI 과금)과 purchases 기록이 중복으로 발생할 수 있다.
 let aiInterpretInFlight = false;
+// 비회원 구매 시 재열람이 안 되므로(내 결제내역에 안 남음), 결과 화면에서 바로 PDF로 저장할 수
+// 있도록 마지막으로 받은 해석 텍스트를 잠깐 들고 있는다. 로그인 사용자도 이 버튼으로 즉시 저장 가능.
+let lastAiResultText = '';
 let selectedAiCategory = null;
 let selectedLoveStatus = null;
 let selectedJobStatus = null; // 취업·사업·이동운 카테고리에서 고른 현재 신분(직장인/자영업/프리랜서 등)
@@ -4066,6 +4066,10 @@ function buildAiPayload(){
 function openPayModal(){
   const meta = AI_CATEGORY_META[selectedAiCategory] || AI_CATEGORY_META.comprehensive;
   $('#modalPrice').textContent = meta.price;
+  // 비회원도 구매할 수 있지만(2026-08-25), 로그인 여부에 따라 재열람 가능 여부가 다르므로 미리 안내한다.
+  $('#payModalDesc').textContent = currentSession
+    ? '실제 결제 수단은 아직 연동 전이에요. 아래 버튼으로 결제 완료 상태를 임시로 체험할 수 있어요. 결제 후 15일간 다시보기와 PDF 저장을 이용할 수 있어요.'
+    : '실제 결제 수단은 아직 연동 전이에요. 아래 버튼으로 결제 완료 상태를 임시로 체험할 수 있어요. 로그인 없이 진행하면 이 결과는 지금 화면에서만 볼 수 있으니, 결과가 나오면 꼭 PDF로 저장해주세요. (로그인하면 15일간 다시보기가 가능해요)';
   $('#payModal').hidden = false;
 }
 function closePayModal(){ $('#payModal').hidden = true; }
@@ -4193,13 +4197,8 @@ $('#mockPayBtn').addEventListener('click', ()=>{
   // 중복 클릭/중복 탭 방지: 이미 AI 호출이 진행 중이면 두 번째 클릭은 무시한다
   // (버튼을 빠르게 두 번 누르면 OpenAI 호출과 purchases 기록이 중복될 수 있어서 막아둠).
   if(aiInterpretInFlight) return;
-  // 결제 기록은 로그인한 사용자 명의로만 남길 수 있어요(비회원 결제 위조 방지) — 로그인 안 돼 있으면 먼저 로그인부터 안내
-  if(!currentSession){
-    closePayModal();
-    alert('로그인 후 이용할 수 있는 기능이에요. 카카오로 3초만에 로그인해주세요.');
-    openLoginModal();
-    return;
-  }
+  // 비회원도 구매할 수 있어요(2026-08-25) — 로그인 없이 진행하면 결과는 이 화면에서 1회만 보여주고
+  // (다시보기 불가), 로그인한 사용자는 기존처럼 마이페이지에서 15일간 재열람할 수 있어요.
   // TODO: 실제 결제 SDK(토스페이먼츠/포트원 등) 연동 시 이 부분을 교체하세요.
   // 결제 성공 콜백 안에서 아래 두 줄을 호출하면 됩니다.
   closePayModal();
@@ -4227,7 +4226,9 @@ async function runAiInterpretation(){
     }
     const data = await res.json();
     $('#aiLoading').hidden = true;
-    $('#aiResultText').textContent = data.interpretation || '해석 결과를 받아오지 못했어요.';
+    lastAiResultText = data.interpretation || '해석 결과를 받아오지 못했어요.';
+    $('#aiResultText').textContent = lastAiResultText;
+    renderAiResultNote();
     $('#aiResult').hidden = false;
     // 뒤로가기(브라우저/기기 back)를 누르면 이 결과 화면에서 페이지 자체를 이탈하는 대신
     // 유료 콘텐츠 목록으로 돌아가도록 히스토리에 상태를 하나 쌓아둔다. 같은 결과를 보는 동안
@@ -4248,7 +4249,35 @@ async function runAiInterpretation(){
     aiInterpretInFlight = false;
   }
 }
-$('#aiResultHistoryBtn').addEventListener('click', ()=>{ openHistoryModal(); });
+// 결과 화면 하단 안내 문구를 로그인 여부에 따라 다르게 그린다.
+// - 로그인 사용자: 기존처럼 "내 결제내역"에서 15일간 재열람 + PDF 저장 가능 안내
+// - 비회원: 다시 볼 수 없다는 점을 명확히 알리고, 지금 바로 PDF로 저장할 수 있는 버튼을 제공
+function renderAiResultNote(){
+  const note = $('#aiResultNote');
+  if(!note) return;
+  if(currentSession){
+    note.innerHTML = '📌 이 결과는 <b>마이페이지 &gt; 내 결제내역</b>에서 15일 동안 다시 볼 수 있고, PDF로도 저장할 수 있어요.'
+      + '<button class="ai-result-note-btn" id="aiResultHistoryBtn">내 결제내역 바로가기 →</button>';
+    $('#aiResultHistoryBtn').addEventListener('click', ()=>{ openHistoryModal(); });
+  } else {
+    note.innerHTML = '📌 비회원으로 결제하면 이 결과는 다시 볼 수 없어요. 지금 PDF로 저장해두시면 계속 보관할 수 있어요.'
+      + '<button class="ai-result-note-btn" id="aiResultPdfBtn">📄 지금 PDF로 저장하기</button>';
+    $('#aiResultPdfBtn').addEventListener('click', (e)=>{ downloadCurrentResultPdf(e.currentTarget); });
+  }
+}
+// 비회원은 결제 기록이 DB에 남지 않으므로(내 결제내역 접근 불가), 방금 받은 해석 결과를
+// 기존 downloadPurchasePdf()가 기대하는 형태(row 객체)로 감싸서 그대로 재사용한다.
+function downloadCurrentResultPdf(btnEl){
+  const meta = AI_CATEGORY_META[selectedAiCategory] || AI_CATEGORY_META.comprehensive;
+  const amount = parseInt((meta.price || '').replace(/[^0-9]/g, ''), 10) || 0;
+  const row = {
+    category: selectedAiCategory || 'comprehensive',
+    amount,
+    created_at: new Date().toISOString(),
+    result_text: lastAiResultText
+  };
+  downloadPurchasePdf(row, btnEl);
+}
 // AI 결과를 본 뒤 브라우저/기기 뒤로가기를 누르면, 실제로 지금 AI 결과 화면을 보고 있을 때만
 // 유료 콘텐츠 목록(카테고리 선택)으로 되돌리고, 그 히스토리 상태를 소비한다. 이미 다른 탭으로
 // 넘어가 있는 상태라면(패널이 더 이상 active가 아니면) 평범한 브라우저 뒤로가기 동작에 맡긴다.
