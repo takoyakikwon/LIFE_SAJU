@@ -185,6 +185,12 @@
     margin-top:16px; font-size:11px; line-height:1.6; color:var(--ink-faint);
     padding:12px 13px; background:var(--paper-deep); border-radius:var(--radius-sm);
   }
+  .app-footer{margin-top:20px; padding-top:16px; border-top:1px solid var(--line); text-align:center;}
+  .app-footer-links{display:flex; justify-content:center; align-items:center; gap:8px; font-size:11.5px;}
+  .app-footer-links a{color:var(--ink-faint); text-decoration:none; font-weight:700;}
+  .app-footer-links a:active{color:var(--ink-soft);}
+  .app-footer-links .dot{color:var(--ink-faint); opacity:.5;}
+  .app-footer-copy{margin-top:8px; font-size:10.5px; color:var(--ink-faint); opacity:.7;}
   /* ---------- RESULT VIEW ---------- */
   #view-result{padding:20px 20px 8px;}
   .summary{
@@ -977,6 +983,16 @@
         음력 날짜는 실제 삭望(신월) 시각을 계산해 분 단위로 정밀하게 구합니다. 사주팔자와 더불어 <b>자미두수</b> 명반도 함께 계산해
         두 체계를 나란히 비교해볼 수 있어요. 다만 이것도 명리학 여러 유파 중 하나의 방식을 따른 참고·재미용 도구이며, 정밀 상담은 전문가와 나누시길 권해요.
       </p>
+      <footer class="app-footer">
+        <div class="app-footer-links">
+          <a href="/terms.html">이용약관</a>
+          <span class="dot">·</span>
+          <a href="/privacy.html">개인정보처리방침</a>
+          <span class="dot">·</span>
+          <a href="/refund.html">환불정책</a>
+        </div>
+        <div class="app-footer-copy">© 2026 사주풀이</div>
+      </footer>
     </section>
     <!-- 생년월일 휠 스크롤 피커 바텀시트 -->
     <div class="sheet-bg" id="dateSheetBg">

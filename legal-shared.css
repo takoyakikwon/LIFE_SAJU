@@ -1,0 +1,52 @@
+/* 사주풀이 — 약관/정책 공통 스타일 (다크 미스틱 테마, index.html :root 변수와 통일) */
+:root{
+  --paper:#14142a; --paper-deep:#1c1a3a; --paper-card:rgba(255,255,255,.055);
+  --ink:#f1eefc; --ink-soft:#9c98c4; --ink-faint:#6b6790;
+  --seal:#a78bfa; --line:rgba(255,255,255,.13);
+  --gold:#f4c463; --violet:#a78bfa; --pink:#f472b6;
+  --radius-lg:28px; --radius-md:18px; --radius-sm:10px;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0; background:var(--paper);
+  background-image:radial-gradient(circle at 15% 0%, rgba(167,139,250,.14), transparent 45%),
+                    radial-gradient(circle at 85% 20%, rgba(244,114,182,.10), transparent 40%);
+  color:var(--ink); font-family:"Noto Sans KR", sans-serif;
+  line-height:1.7; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:640px; margin:0 auto; padding:28px 20px 80px;}
+.back-link{
+  display:inline-flex; align-items:center; gap:6px; color:var(--ink-soft);
+  text-decoration:none; font-size:13px; font-weight:700; margin-bottom:18px;
+}
+.back-link:hover{color:var(--ink);}
+h1{
+  font-family:"Noto Serif KR", serif; font-weight:900; font-size:24px;
+  margin:0 0 6px; color:var(--ink);
+}
+.updated{font-size:12px; color:var(--ink-faint); margin-bottom:20px;}
+.notice{
+  background:rgba(244,196,99,.10); border:1px solid rgba(244,196,99,.28);
+  border-radius:var(--radius-sm); padding:14px 16px; font-size:12.5px;
+  line-height:1.7; color:var(--ink-soft); margin-bottom:28px;
+}
+.notice b{color:var(--gold);}
+section{margin-bottom:26px;}
+h2{
+  font-family:"Noto Serif KR", serif; font-weight:700; font-size:16px;
+  color:var(--seal); margin:0 0 10px; padding-bottom:8px; border-bottom:1px solid var(--line);
+}
+p{font-size:13.5px; color:var(--ink-soft); margin:0 0 10px;}
+ul, ol{margin:0 0 10px; padding-left:20px;}
+li{font-size:13.5px; color:var(--ink-soft); margin-bottom:6px;}
+b, strong{color:var(--ink); font-weight:700;}
+table{width:100%; border-collapse:collapse; margin:10px 0 14px; font-size:12.5px;}
+th, td{border:1px solid var(--line); padding:8px 10px; text-align:left; color:var(--ink-soft);}
+th{background:var(--paper-card); color:var(--ink); font-weight:700;}
+.footer-links{
+  margin-top:40px; padding-top:20px; border-top:1px solid var(--line);
+  display:flex; flex-wrap:wrap; gap:10px 14px; font-size:12.5px;
+}
+.footer-links a{color:var(--ink-soft); text-decoration:none; font-weight:700;}
+.footer-links a.current{color:var(--gold);}
+.footer-copy{margin-top:14px; font-size:11px; color:var(--ink-faint);}
