@@ -558,13 +558,10 @@ module.exports = async (req, res) => {
     return;
   }
 
-  // 결제 기록을 남기려면 실제 로그인한 사용자여야 한다. 클라이언트가 보낸 access_token을
-  // Supabase Auth에 되물어 검증하고, 검증된 user.id만 신뢰한다(클라이언트가 보낸 user_id는 쓰지 않음).
-  const user = await verifySupabaseUser(payload.access_token);
-  if (!user) {
-    res.status(401).json({ error: '로그인이 필요한 서비스입니다. 카카오 로그인 후 다시 시도해주세요.' });
-    return;
-  }
+  // 비회원도 구매할 수 있다(2026-08-25). access_token이 있으면(로그인 사용자) Supabase Auth에
+  // 되물어 검증하고, 검증된 user.id만 신뢰한다(클라이언트가 보낸 user_id는 쓰지 않음). 토큰이
+  // 없거나 검증에 실패하면 비회원으로 간주하고 계속 진행한다(결제 기록은 user_id 없이 남는다).
+  const user = payload.access_token ? await verifySupabaseUser(payload.access_token) : null;
 
   // 반려동물궁합(pet)은 BASE_PROMPT + 오버레이 구조를 아예 타지 않는 완전 독립 프롬프트라
   // (위 PET_SYSTEM_PROMPT 주석 참고) 여기서 따로 분기한다. userPrompt도 무거운 원국 데이터
@@ -627,7 +624,7 @@ module.exports = async (req, res) => {
     const { access_token, ...payloadWithoutToken } = payload;
     const amount = CATEGORY_AMOUNT_KRW[payload.category] || CATEGORY_AMOUNT_KRW.comprehensive;
     await recordPurchase({
-      userId: user.id,
+      userId: user ? user.id : null,
       category: payload.category || 'comprehensive',
       amount,
       payload: payloadWithoutToken,
