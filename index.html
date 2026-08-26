@@ -3256,6 +3256,13 @@ let selectedAiCategory = null;
 let selectedLoveStatus = null;
 let selectedJobStatus = null; // 취업·사업·이동운 카테고리에서 고른 현재 신분(직장인/자영업/프리랜서 등)
 let partnerGenderVal = "남";
+// 생년월일/태어난 시간 바텀시트(#dateSheetBg/#timeSheetBg)가 열려 있을 때 기기/브라우저
+// 뒤로가기를 누르면, 시트가 그대로 떠 있는 채로 뒤쪽 화면만 뒤로가기 되었다가 앱이 꺼지는
+// 문제가 있었다(2026-08-26 피드백). 시트를 열 때 히스토리를 한 번 pushState해두고, 뒤로가기가
+// 오면 페이지 이탈 대신 시트만 닫도록 한다. 'date'|'time'|null.
+let sheetPushedType = null;
+// 태어난 곳 검색 바텀시트(#citySheetBg)도 동일한 구조라 같은 문제가 있어 함께 고친다.
+let citySheetPushed = false;
 // AI 유료 결과 화면(#aiResult)에서 브라우저/기기 뒤로가기를 누르면 페이지를 이탈하는 대신
 // 유료 콘텐츠 목록으로 돌아가게 하기 위한 히스토리 상태 추적 플래그. 결과가 뜰 때 한 번만
 // pushState하고, 그 상태를 소비(뒤로가기 처리 또는 resetAiPanel)하면 다시 false로 돌아간다.
@@ -3342,8 +3349,16 @@ function openCitySheet(){
   $('#citySearchInput').value = '';
   renderCityList('');
   $('#citySheetBg').classList.add('open');
+  history.pushState({ view: 'citySheetOpen' }, '');
+  citySheetPushed = true;
 }
-function closeCitySheet(){ $('#citySheetBg').classList.remove('open'); }
+function closeCitySheet(){
+  $('#citySheetBg').classList.remove('open');
+  if(citySheetPushed){
+    citySheetPushed = false;
+    history.back();
+  }
+}
 $('#cityBtn').addEventListener('click', openCitySheet);
 $('#citySearchInput').addEventListener('input', (e)=> renderCityList(e.target.value));
 $('#cityList').addEventListener('click', (e)=>{
@@ -3629,6 +3644,8 @@ function openSheet(type, target){
     $('#pkManualDateError').hidden = true;
     $('#dateSheetBg').classList.add('open');
     setTimeout(pkInitDateWheels, 10);
+    history.pushState({ view: 'sheetOpen', sheet: 'date' }, '');
+    sheetPushedType = 'date';
   } else {
     if($('#'+t.unknownId).checked) return;
     $('#pkManualHour').value = p.timeSet ? p.hour : '';
@@ -3637,10 +3654,16 @@ function openSheet(type, target){
     pkUpdateSijinLabel(p.hour);
     $('#timeSheetBg').classList.add('open');
     setTimeout(pkInitTimeWheels, 10);
+    history.pushState({ view: 'sheetOpen', sheet: 'time' }, '');
+    sheetPushedType = 'time';
   }
 }
 function closeSheet(type){
   $(type==='date' ? '#dateSheetBg' : '#timeSheetBg').classList.remove('open');
+  if(sheetPushedType === type){
+    sheetPushedType = null;
+    history.back();
+  }
 }
 $('#dateBtn').addEventListener('click', ()=> openSheet('date', 'main'));
 $('#timeBtn').addEventListener('click', ()=> openSheet('time', 'main'));
@@ -4585,6 +4608,20 @@ function downloadCurrentResultPdf(btnEl){
 // 이탈시키는 대신 "종료할까요?" 확인부터 보여준다(웹페이지는 스크립트로 탭을 강제로 닫을 수
 // 없으므로, "종료"는 실제로는 이 페이지 이전의 실제 브라우저 히스토리로 빠져나가는 것을 의미).
 window.addEventListener('popstate', ()=>{
+  // 바텀시트(생년월일/태어난 시간/태어난 곳 검색)가 열려 있으면, 그 아래 화면이 무엇이든
+  // 상관없이 뒤로가기는 항상 시트부터 닫는다 — 가장 위에 떠 있는 레이어가 먼저 반응해야
+  // 자연스럽기 때문에 다른 어떤 분기보다도 먼저 확인한다.
+  if(sheetPushedType){
+    const t = sheetPushedType;
+    sheetPushedType = null;
+    $(t === 'date' ? '#dateSheetBg' : '#timeSheetBg').classList.remove('open');
+    return;
+  }
+  if(citySheetPushed){
+    citySheetPushed = false;
+    $('#citySheetBg').classList.remove('open');
+    return;
+  }
   const aiPanelActive = $('.panel[data-panel="ai"]') && $('.panel[data-panel="ai"]').classList.contains('active');
   if(aiResultPushedState && aiPanelActive && !$('#aiResult').hidden){
     // 1번째 뒤로가기: AI 결과 화면 → 카테고리 목록. 곧바로 두 번째 트랩 상태를 쌓아서
