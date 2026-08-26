@@ -3273,6 +3273,20 @@ let aiBackTrapPushed = false;
 // 그 상태를 popstate에서 소비하면 다시 false로 리셋된다. 이미 안쪽 단계인 채로 다른 안쪽
 // 단계로 더 들어가는 전환(예: 연애상태선택→결제)에서는 중복으로 쌓지 않는다.
 let aiStepPushedState = false;
+// 무료 스크롤(기본사주) 화면에서 심층풀이 화면으로 처음 진입할 때 한 번만 pushState해서
+// 세우는 히스토리 트랩(2026-08-26, "심층풀이 화면에서 뒤로가기 누르면 기본사주 화면이
+// 아니라 종료돼버린다" 피드백으로 추가). 카테고리 목록(맨 위 단계)에서 뒤로가기를 누르면
+// 이 트랩을 소비해 기본사주 화면으로 되돌리고, 대신 아래 resultExitTrapPushed를 새로 세운다.
+// 이미 부가입력/결제/결과 단계까지 진행해 그쪽 트랩(aiStepPushedState/aiResultPushedState)을
+// 쌓아둔 상태라면 이 플래그는 그 트랩에 합쳐지고(replaceState) 더 이상 쓰이지 않는다.
+let aiGroupPushedState = false;
+// 심층풀이 화면에서 기본사주(자유 스크롤) 화면으로 뒤로가기 한 번으로 돌아온 뒤, 그 화면에서
+// 뒤로가기를 한 번 더 누르면 곧장 이탈하는 대신 "종료할까요?" 확인을 보여주기 위한 트랩.
+let resultExitTrapPushed = false;
+// 종료 확인 모달이 어느 트랩에서 열렸는지 기억해뒀다가, "계속 볼게요"를 누르면 같은 종류의
+// 트랩으로 재무장하기 위한 값('aiCategory' = 심층풀이 카테고리 목록에서 온 경우, 'freeScroll'
+// = 기본사주 자유 스크롤 화면에서 온 경우).
+let exitModalRearmTarget = null;
 // 카카오 로그인은 페이지 전체를 리다이렉트하는 방식이라, 로그인 도중 입력해둔 내 정보가
 // 브라우저 메모리에서 전부 사라진다. 로그인 직전에 폼 스냅샷을 저장해두고, 로그인 후
 // 돌아왔을 때 자동으로 복원 + 재계산해서 사용자가 처음부터 다시 입력하지 않게 한다.
@@ -3858,6 +3872,18 @@ function activateGroup(groupKey){
   renderSubtabBar(groupKey);
   // 사용자가 AI 해석 탭을 한 번이라도 열어봤다면, 결제 유도용 강조 배지는 더 이상 보여줄 필요가 없음
   if(groupKey === 'ai'){ $('#aiTabBadge').hidden = true; }
+  // 2026-08-26: 기본사주(자유 스크롤) → 심층풀이 화면으로 처음 넘어갈 때 히스토리 트랩을 하나
+  // 세운다(위 aiGroupPushedState 주석 참고). 이미 더 안쪽 단계의 트랩을 쌓아둔 상태로 다시
+  // activateGroup('ai')가 호출되는 경우(드묾)에는 중복으로 쌓지 않는다. 반대로 기본사주 화면
+  // 으로 돌아가면 이 트랩은 더 이상 유효하지 않으므로 내린다.
+  if(groupKey === 'ai'){
+    if(!aiGroupPushedState && !aiStepPushedState && !aiResultPushedState){
+      history.pushState({ view: 'aiGroupBackTrap' }, '');
+      aiGroupPushedState = true;
+    }
+  } else if(groupKey === 'palja_group'){
+    aiGroupPushedState = false;
+  }
   // 상시 플로팅 CTA — 무료 스크롤에서는 계속 떠 있다가, 심층풀이 화면으로 넘어가면 숨긴다
   // (groupKey는 이제 'palja_group' 아니면 'ai' 둘 중 하나만 온다 — 이어지는 스크롤 개편 이후
   // 다른 그룹으로의 전환 경로가 없어졌기 때문).
@@ -3954,6 +3980,7 @@ function resetAiPanel(){
   partnerData = null;
   petData = null;
   aiResultPushedState = false;
+  aiGroupPushedState = false;
   $('#aiLocked').hidden = false;
   $('#aiLoading').hidden = true;
   $('#aiResult').hidden = true;
@@ -3973,7 +4000,10 @@ function showAiStep(stepId){
   if(stepId === 'aiStepCategory'){
     aiStepPushedState = false;
   } else if(!aiStepPushedState){
-    history.pushState({ view: 'aiStepBackTrap' }, '');
+    // 카테고리 목록 단계에서 이미 aiGroupBackTrap 항목을 하나 쌓아둔 상태라면(위 aiGroupPushedState
+    // 참고) 그 위에 또 쌓지 않고 replaceState로 같은 자리를 이 단계용 트랩으로 갈아끼운다.
+    if(aiGroupPushedState){ history.replaceState({ view: 'aiStepBackTrap' }, ''); aiGroupPushedState = false; }
+    else { history.pushState({ view: 'aiStepBackTrap' }, ''); }
     aiStepPushedState = true;
   }
 }
@@ -4565,25 +4595,48 @@ window.addEventListener('popstate', ()=>{
     aiBackTrapPushed = true;
   } else if(aiStepPushedState && aiPanelActive && !$('#aiLocked').hidden && $('#aiStepCategory').hidden){
     // 카테고리 목록보다 안쪽 단계(연애상태선택/취업신분선택/상대방정보/결제 등)에서 뒤로가기
-    // → 페이지를 이탈하는 대신 카테고리 목록으로만 돌아간다(추가 종료 확인 트랩은 결제 완료 후
-    // 실제 유료 결과를 본 경우에만 필요하다고 보고 여기서는 걸지 않음).
+    // → 페이지를 이탈하는 대신 카테고리 목록으로만 돌아간다. 안쪽 단계로 들어갈 때 아래
+    // aiGroupPushedState 트랩이 이 트랩에 합쳐져(replaceState) 소비된 상태이므로, 카테고리
+    // 목록에 돌아온 자리에서 다음 뒤로가기가 "기본사주로 복귀"를 다시 잡아낼 수 있도록 새로
+    // 세워둔다.
     aiStepPushedState = false;
     showAiStep('aiStepCategory');
+    history.pushState({ view: 'aiGroupBackTrap' }, '');
+    aiGroupPushedState = true;
   } else if(aiBackTrapPushed && aiPanelActive){
     // 2번째(연달아) 뒤로가기: 카테고리 목록에서 또 뒤로가기 → 종료 확인 모달
     aiBackTrapPushed = false;
+    exitModalRearmTarget = 'aiCategory';
+    $('#exitConfirmModal').hidden = false;
+  } else if(aiGroupPushedState && aiPanelActive && !$('#aiLocked').hidden && !$('#aiStepCategory').hidden){
+    // 2026-08-26: 심층풀이 카테고리 목록(맨 위 단계)에서 뒤로가기 → 종료가 아니라 기본사주
+    // (자유 스크롤) 화면으로 돌아간다. 그 화면에서 뒤로가기를 한 번 더 누르면 종료 확인 모달이
+    // 뜨도록, 이 자리에서 새 트랩(resultExitTrapPushed)을 쌓아둔다.
+    aiGroupPushedState = false;
+    activateGroup('palja_group');
+    window.scrollTo(0,0);
+    history.pushState({ view: 'freeScrollBackTrap' }, '');
+    resultExitTrapPushed = true;
+  } else if(resultExitTrapPushed){
+    // 기본사주(자유 스크롤) 화면에서 뒤로가기 → 곧장 이탈하는 대신 종료 확인 모달을 보여준다.
+    resultExitTrapPushed = false;
+    exitModalRearmTarget = 'freeScroll';
     $('#exitConfirmModal').hidden = false;
   } else {
     aiResultPushedState = false;
     aiBackTrapPushed = false;
     aiStepPushedState = false;
+    aiGroupPushedState = false;
+    resultExitTrapPushed = false;
   }
 });
 $('#exitConfirmCancel').addEventListener('click', ()=>{
   // "취소": 이 페이지에 머무르고, 다음 뒤로가기를 다시 잡아낼 수 있도록 트랩을 재무장한다.
+  // 어느 화면에서 모달이 열렸는지(exitModalRearmTarget)에 따라 같은 종류의 트랩으로 되돌린다.
   $('#exitConfirmModal').hidden = true;
-  history.pushState({ view: 'aiCategoryBackTrap' }, '');
-  aiBackTrapPushed = true;
+  history.pushState({ view: 'exitBackTrap' }, '');
+  if(exitModalRearmTarget === 'freeScroll'){ resultExitTrapPushed = true; }
+  else { aiBackTrapPushed = true; }
 });
 $('#exitConfirmLeave').addEventListener('click', ()=>{
   // "나가기": 트랩 상태는 이미 popstate에서 한 번 소비된 상태이므로, 뒤로가기를 한 번 더
