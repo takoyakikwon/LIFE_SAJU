@@ -1529,9 +1529,6 @@
         </div>
         <div id="aiError" hidden class="ai-error"></div>
       </div>
-      <div class="floating-ai-cta" id="floatingAiCta">
-        <button type="button" class="submit-btn" id="floatingAiCtaBtn">✦ 심층풀이로 자세히 보기</button>
-      </div>
     </section>
   </main>
   <nav id="tabbar" hidden>
@@ -4431,9 +4428,6 @@ function renderAiResult(container, text){
     return;
   }
   const leadInHtml = leadIn ? `<p style="white-space:pre-wrap; margin:0 0 18px;">${escapeHtml(leadIn)}</p>` : '';
-  const steps = sections.map((s,i)=>
-    `<div class="ai-step-dot" data-i="${i}">${i+1}</div>` + (i<sections.length-1 ? `<div class="ai-step-line" data-i="${i}"></div>` : '')
-  ).join('');
   const tocItems = sections.map((s,i)=>
     `<div class="ai-toc-item" data-i="${i}"><span class="ai-toc-num">${String(i+1).padStart(2,'0')}</span><span>${escapeHtml(s.title)}</span></div>`
   ).join('');
@@ -4445,20 +4439,13 @@ function renderAiResult(container, text){
   ).join('');
   container.innerHTML = `
     ${leadInHtml}
-    <div class="ai-toc-wrap"><div class="ai-step-track">${steps}</div><div class="ai-toc-list">${tocItems}</div></div>
-    <div class="ai-toc-progress-hint">지금 <b id="aiTocHintNum">1번</b> 이야기를 읽는 중이에요</div>
+    <div class="ai-toc-wrap"><div class="ai-toc-list">${tocItems}</div></div>
     ${secHtml}
   `;
   const secEls = Array.from(container.querySelectorAll('.ai-report-sec'));
   const tocEls = Array.from(container.querySelectorAll('.ai-toc-item'));
-  const dotEls = Array.from(container.querySelectorAll('.ai-step-dot'));
-  const lineEls = Array.from(container.querySelectorAll('.ai-step-line'));
-  const hintEl = container.querySelector('#aiTocHintNum');
   function setCurrent(i){
     tocEls.forEach(el=>{ const idx=+el.dataset.i; el.classList.toggle('current', idx===i); el.classList.toggle('done', idx<i); });
-    dotEls.forEach(el=>{ const idx=+el.dataset.i; el.classList.toggle('done', idx<i); el.classList.toggle('current', idx===i); el.textContent = idx<i ? '✓' : (idx+1); });
-    lineEls.forEach(el=>{ el.classList.toggle('done', +el.dataset.i < i); });
-    if(hintEl) hintEl.textContent = (i+1) + '번';
   }
   setCurrent(0);
   if('IntersectionObserver' in window && secEls.length){
