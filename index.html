@@ -3266,6 +3266,13 @@ let aiResultPushedState = false;
 // 세팅하고, 확인 모달에서 "취소"를 누르면 다시 세팅(재무장), "나가기"를 누르면 소비하고 실제
 // 브라우저 뒤로가기를 한 번 더 실행해 이 페이지 이전 히스토리로 진짜 빠져나가게 한다.
 let aiBackTrapPushed = false;
+// 카테고리 목록(aiStepCategory)보다 안쪽 단계(연애상태선택/취업신분선택/상대방정보/결제 등)에
+// 있을 때 기기/브라우저 뒤로가기를 누르면, 페이지를 완전히 이탈하는 대신 카테고리 목록으로
+// 돌아오게 하기 위한 히스토리 트랩(2026-08-26, "뒤로가기 누르면 카테고리 목록으로 안 돌아온다"
+// 피드백으로 추가). showAiStep()이 카테고리 밖 단계로 처음 진입할 때 한 번만 pushState하고,
+// 그 상태를 popstate에서 소비하면 다시 false로 리셋된다. 이미 안쪽 단계인 채로 다른 안쪽
+// 단계로 더 들어가는 전환(예: 연애상태선택→결제)에서는 중복으로 쌓지 않는다.
+let aiStepPushedState = false;
 // 카카오 로그인은 페이지 전체를 리다이렉트하는 방식이라, 로그인 도중 입력해둔 내 정보가
 // 브라우저 메모리에서 전부 사라진다. 로그인 직전에 폼 스냅샷을 저장해두고, 로그인 후
 // 돌아왔을 때 자동으로 복원 + 재계산해서 사용자가 처음부터 다시 입력하지 않게 한다.
@@ -3962,6 +3969,13 @@ function showAiStep(stepId){
   ['aiStepCategory','aiStepLove','aiStepCareer','aiStepPartner','aiStepPet','aiStepCompatFree','aiStepPay'].forEach(id=>{
     $('#'+id).hidden = (id !== stepId);
   });
+  // 카테고리 목록 밖으로 처음 나갈 때만 히스토리 트랩을 하나 세운다(위 aiStepPushedState 주석 참고).
+  if(stepId === 'aiStepCategory'){
+    aiStepPushedState = false;
+  } else if(!aiStepPushedState){
+    history.pushState({ view: 'aiStepBackTrap' }, '');
+    aiStepPushedState = true;
+  }
 }
 function goToAiPayStep(){
   const meta = AI_CATEGORY_META[selectedAiCategory] || AI_CATEGORY_META.comprehensive;
@@ -4483,9 +4497,15 @@ async function runAiInterpretation(){
     // 뒤로가기(브라우저/기기 back)를 누르면 이 결과 화면에서 페이지 자체를 이탈하는 대신
     // 유료 콘텐츠 목록으로 돌아가도록 히스토리에 상태를 하나 쌓아둔다. 같은 결과를 보는 동안
     // 중복으로 쌓이지 않도록 한 번만 push한다(popstate에서 소비되면 다시 false로 리셋됨).
+    // 카테고리 선택 단계에서 이미 aiStepBackTrap 항목을 하나 쌓아둔 상태라면(위 aiStepPushedState
+    // 참고) 그 위에 또 pushState로 쌓지 않고 replaceState로 같은 자리를 aiResult 트랩으로
+    // 갈아끼운다 — 안 그러면 뒤로가기 트랩이 두 겹으로 쌓여 "종료" 버튼이 한 번에 실제로
+    // 빠져나가지 못하는 문제가 생긴다.
     if(!aiResultPushedState){
-      history.pushState({ view: 'aiResult' }, '');
+      if(aiStepPushedState){ history.replaceState({ view: 'aiResult' }, ''); }
+      else { history.pushState({ view: 'aiResult' }, ''); }
       aiResultPushedState = true;
+      aiStepPushedState = false;
     }
   } catch(err){
     $('#aiLoading').hidden = true;
@@ -4543,6 +4563,12 @@ window.addEventListener('popstate', ()=>{
     window.scrollTo(0,0);
     history.pushState({ view: 'aiCategoryBackTrap' }, '');
     aiBackTrapPushed = true;
+  } else if(aiStepPushedState && aiPanelActive && !$('#aiLocked').hidden && $('#aiStepCategory').hidden){
+    // 카테고리 목록보다 안쪽 단계(연애상태선택/취업신분선택/상대방정보/결제 등)에서 뒤로가기
+    // → 페이지를 이탈하는 대신 카테고리 목록으로만 돌아간다(추가 종료 확인 트랩은 결제 완료 후
+    // 실제 유료 결과를 본 경우에만 필요하다고 보고 여기서는 걸지 않음).
+    aiStepPushedState = false;
+    showAiStep('aiStepCategory');
   } else if(aiBackTrapPushed && aiPanelActive){
     // 2번째(연달아) 뒤로가기: 카테고리 목록에서 또 뒤로가기 → 종료 확인 모달
     aiBackTrapPushed = false;
@@ -4550,6 +4576,7 @@ window.addEventListener('popstate', ()=>{
   } else {
     aiResultPushedState = false;
     aiBackTrapPushed = false;
+    aiStepPushedState = false;
   }
 });
 $('#exitConfirmCancel').addEventListener('click', ()=>{
