@@ -6,12 +6,13 @@
 // 이 파일은 Node.js 런타임의 Vercel 서버리스 함수 형식(module.exports = async (req,res)=>{...})입니다.
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
-// 필요 시 환경변수로 모델을 바꿀 수 있게 해둠. gpt-4o-mini는 저렴하면서 이런 글쓰기 작업엔 충분합니다.
-// 기본값은 전부 gpt-4o-mini이고, 프롬프트 개선만으로 부족한 카테고리가 생기면 전체를 다 올리지
-// 않고 그 카테고리만 상위 모델로 바꿀 수 있게 카테고리별 오버라이드를 둔다.
+// 필요 시 환경변수로 모델을 바꿀 수 있게 해둠. 기본값은 gpt-5.4-mini(2026-08-26 gpt-4o-mini/gpt-4o
+// 대비 실측 비교 후 전환 — 분량 미달 문제가 사라지고 문장 품질도 더 나으면서 gpt-4o보다도 저렴함).
+// 프롬프트 개선만으로 부족한 카테고리가 생기면 전체를 다 올리지 않고 그 카테고리만 다른 모델로
+// 바꿀 수 있게 카테고리별 오버라이드를 둔다.
 // 예: Vercel 환경변수에 OPENAI_MODEL_NEWYEAR=gpt-4o 를 추가하면 신년운세만 그 모델을 씀
-// (다른 카테고리는 그대로 OPENAI_MODEL 또는 기본값 gpt-4o-mini 유지).
-const DEFAULT_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+// (다른 카테고리는 그대로 OPENAI_MODEL 또는 기본값 gpt-5.4-mini 유지).
+const DEFAULT_MODEL = process.env.OPENAI_MODEL || 'gpt-5.4-mini';
 const MODEL_BY_CATEGORY = {
   comprehensive: process.env.OPENAI_MODEL_COMPREHENSIVE || DEFAULT_MODEL,
   love: process.env.OPENAI_MODEL_LOVE || DEFAULT_MODEL,
@@ -483,6 +484,10 @@ const OPENAI_RETRY_MAX_ATTEMPTS = 3;
 const OPENAI_RETRY_BASE_DELAY_MS = 1000;
 
 async function callOpenAIOnce(apiKey, messages, maxTokens, model) {
+  // GPT-5 계열(gpt-5.4-mini 등)은 max_tokens 파라미터를 거부하고 max_completion_tokens를
+  // 요구한다(2026-08-26 실측 확인 — max_tokens로 보내면 400 invalid_request_error /
+  // unsupported_parameter). 모델명이 gpt-5로 시작하면 새 파라미터명을 쓴다.
+  const tokenParamKey = /^gpt-5/.test(model) ? 'max_completion_tokens' : 'max_tokens';
   const openaiRes = await fetch(OPENAI_API_URL, {
     method: 'POST',
     headers: {
@@ -491,7 +496,7 @@ async function callOpenAIOnce(apiKey, messages, maxTokens, model) {
     },
     // temperature를 기본값(1.0)보다 살짝 낮춰(0.8) 저확률·엉뚱한 토큰이 뽑힐 여지를 줄인다.
     // 문체의 다양성을 크게 해치지 않으면서, 위 sanitizeAiText와 함께 이중 안전장치 역할.
-    body: JSON.stringify({ model, max_tokens: maxTokens, temperature: 0.8, messages }),
+    body: JSON.stringify({ model, [tokenParamKey]: maxTokens, temperature: 0.8, messages }),
   });
   if (!openaiRes.ok) {
     const errText = await openaiRes.text();
