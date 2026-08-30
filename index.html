@@ -47,7 +47,13 @@
     --shadow-soft: 0 10px 30px rgba(0,0,0,0.35);
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
-  html,body{margin:0;padding:0;}
+  /* 2026-08-30: 아이폰(iOS Safari)에서 화면이 실제 기기 폭보다 넓게 렌더링돼 콘텐츠가 잘리고
+     사용자가 직접 핀치줌으로 축소해야 하는 문제 신고 — iOS Safari의 "텍스트 자동 확대(text
+     autosizing)"가 뷰포트 폭 계산과 어긋나면서 생기는 것으로 파악. text-size-adjust로 그 자동
+     확대를 끄고, html/body에 overflow-x:hidden을 안전망으로 둬 혹시 남는 요소가 있어도
+     페이지 전체가 옆으로 늘어나지 않게 한다. */
+  html{-webkit-text-size-adjust:100%; text-size-adjust:100%;}
+  html,body{margin:0;padding:0; overflow-x:hidden; width:100%;}
   body{
     background:
       radial-gradient(circle at 20% 0%, #201c38 0%, #0a0a14 55%),
@@ -112,6 +118,10 @@
     flex-shrink:0;
     box-shadow:0 4px 14px rgba(167,139,250,.4);
   }
+  /* 2026-08-30: flex 아이템은 기본적으로 내용물 크기보다 작게 줄어들지 않아(min-width:auto),
+     제목+부제 글자가 길어지면 .topbar 전체가 화면 폭보다 넓어질 수 있음 — min-width:0으로
+     정상적으로 줄어들며 줄바꿈되도록 함(위 overflow-x 안전망과 별개로 근본 원인 쪽 보강). */
+  .topbar-title{min-width:0;}
   .topbar h1{
     font-family:"Noto Serif KR"; font-weight:900; font-size:19px; margin:0;
     letter-spacing:-0.3px;
@@ -998,7 +1008,7 @@
   </div>
   <header class="topbar">
     <div class="mark">四柱</div>
-    <div>
+    <div class="topbar-title">
       <h1>사주풀이</h1>
       <div class="sub">전통 명리학 기반 사주팔자 계산</div>
     </div>
