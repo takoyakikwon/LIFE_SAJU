@@ -4492,6 +4492,17 @@ $('#mockPayBtn').addEventListener('click', async ()=>{
       totalAmount: amount,
       currency: 'KRW',
       payMethod: 'CARD',
+      // 2026-08-30(모바일 결제 오류 대응): windowType을 지정하지 않으면 모바일에서
+      // 기본값이 REDIRECTION(페이지 이동)이 되는데, 이 앱은 SPA라서 페이지가 이동하면
+      // 결제 전 상태(사주 계산 결과 등)가 전부 날아간다 — 실제로 사용자 아이폰에서
+      // "[INIStdPay/Dev. Error] 해당기기로는 정상적인 결제가 진행되지 않을 수 있습니다.
+      // PC로 결제 진행을 부탁드립니다" 오류로 재현됨(KG이니시스 PC 모듈이 모바일에서
+      // 잘못 호출된 것으로 보임). PC/모바일 모두 팝업 창으로 띄워 페이지 이동 없이 결제창만
+      // 뜨게 하고, 그래도 특정 결제수단이 리디렉션을 강제하는 경우를 대비해 redirectUrl도
+      // 현재 페이지로 지정해둔다(다만 실제 리디렉션이 발생하면 결제 후 상태 복원은
+      // 아직 구현돼 있지 않음 — 필요해지면 sessionStorage 기반 복원 로직 추가 필요).
+      windowType: { pc: 'POPUP', mobile: 'POPUP' },
+      redirectUrl: location.origin + location.pathname,
       customer: {
         fullName: (lastName || (currentSession && currentSession.user && currentSession.user.user_metadata && currentSession.user.user_metadata.name)) || '고객',
         email: (currentSession && currentSession.user && currentSession.user.email) || 'noemail@lifesaju.app',
