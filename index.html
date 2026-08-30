@@ -1553,9 +1553,9 @@
 <div id="payModal" class="modal-overlay" hidden>
   <div class="modal-card">
     <div class="modal-title">결제 확인</div>
-    <p class="modal-desc" id="payModalDesc">실제 결제 수단은 아직 연동 전이에요. 아래 버튼으로 결제 완료 상태를 임시로 체험할 수 있어요.</p>
+    <p class="modal-desc" id="payModalDesc">아래 버튼을 누르면 결제창이 열려요.</p>
     <div class="modal-price" id="modalPrice">3,900원</div>
-    <button class="submit-btn" id="mockPayBtn">결제 완료</button>
+    <button class="submit-btn" id="mockPayBtn">결제하기</button>
     <button class="modal-cancel" id="payModalCancel">닫기</button>
   </div>
 </div>
@@ -1615,6 +1615,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<!-- 2026-08-30: 포트원(PortOne) V2 결제 SDK. KG이니시스 테스트 연동 — window.PortOne 전역객체로 사용. -->
+<script src="https://cdn.portone.io/v2/browser-sdk.js"></script>
 <script>
 (function(){
 "use strict";
@@ -4323,15 +4325,21 @@ function buildAiPayload(){
   if(currentSession && currentSession.access_token){
     payload.access_token = currentSession.access_token;
   }
+  // 결제 성공 시 발급된 paymentId를 함께 보내야 서버가 포트원 REST API로 실제 결제 여부를
+  // 검증할 수 있다(2026-08-30 KG이니시스 테스트 연동). 없으면 서버가 요청을 거부한다.
+  if(pendingPaymentId){
+    payload.paymentId = pendingPaymentId;
+  }
   return payload;
 }
 function openPayModal(){
   const meta = AI_CATEGORY_META[selectedAiCategory] || AI_CATEGORY_META.comprehensive;
   $('#modalPrice').textContent = meta.price;
   // 비회원도 구매할 수 있지만(2026-08-25), 로그인 여부에 따라 재열람 가능 여부가 다르므로 미리 안내한다.
+  // 2026-08-30: 포트원 결제창(현재 테스트 채널)이 실제로 뜨므로, "임시 체험" 문구는 제거했다.
   $('#payModalDesc').textContent = currentSession
-    ? '실제 결제 수단은 아직 연동 전이에요. 아래 버튼으로 결제 완료 상태를 임시로 체험할 수 있어요. 결제 후 15일간 다시보기와 PDF 저장을 이용할 수 있어요.'
-    : '실제 결제 수단은 아직 연동 전이에요. 아래 버튼으로 결제 완료 상태를 임시로 체험할 수 있어요. 로그인 없이 진행하면 이 결과는 지금 화면에서만 볼 수 있으니, 결과가 나오면 꼭 PDF로 저장해주세요. (로그인하면 15일간 다시보기가 가능해요)';
+    ? '결제 후 15일간 다시보기와 PDF 저장을 이용할 수 있어요.'
+    : '로그인 없이 진행하면 이 결과는 지금 화면에서만 볼 수 있으니, 결과가 나오면 꼭 PDF로 저장해주세요. (로그인하면 15일간 다시보기가 가능해요)';
   $('#payModal').hidden = false;
 }
 function closePayModal(){ $('#payModal').hidden = true; }
@@ -4455,17 +4463,59 @@ $('#partnerBackBtn').addEventListener('click', ()=>{ showAiStep('aiStepCategory'
 $('#compatFreeBackBtn').addEventListener('click', ()=>{ showAiStep('aiStepCategory'); });
 $('#compatFreeUnlockBtn').addEventListener('click', ()=>{ goToAiPayStep(); });
 $('#payBackBtn').addEventListener('click', ()=>{ showAiStep('aiStepCategory'); });
-$('#mockPayBtn').addEventListener('click', ()=>{
+// 2026-08-30: 포트원(PortOne) V2 결제창을 실제로 띄운다(KG이니시스 테스트 채널).
+// 결제창의 성공/실패는 여기서 참고만 하고, 최종 신뢰는 서버(api/interpret.js)가
+// paymentId를 포트원에 재조회해서 판단한다 — 클라이언트 응답만으로 아래를 판단해
+// AI 해석을 생성하면 브라우저 콘솔 조작으로 결제 없이 통과시킬 수 있기 때문이다.
+$('#mockPayBtn').addEventListener('click', async ()=>{
   // 중복 클릭/중복 탭 방지: 이미 AI 호출이 진행 중이면 두 번째 클릭은 무시한다
-  // (버튼을 빠르게 두 번 누르면 OpenAI 호출과 purchases 기록이 중복될 수 있어서 막아둠).
+  // (버튼을 빠르게 두 번 누르면 결제창이 중복으로 뜨거나 OpenAI 호출/purchases 기록이
+  // 중복될 수 있어서 막아둠).
   if(aiInterpretInFlight) return;
-  // 비회원도 구매할 수 있어요(2026-08-25) — 로그인 없이 진행하면 결과는 이 화면에서 1회만 보여주고
-  // (다시보기 불가), 로그인한 사용자는 기존처럼 마이페이지에서 15일간 재열람할 수 있어요.
-  // TODO: 실제 결제 SDK(토스페이먼츠/포트원 등) 연동 시 이 부분을 교체하세요.
-  // 결제 성공 콜백 안에서 아래 두 줄을 호출하면 됩니다.
-  closePayModal();
-  aiUnlocked = true;
-  runAiInterpretation();
+  if(!window.PortOne){
+    alert('결제 모듈을 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
+    return;
+  }
+  const meta = AI_CATEGORY_META[selectedAiCategory] || AI_CATEGORY_META.comprehensive;
+  const amount = parseInt((meta.price || '').replace(/[^0-9]/g, ''), 10) || 0;
+  const paymentId = 'pay_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+  const payBtnEl = $('#mockPayBtn');
+  payBtnEl.disabled = true;
+  const prevBtnText = payBtnEl.textContent;
+  payBtnEl.textContent = '결제창 여는 중...';
+  try{
+    const response = await window.PortOne.requestPayment({
+      storeId: PORTONE_STORE_ID,
+      channelKey: PORTONE_CHANNEL_KEY,
+      paymentId,
+      orderName: `사주풀이 - ${(meta.desc || '심층풀이 리포트').split('.')[0]}`,
+      totalAmount: amount,
+      currency: 'KRW',
+      payMethod: 'CARD',
+      customer: {
+        fullName: (lastName || (currentSession && currentSession.user && currentSession.user.user_metadata && currentSession.user.user_metadata.name)) || '고객',
+        email: (currentSession && currentSession.user && currentSession.user.email) || 'noemail@lifesaju.app',
+        phoneNumber: '010-0000-0000', // 앱에 연락처 입력 필드가 아직 없어 임시값 사용 — 본인인증 연동 시 실제 값으로 교체 필요.
+      },
+    });
+    // requestPayment()는 code 필드가 있으면 실패, 없으면 성공(포트원 V2 SDK 규격).
+    if(response && response.code){
+      alert('결제가 완료되지 않았어요. (' + (response.message || response.code) + ')');
+      payBtnEl.disabled = false;
+      payBtnEl.textContent = prevBtnText;
+      return;
+    }
+    pendingPaymentId = paymentId;
+    closePayModal();
+    aiUnlocked = true;
+    await runAiInterpretation();
+  } catch(err){
+    alert('결제 진행 중 오류가 발생했어요. (' + err.message + ')');
+  } finally {
+    payBtnEl.disabled = false;
+    payBtnEl.textContent = prevBtnText;
+    pendingPaymentId = null; // 다음 결제를 위해 초기화(성공 시에는 이미 buildAiPayload에 실려 나간 뒤)
+  }
 });
 // 2026-08-25: 심층풀이 목차 + 진행상태. 새로 파싱 규칙을 만들 필요 없이, BASE_PROMPT가 이미
 // 강제하는 "[짧은 주제어] — [핵심 통찰 문장]"(소제목, 단독 줄) + 빈 줄 + 본문 문단 형식을 그대로
@@ -4690,6 +4740,17 @@ const sb = (window.supabase && window.supabase.createClient)
 
 let currentSession = null;
 let currentProfile = null;
+
+/* =========================================================
+   결제 (PortOne V2 — KG이니시스 테스트 채널, 2026-08-30 연동)
+   ========================================================= */
+// storeId/channelKey는 프론트엔드에 노출되는 값이라 시크릿이 아니다(포트원 콘솔 문서 기준).
+// 실제 결제 승인 여부는 여기서 절대 판단하지 않고, 서버(api/interpret.js)가
+// 결제ID(paymentId)를 포트원 REST API로 다시 조회해 상태/금액을 검증한 뒤에만 AI 해석을 생성한다.
+// → 실연동으로 전환할 때는 아래 두 값만 실 채널 값으로 바꾸면 된다.
+const PORTONE_STORE_ID = 'store-ab474ff3-11c5-4963-9a60-7fbc67ada5f4';
+const PORTONE_CHANNEL_KEY = 'channel-key-acfc500d-d775-440c-b903-05418eaa7a30';
+let pendingPaymentId = null; // 결제 성공 후 발급된 paymentId. buildAiPayload()가 서버 검증용으로 함께 보낸다.
 
 // 사용자가 입력한 문자열(닉네임 등)을 innerHTML에 꽂아넣을 때 HTML/스크립트로 해석되지 않도록 이스케이프.
 function escapeHtml(str){
