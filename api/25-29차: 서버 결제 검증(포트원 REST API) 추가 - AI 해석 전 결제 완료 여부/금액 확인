@@ -30,6 +30,46 @@ const MODEL_BY_CATEGORY = {
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+// PortOne payment verification (server-side only). Reads a secret from an
+// environment variable (never hard-coded, never sent to the client).
+const PORTONE_API_SECRET = process.env.PORTONE_API_SECRET;
+const PORTONE_API_BASE = 'https://api.portone.io';
+
+async function verifyPortOnePayment(paymentId, expectedAmountKrw) {
+  if (!PORTONE_API_SECRET) {
+    console.error('verifyPortOnePayment skipped: PORTONE_API_SECRET not configured');
+    return { ok: false, reason: 'PORTONE_API_SECRET env var not set' };
+  }
+  if (!paymentId) {
+    return { ok: false, reason: 'missing paymentId' };
+  }
+  try {
+    const r = await fetch(PORTONE_API_BASE + '/payments/' + encodeURIComponent(paymentId), {
+      headers: { Authorization: 'PortOne ' + PORTONE_API_SECRET },
+    });
+    if (!r.ok) {
+      const errText = await r.text();
+      console.error('verifyPortOnePayment lookup failed', r.status, errText);
+      return { ok: false, reason: 'lookup failed (' + r.status + ')' };
+    }
+    const data = await r.json();
+    const status = data && data.status;
+    const paidAmount = data && data.amount && typeof data.amount.total === 'number' ? data.amount.total : null;
+    if (status !== 'PAID') {
+      console.error('verifyPortOnePayment status not PAID', paymentId, status);
+      return { ok: false, reason: 'payment not completed (status: ' + status + ')' };
+    }
+    if (paidAmount !== expectedAmountKrw) {
+      console.error('verifyPortOnePayment amount mismatch', paymentId, paidAmount, expectedAmountKrw);
+      return { ok: false, reason: 'amount mismatch' };
+    }
+    return { ok: true };
+  } catch (e) {
+    console.error('verifyPortOnePayment error:', e);
+    return { ok: false, reason: 'verification error' };
+  }
+}
+
 // 카테고리별 실제 결제 금액(원 단위 정수). AI_CATEGORY_META의 표시용 문자열과 반드시 일치시켜야 합니다.
 const CATEGORY_AMOUNT_KRW = {
   comprehensive: 9900,
@@ -83,7 +123,10 @@ async function recordPurchase({ userId, category, amount, payload, resultText })
         category,
         amount,
         status: 'paid',
-        pg_provider: null,
+        // 2026-08-30: 포트원(PortOne)+KG이니시스 테스트 채널로 실제 결제 검증을 통과한 건만
+        // 여기 도달한다(위 verifyPortOnePayment 게이트 참고). 실연동 전환 시 이 문자열만
+        // 'portone_inicis'로 바꾸면 테스트/실결제 건을 구분해서 조회할 수 있다.
+        pg_provider: 'portone_inicis_test',
         payload,
         result_text: resultText,
       }),
@@ -589,6 +632,15 @@ module.exports = async (req, res) => {
 
   const maxTokens = MAX_TOKENS_BY_CATEGORY[payload.category] || 4000;
   const model = MODEL_BY_CATEGORY[payload.category] || DEFAULT_MODEL;
+  const amount = CATEGORY_AMOUNT_KRW[payload.category] || CATEGORY_AMOUNT_KRW.comprehensive;
+
+  // 2026-08-30: 결제 검증 게이트. OpenAI를 호출(=과금)하기 전에 먼저 포트원에서 실제 결제
+  // 완료 여부를 확인한다. paymentId가 없거나 검증에 실패하면 AI 해석을 아예 생성하지 않는다.
+  const paymentCheck = await verifyPortOnePayment(payload.paymentId, amount);
+  if (!paymentCheck.ok) {
+    res.status(402).json({ error: `결제 확인에 실패했습니다. (${paymentCheck.reason})` });
+    return;
+  }
 
   try {
     const first = await callOpenAI(apiKey, [
@@ -627,7 +679,6 @@ module.exports = async (req, res) => {
     // 결제 기록 + 재열람용 캐시 저장. access_token 검증을 통과한 사용자이므로 여기서만 기록한다.
     // (payload에 access_token이 그대로 들어있으면 DB에 시크릿 성격의 값이 남으므로 제외하고 저장)
     const { access_token, ...payloadWithoutToken } = payload;
-    const amount = CATEGORY_AMOUNT_KRW[payload.category] || CATEGORY_AMOUNT_KRW.comprehensive;
     await recordPurchase({
       userId: user ? user.id : null,
       category: payload.category || 'comprehensive',
