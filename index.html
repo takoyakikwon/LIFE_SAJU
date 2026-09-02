@@ -1581,6 +1581,9 @@
 <div id="adminModal" class="modal-overlay" hidden>
   <div class="modal-card modal-card-wide">
     <div class="modal-title">관리자 — 결제/문의 현황</div>
+    <div class="admin-section-title">유입 퍼널 (전체 기간)</div>
+    <div class="admin-summary" id="funnelSummary"></div>
+    <div class="admin-section-title">결제 요약</div>
     <div class="admin-summary" id="adminSummary"></div>
     <div class="admin-section-title">전체 결제내역</div>
     <div class="history-list" id="adminPurchaseList"></div>
@@ -3841,6 +3844,7 @@ $('#submitBtn').addEventListener('click', ()=>{
     lastSajuResult = result;
     lastZiweiResult = ziweiResult;
     lastName = ($('#inpName').value||"").trim();
+    logFunnelEvent('form_submit');
     renderTodayPanel(result, y, m, d);
     // 대운/세운/오늘의 사주 패널이 전부 렌더된 뒤에 호출해야 목차 미리보기 티저가
     // 그 DOM(.current 카드, todayIljinTag)을 정확히 읽을 수 있다.
@@ -4359,6 +4363,7 @@ function buildAiPayload(){
   if(pendingPaymentId){
     payload.paymentId = pendingPaymentId;
   }
+  payload.visitorId = VISITOR_ID;
   return payload;
 }
 function openPayModal(){
@@ -4790,6 +4795,41 @@ let currentSession = null;
 let currentProfile = null;
 
 /* =========================================================
+   유입 퍼널 트래킹 (방문 / 기본운세 확인, 2026-09-02 신규)
+   — 몇 명이 들어와서 몇 명이 생년월일로 기본운세를 확인하고 몇 명이 결제까지 하는지
+   관리자 페이지에서 볼 수 있도록, 브라우저마다 무작위 익명 ID(visitor_id)를 만들어
+   funnel_events 테이블에 이벤트만 남긴다. 이름/생년월일 등 개인정보는 전혀 담지 않는다.
+   ========================================================= */
+const VISITOR_ID_KEY = 'sajuVisitorId_v1';
+function getVisitorId(){
+  try{
+    let id = localStorage.getItem(VISITOR_ID_KEY);
+    if(!id){
+      id = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : ('v-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+      localStorage.setItem(VISITOR_ID_KEY, id);
+    }
+    return id;
+  } catch(e){
+    // localStorage를 못 쓰는 환경(시크릿모드 등)이면 매번 새 ID — 집계에 약간의 오차가
+    // 생길 수 있지만, 트래킹 자체가 막히는 것보다는 낫다고 판단.
+    return 'v-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+  }
+}
+const VISITOR_ID = getVisitorId();
+// 실패해도 사용자 경험에는 절대 영향을 주면 안 되므로 결과를 기다리지 않고(fire-and-forget),
+// 에러도 조용히 무시한다(funnel_events 테이블이 아직 없어도 앱 동작에는 지장 없음).
+function logFunnelEvent(eventType){
+  if(!sb) return;
+  try{
+    sb.from('funnel_events').insert({
+      event_type: eventType,
+      visitor_id: VISITOR_ID,
+      user_id: (currentSession && currentSession.user) ? currentSession.user.id : null,
+    }).then(()=>{}, ()=>{});
+  } catch(e){ /* 무시 */ }
+}
+
+/* =========================================================
    결제 (PortOne V2 — KG이니시스 테스트 채널, 2026-08-30 연동)
    ========================================================= */
 // storeId/channelKey는 프론트엔드에 노출되는 값이라 시크릿이 아니다(포트원 콘솔 문서 기준).
@@ -4990,13 +5030,35 @@ async function openAdminModal(){
   const purchaseEl = $('#adminPurchaseList');
   const inquiryEl = $('#adminInquiryList');
   const summaryEl = $('#adminSummary');
+  const funnelEl = $('#funnelSummary');
   summaryEl.innerHTML = '';
+  if(funnelEl) funnelEl.innerHTML = '<div class="history-empty">불러오는 중...</div>';
   purchaseEl.innerHTML = '<div class="history-empty">불러오는 중...</div>';
   inquiryEl.innerHTML = '<div class="history-empty">불러오는 중...</div>';
   if(!sb || !currentSession){
     purchaseEl.innerHTML = '<div class="history-empty">로그인이 필요해요.</div>';
     inquiryEl.innerHTML = '';
     return;
+  }
+  // 유입 퍼널(방문 → 기본운세 확인 → 결제완료) — funnel_events/purchases를 서버(RPC, is_admin
+  // 재검증)에서 한 번에 집계해온다. 2026-09-02 이전 데이터는 없을 수 있어(마이그레이션 전),
+  // 함수 자체가 없거나 값이 비어 있으면 안내 문구만 보여주고 나머지 화면은 그대로 진행한다.
+  if(funnelEl){
+    const { data: funnel, error: fErr } = await sb.rpc('admin_funnel_summary');
+    if(fErr || !funnel || !funnel.length){
+      funnelEl.innerHTML = '<div class="history-empty">불러오지 못했어요' + (fErr ? (' (' + escapeHtml(fErr.message) + ')') : '') + '</div>';
+    } else {
+      const row = funnel[0];
+      const visitors = row.visitors || 0;
+      const submitters = row.form_submitters || 0;
+      const purchasers = row.purchasers || 0;
+      const pctSubmit = visitors ? Math.round(submitters/visitors*100) : 0;
+      const pctPay = submitters ? Math.round(purchasers/submitters*100) : 0;
+      funnelEl.innerHTML =
+        `<div class="stat"><div class="n">${visitors}</div><div class="l">방문자</div></div>` +
+        `<div class="stat"><div class="n">${submitters}</div><div class="l">기본운세 확인 (${pctSubmit}%)</div></div>` +
+        `<div class="stat"><div class="n">${purchasers}</div><div class="l">결제완료 (${pctPay}%)</div></div>`;
+    }
   }
   const { data: purchases, error: pErr } = await sb.from('purchases')
     .select('id,category,amount,status,created_at,result_text,profiles(nickname)')
@@ -5341,6 +5403,7 @@ async function initAuth(){
   currentSession = data.session || null;
   if(currentSession){ currentProfile = await loadProfile(currentSession.user.id); }
   updateAccountBtn();
+  logFunnelEvent('visit');
   sb.auth.onAuthStateChange(async (event, session)=>{
     currentSession = session || null;
     currentProfile = currentSession ? await loadProfile(currentSession.user.id) : null;
