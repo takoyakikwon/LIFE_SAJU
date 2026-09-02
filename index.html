@@ -718,6 +718,24 @@
   .admin-summary .stat .l{ font-size:10px; color:var(--ink-faint); margin-top:3px; }
   .admin-section-title{ font-family:"Noto Serif KR"; font-weight:900; font-size:13px; margin:14px 0 8px; }
   .admin-section-title:first-of-type{ margin-top:0; }
+  .admin-period-bar{ margin-bottom:2px; }
+  .funnel-period-tabs{ display:flex; flex-wrap:wrap; gap:6px; }
+  .funnel-period-tabs button{
+    padding:6px 12px; border-radius:100px; border:1.5px solid var(--line);
+    background:var(--paper-card); font-family:"Noto Sans KR"; font-weight:700;
+    font-size:11.5px; color:var(--ink-soft); cursor:pointer;
+  }
+  .funnel-period-tabs button.active{ background:var(--ink); color:var(--paper); border-color:var(--ink); }
+  .admin-date-range{ display:flex; align-items:center; gap:6px; margin-top:8px; flex-wrap:wrap; }
+  .admin-date-range input[type="date"]{
+    flex:1; min-width:118px; padding:8px; border:1.5px solid var(--line); border-radius:var(--radius-sm);
+    background:var(--paper-card); color:var(--ink); font-size:12px; font-family:"Noto Sans KR";
+  }
+  .admin-date-range span{ color:var(--ink-faint); font-size:12px; }
+  .admin-date-range button{
+    padding:8px 14px; border-radius:var(--radius-sm); border:1.5px solid var(--line);
+    background:var(--ink); color:var(--paper); font-weight:700; font-size:12px; cursor:pointer; white-space:nowrap;
+  }
   /* CS 문의 폼 */
   .form-msg{ font-size:12px; line-height:1.6; padding:10px 12px; border-radius:var(--radius-sm); margin-bottom:14px; }
   .form-msg.ok{ background:rgba(52,211,153,.14); color:#34d399; }
@@ -1581,7 +1599,23 @@
 <div id="adminModal" class="modal-overlay" hidden>
   <div class="modal-card modal-card-wide">
     <div class="modal-title">관리자 — 결제/문의 현황</div>
-    <div class="admin-section-title">유입 퍼널 (전체 기간)</div>
+    <div class="admin-period-bar">
+      <div class="funnel-period-tabs" id="funnelPeriodTabs">
+        <button type="button" class="active" data-period="all">전체</button>
+        <button type="button" data-period="today">오늘</button>
+        <button type="button" data-period="week">이번 주</button>
+        <button type="button" data-period="month">이번 달</button>
+        <button type="button" data-period="quarter">이번 분기</button>
+        <button type="button" data-period="year">올해</button>
+      </div>
+      <div class="admin-date-range">
+        <input type="date" id="adminDateFrom" aria-label="시작일">
+        <span>~</span>
+        <input type="date" id="adminDateTo" aria-label="종료일">
+        <button type="button" id="adminDateSearchBtn">검색</button>
+      </div>
+    </div>
+    <div class="admin-section-title">유입 퍼널</div>
     <div class="admin-summary" id="funnelSummary"></div>
     <div class="admin-section-title">결제 요약</div>
     <div class="admin-summary" id="adminSummary"></div>
@@ -5025,56 +5059,112 @@ async function downloadPurchasePdf(row, btnEl){
    서버(Supabase RLS: public.is_admin())가 최종적으로 검사한다. 즉 이 버튼이
    안 보여도 UI를 몰래 열 수는 없고, is_admin=false인 계정은 쿼리 자체가 빈 결과만 받는다.
    ========================================================= */
-async function openAdminModal(){
-  $('#adminModal').hidden = false;
-  const purchaseEl = $('#adminPurchaseList');
-  const inquiryEl = $('#adminInquiryList');
-  const summaryEl = $('#adminSummary');
+// 관리자 페이지 기간 필터(2026-09-02 신규) — 전체/오늘/이번 주/이번 달/이번 분기/올해 프리셋
+// 버튼 또는 시작일~종료일 직접 검색(환불 대응 등으로 특정 날짜의 결제건을 찾을 때 사용) 중
+// 하나를 고르면, 유입 퍼널 통계와 결제내역 목록이 같은 기간 기준으로 함께 갱신된다.
+function computeFunnelPeriodStart(period){
+  const now = new Date();
+  if(period === 'today'){ return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString(); }
+  if(period === 'week'){
+    const day = now.getDay();
+    const diffToMonday = (day === 0) ? 6 : day - 1;
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday).toISOString();
+  }
+  if(period === 'month'){ return new Date(now.getFullYear(), now.getMonth(), 1).toISOString(); }
+  if(period === 'quarter'){
+    const qStartMonth = Math.floor(now.getMonth()/3)*3;
+    return new Date(now.getFullYear(), qStartMonth, 1).toISOString();
+  }
+  if(period === 'year'){ return new Date(now.getFullYear(), 0, 1).toISOString(); }
+  return null; // 'all'
+}
+async function refreshFunnelSummary(startISO, endISO){
   const funnelEl = $('#funnelSummary');
-  summaryEl.innerHTML = '';
-  if(funnelEl) funnelEl.innerHTML = '<div class="history-empty">불러오는 중...</div>';
-  purchaseEl.innerHTML = '<div class="history-empty">불러오는 중...</div>';
-  inquiryEl.innerHTML = '<div class="history-empty">불러오는 중...</div>';
-  if(!sb || !currentSession){
-    purchaseEl.innerHTML = '<div class="history-empty">로그인이 필요해요.</div>';
-    inquiryEl.innerHTML = '';
+  if(!funnelEl || !sb) return;
+  funnelEl.innerHTML = '<div class="history-empty">불러오는 중...</div>';
+  const { data: funnel, error: fErr } = await sb.rpc('admin_funnel_summary', { p_start: startISO, p_end: endISO });
+  if(fErr || !funnel || !funnel.length){
+    funnelEl.innerHTML = '<div class="history-empty">불러오지 못했어요' + (fErr ? (' (' + escapeHtml(fErr.message) + ')') : '') + '</div>';
     return;
   }
-  // 유입 퍼널(방문 → 기본운세 확인 → 결제완료) — funnel_events/purchases를 서버(RPC, is_admin
-  // 재검증)에서 한 번에 집계해온다. 2026-09-02 이전 데이터는 없을 수 있어(마이그레이션 전),
-  // 함수 자체가 없거나 값이 비어 있으면 안내 문구만 보여주고 나머지 화면은 그대로 진행한다.
-  if(funnelEl){
-    const { data: funnel, error: fErr } = await sb.rpc('admin_funnel_summary');
-    if(fErr || !funnel || !funnel.length){
-      funnelEl.innerHTML = '<div class="history-empty">불러오지 못했어요' + (fErr ? (' (' + escapeHtml(fErr.message) + ')') : '') + '</div>';
-    } else {
-      const row = funnel[0];
-      const visitors = row.visitors || 0;
-      const submitters = row.form_submitters || 0;
-      const purchasers = row.purchasers || 0;
-      const pctSubmit = visitors ? Math.round(submitters/visitors*100) : 0;
-      const pctPay = submitters ? Math.round(purchasers/submitters*100) : 0;
-      funnelEl.innerHTML =
-        `<div class="stat"><div class="n">${visitors}</div><div class="l">방문자</div></div>` +
-        `<div class="stat"><div class="n">${submitters}</div><div class="l">기본운세 확인 (${pctSubmit}%)</div></div>` +
-        `<div class="stat"><div class="n">${purchasers}</div><div class="l">결제완료 (${pctPay}%)</div></div>`;
-    }
-  }
-  const { data: purchases, error: pErr } = await sb.from('purchases')
+  const row = funnel[0];
+  const visitors = row.visitors || 0;
+  const submitters = row.form_submitters || 0;
+  const purchasers = row.purchasers || 0;
+  const pctSubmit = visitors ? Math.round(submitters/visitors*100) : 0;
+  const pctPay = submitters ? Math.round(purchasers/submitters*100) : 0;
+  funnelEl.innerHTML =
+    `<div class="stat"><div class="n">${visitors}</div><div class="l">방문자</div></div>` +
+    `<div class="stat"><div class="n">${submitters}</div><div class="l">기본운세 확인 (${pctSubmit}%)</div></div>` +
+    `<div class="stat"><div class="n">${purchasers}</div><div class="l">결제완료 (${pctPay}%)</div></div>`;
+}
+async function refreshPurchaseList(startISO, endISO){
+  const purchaseEl = $('#adminPurchaseList');
+  const summaryEl = $('#adminSummary');
+  if(!purchaseEl || !summaryEl || !sb) return;
+  purchaseEl.innerHTML = '<div class="history-empty">불러오는 중...</div>';
+  let q = sb.from('purchases')
     .select('id,category,amount,status,created_at,result_text,profiles(nickname)')
     .order('created_at', { ascending:false })
-    .limit(200);
+    .limit(500);
+  if(startISO) q = q.gte('created_at', startISO);
+  if(endISO) q = q.lt('created_at', endISO);
+  const { data: purchases, error: pErr } = await q;
   if(pErr){
     purchaseEl.innerHTML = '<div class="history-empty">불러오지 못했어요. (' + escapeHtml(pErr.message) + ')</div>';
-  } else {
-    const paidRows = (purchases||[]).filter(r=>r.status==='paid');
-    const totalAmount = paidRows.reduce((sum,r)=>sum+(r.amount||0), 0);
-    summaryEl.innerHTML =
-      `<div class="stat"><div class="n">${(purchases||[]).length}</div><div class="l">전체 결제건</div></div>` +
-      `<div class="stat"><div class="n">${paidRows.length}</div><div class="l">결제완료</div></div>` +
-      `<div class="stat"><div class="n">${formatKRW(totalAmount)}</div><div class="l">누적 결제액</div></div>`;
-    renderPurchaseList(purchaseEl, purchases || [], true);
+    return;
   }
+  const paidRows = (purchases||[]).filter(r=>r.status==='paid');
+  const totalAmount = paidRows.reduce((sum,r)=>sum+(r.amount||0), 0);
+  summaryEl.innerHTML =
+    `<div class="stat"><div class="n">${(purchases||[]).length}</div><div class="l">전체 결제건</div></div>` +
+    `<div class="stat"><div class="n">${paidRows.length}</div><div class="l">결제완료</div></div>` +
+    `<div class="stat"><div class="n">${formatKRW(totalAmount)}</div><div class="l">누적 결제액</div></div>`;
+  renderPurchaseList(purchaseEl, purchases || [], true);
+}
+function applyAdminPeriod(startISO, endISO){
+  refreshFunnelSummary(startISO, endISO);
+  refreshPurchaseList(startISO, endISO);
+}
+$$('#funnelPeriodTabs button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    $$('#funnelPeriodTabs button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    if($('#adminDateFrom')) $('#adminDateFrom').value = '';
+    if($('#adminDateTo')) $('#adminDateTo').value = '';
+    applyAdminPeriod(computeFunnelPeriodStart(btn.dataset.period), null);
+  });
+});
+if($('#adminDateSearchBtn')){
+  $('#adminDateSearchBtn').addEventListener('click', ()=>{
+    const fromVal = $('#adminDateFrom').value;
+    const toVal = $('#adminDateTo').value;
+    if(!fromVal && !toVal){ alert('시작일 또는 종료일을 선택해주세요.'); return; }
+    const startISO = fromVal ? new Date(fromVal + 'T00:00:00').toISOString() : null;
+    let endISO = null;
+    if(toVal){
+      // 종료일 하루 전체(자정까지)를 포함시키기 위해, 종료일 다음날 0시를 미만(<) 경계로 사용한다.
+      const endDate = new Date(toVal + 'T00:00:00');
+      endDate.setDate(endDate.getDate() + 1);
+      endISO = endDate.toISOString();
+    }
+    $$('#funnelPeriodTabs button').forEach(b=>b.classList.remove('active'));
+    applyAdminPeriod(startISO, endISO);
+  });
+}
+async function openAdminModal(){
+  $('#adminModal').hidden = false;
+  const inquiryEl = $('#adminInquiryList');
+  if(!sb || !currentSession){
+    $('#adminPurchaseList').innerHTML = '<div class="history-empty">로그인이 필요해요.</div>';
+    if(inquiryEl) inquiryEl.innerHTML = '';
+    return;
+  }
+  if($('#adminDateFrom')) $('#adminDateFrom').value = '';
+  if($('#adminDateTo')) $('#adminDateTo').value = '';
+  $$('#funnelPeriodTabs button').forEach(b=>b.classList.toggle('active', b.dataset.period === 'all'));
+  applyAdminPeriod(null, null);
+  inquiryEl.innerHTML = '<div class="history-empty">불러오는 중...</div>';
   const { data: inquiries, error: iErr } = await sb.from('cs_inquiries')
     .select('id,subject,message,status,guest_contact,created_at,profiles(nickname)')
     .order('created_at', { ascending:false })
