@@ -104,7 +104,7 @@ async function verifySupabaseUser(accessToken) {
 
 // purchases 테이블에 결제 1건을 기록한다(RLS 우회를 위해 서비스 롤 키 사용).
 // 실패해도 이미 생성된 AI 해석 응답 자체는 막지 않고, 서버 로그만 남긴다.
-async function recordPurchase({ userId, category, amount, payload, resultText }) {
+async function recordPurchase({ userId, category, amount, payload, resultText, visitorId }) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     console.error('recordPurchase skipped: SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY not configured');
     return false;
@@ -120,6 +120,10 @@ async function recordPurchase({ userId, category, amount, payload, resultText })
       },
       body: JSON.stringify({
         user_id: userId,
+        // 2026-09-02: 유입 퍼널(방문→기본운세 확인→결제) 집계용 익명 방문자 ID. 로그인 여부와
+        // 무관하게 항상 채워지므로, 비회원 결제까지 포함해 "몇 명이 결제까지 왔는지"를 정확히
+        // 셀 수 있다(관리자 페이지의 admin_funnel_summary() RPC가 이 컬럼을 사용).
+        visitor_id: visitorId || null,
         category,
         amount,
         status: 'paid',
@@ -685,6 +689,7 @@ module.exports = async (req, res) => {
       amount,
       payload: payloadWithoutToken,
       resultText: finalText,
+      visitorId: payload.visitorId || null,
     });
 
     res.status(200).json({ interpretation: finalText });
