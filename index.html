@@ -737,6 +737,18 @@
     padding:8px 14px; border-radius:var(--radius-sm); border:1.5px solid var(--line);
     background:var(--ink); color:var(--paper); font-weight:700; font-size:12px; cursor:pointer; white-space:nowrap;
   }
+  .admin-section-title-row{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    margin:14px 0 8px;
+  }
+  .admin-section-title-row:first-of-type{ margin-top:0; }
+  .admin-section-title-row .admin-section-title{ margin:0; }
+  .admin-csv-btn{
+    padding:5px 10px; border-radius:100px; border:1.5px solid var(--line);
+    background:var(--paper-card); color:var(--ink-soft); font-family:"Noto Sans KR"; font-weight:700;
+    font-size:10.5px; cursor:pointer; white-space:nowrap;
+  }
+  .admin-csv-btn:hover{ border-color:var(--ink-soft); color:var(--ink); }
   /* CS 문의 폼 */
   .form-msg{ font-size:12px; line-height:1.6; padding:10px 12px; border-radius:var(--radius-sm); margin-bottom:14px; }
   .form-msg.ok{ background:rgba(52,211,153,.14); color:#34d399; }
@@ -1620,9 +1632,15 @@
     <div class="admin-summary" id="funnelSummary"></div>
     <div class="admin-section-title">결제 요약</div>
     <div class="admin-summary" id="adminSummary"></div>
-    <div class="admin-section-title">전체 결제내역</div>
+    <div class="admin-section-title-row">
+      <div class="admin-section-title">전체 결제내역</div>
+      <button type="button" class="admin-csv-btn" id="exportPurchaseCsvBtn">⬇ CSV 다운로드</button>
+    </div>
     <div class="history-list" id="adminPurchaseList"></div>
-    <div class="admin-section-title">CS 문의</div>
+    <div class="admin-section-title-row">
+      <div class="admin-section-title">CS 문의</div>
+      <button type="button" class="admin-csv-btn" id="exportInquiryCsvBtn">⬇ CSV 다운로드</button>
+    </div>
     <div class="history-list" id="adminInquiryList"></div>
     <button class="modal-cancel" id="adminModalCancel">닫기</button>
   </div>
@@ -5099,13 +5117,74 @@ async function refreshFunnelSummary(startISO, endISO){
     `<div class="stat"><div class="n">${submitters}</div><div class="l">기본운세 확인 (${pctSubmit}%)</div></div>` +
     `<div class="stat"><div class="n">${purchasers}</div><div class="l">결제완료 (${pctPay}%)</div></div>`;
 }
+// 관리자 CSV 다운로드(2026-09-02 신규) — 지금 화면에 로드된(=현재 기간 필터가 적용된) 결제내역/
+// CS 문의를 그대로 CSV로 내려받는다. 별도로 다시 조회하지 않고, refreshPurchaseList/
+// refreshInquiryList가 마지막으로 받아온 결과(lastPurchasesData/lastInquiriesData)를 재사용해
+// 화면에 보이는 것과 파일 내용이 항상 일치하도록 한다.
+let lastPurchasesData = [];
+let lastInquiriesData = [];
+let currentPeriodLabel = '전체';
+function csvEscape(val){
+  const s = (val === null || val === undefined) ? '' : String(val);
+  if(/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+function downloadCSV(filenameBase, headers, rows){
+  // 엑셀(특히 한글 Windows판)에서 한글이 깨지지 않도록 UTF-8 BOM을 맨 앞에 붙인다.
+  const lines = [headers.map(csvEscape).join(',')].concat(
+    rows.map(row => row.map(csvEscape).join(','))
+  );
+  const csvContent = '\ufeff' + lines.join('\r\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const today = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = `${filenameBase}_${currentPeriodLabel.replace(/\s+/g,'')}_${today}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+}
+if($('#exportPurchaseCsvBtn')){
+  $('#exportPurchaseCsvBtn').addEventListener('click', ()=>{
+    if(!lastPurchasesData.length){ alert('다운로드할 결제내역이 없어요.'); return; }
+    const headers = ['결제일시','카테고리','상태','금액','닉네임','결제ID','PG결제ID'];
+    const rows = lastPurchasesData.map(r => [
+      formatDateTime(r.created_at),
+      CATEGORY_LABEL[r.category] || r.category,
+      PURCHASE_STATUS_LABEL[r.status] || r.status,
+      r.amount || 0,
+      (r.profiles && r.profiles.nickname) || '알 수 없음',
+      r.id,
+      (r.payload && r.payload.paymentId) || '',
+    ]);
+    downloadCSV('결제내역', headers, rows);
+  });
+}
+if($('#exportInquiryCsvBtn')){
+  $('#exportInquiryCsvBtn').addEventListener('click', ()=>{
+    if(!lastInquiriesData.length){ alert('다운로드할 CS 문의가 없어요.'); return; }
+    const CS_STATUS_LABEL = { open:'미답변', answered:'답변완료', closed:'종료' };
+    const headers = ['문의일시','제목','상태','작성자','연락처','내용'];
+    const rows = lastInquiriesData.map(q => [
+      formatDateTime(q.created_at),
+      q.subject,
+      CS_STATUS_LABEL[q.status] || q.status,
+      (q.profiles && q.profiles.nickname) || '비회원',
+      q.guest_contact || '',
+      q.message,
+    ]);
+    downloadCSV('CS문의', headers, rows);
+  });
+}
 async function refreshPurchaseList(startISO, endISO){
   const purchaseEl = $('#adminPurchaseList');
   const summaryEl = $('#adminSummary');
   if(!purchaseEl || !summaryEl || !sb) return;
   purchaseEl.innerHTML = '<div class="history-empty">불러오는 중...</div>';
   let q = sb.from('purchases')
-    .select('id,category,amount,status,created_at,result_text,profiles(nickname)')
+    .select('id,category,amount,status,created_at,result_text,payload,profiles(nickname)')
     .order('created_at', { ascending:false })
     .limit(500);
   if(startISO) q = q.gte('created_at', startISO);
@@ -5113,8 +5192,10 @@ async function refreshPurchaseList(startISO, endISO){
   const { data: purchases, error: pErr } = await q;
   if(pErr){
     purchaseEl.innerHTML = '<div class="history-empty">불러오지 못했어요. (' + escapeHtml(pErr.message) + ')</div>';
+    lastPurchasesData = [];
     return;
   }
+  lastPurchasesData = purchases || [];
   const paidRows = (purchases||[]).filter(r=>r.status==='paid');
   const totalAmount = paidRows.reduce((sum,r)=>sum+(r.amount||0), 0);
   summaryEl.innerHTML =
@@ -5123,59 +5204,25 @@ async function refreshPurchaseList(startISO, endISO){
     `<div class="stat"><div class="n">${formatKRW(totalAmount)}</div><div class="l">누적 결제액</div></div>`;
   renderPurchaseList(purchaseEl, purchases || [], true);
 }
-function applyAdminPeriod(startISO, endISO){
-  refreshFunnelSummary(startISO, endISO);
-  refreshPurchaseList(startISO, endISO);
-}
-$$('#funnelPeriodTabs button').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    $$('#funnelPeriodTabs button').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    if($('#adminDateFrom')) $('#adminDateFrom').value = '';
-    if($('#adminDateTo')) $('#adminDateTo').value = '';
-    applyAdminPeriod(computeFunnelPeriodStart(btn.dataset.period), null);
-  });
-});
-if($('#adminDateSearchBtn')){
-  $('#adminDateSearchBtn').addEventListener('click', ()=>{
-    const fromVal = $('#adminDateFrom').value;
-    const toVal = $('#adminDateTo').value;
-    if(!fromVal && !toVal){ alert('시작일 또는 종료일을 선택해주세요.'); return; }
-    const startISO = fromVal ? new Date(fromVal + 'T00:00:00').toISOString() : null;
-    let endISO = null;
-    if(toVal){
-      // 종료일 하루 전체(자정까지)를 포함시키기 위해, 종료일 다음날 0시를 미만(<) 경계로 사용한다.
-      const endDate = new Date(toVal + 'T00:00:00');
-      endDate.setDate(endDate.getDate() + 1);
-      endISO = endDate.toISOString();
-    }
-    $$('#funnelPeriodTabs button').forEach(b=>b.classList.remove('active'));
-    applyAdminPeriod(startISO, endISO);
-  });
-}
-async function openAdminModal(){
-  $('#adminModal').hidden = false;
+async function refreshInquiryList(startISO, endISO){
   const inquiryEl = $('#adminInquiryList');
-  if(!sb || !currentSession){
-    $('#adminPurchaseList').innerHTML = '<div class="history-empty">로그인이 필요해요.</div>';
-    if(inquiryEl) inquiryEl.innerHTML = '';
-    return;
-  }
-  if($('#adminDateFrom')) $('#adminDateFrom').value = '';
-  if($('#adminDateTo')) $('#adminDateTo').value = '';
-  $$('#funnelPeriodTabs button').forEach(b=>b.classList.toggle('active', b.dataset.period === 'all'));
-  applyAdminPeriod(null, null);
+  if(!inquiryEl || !sb) return;
   inquiryEl.innerHTML = '<div class="history-empty">불러오는 중...</div>';
-  const { data: inquiries, error: iErr } = await sb.from('cs_inquiries')
+  let q = sb.from('cs_inquiries')
     .select('id,subject,message,status,guest_contact,created_at,profiles(nickname)')
     .order('created_at', { ascending:false })
     .limit(200);
+  if(startISO) q = q.gte('created_at', startISO);
+  if(endISO) q = q.lt('created_at', endISO);
+  const { data: inquiries, error: iErr } = await q;
   if(iErr){
     inquiryEl.innerHTML = '<div class="history-empty">불러오지 못했어요. (' + escapeHtml(iErr.message) + ')</div>';
+    lastInquiriesData = [];
     return;
   }
+  lastInquiriesData = inquiries || [];
   if(!inquiries || !inquiries.length){
-    inquiryEl.innerHTML = '<div class="history-empty">아직 등록된 CS 문의가 없어요.</div>';
+    inquiryEl.innerHTML = '<div class="history-empty">해당 기간에 등록된 CS 문의가 없어요.</div>';
     return;
   }
   const CS_STATUS_LABEL = { open:'미답변', answered:'답변완료', closed:'종료' };
@@ -5197,6 +5244,51 @@ async function openAdminModal(){
       if(box){ box.hidden = !box.hidden; }
     });
   });
+}
+function applyAdminPeriod(startISO, endISO, label){
+  currentPeriodLabel = label || '전체';
+  refreshFunnelSummary(startISO, endISO);
+  refreshPurchaseList(startISO, endISO);
+  refreshInquiryList(startISO, endISO);
+}
+$$('#funnelPeriodTabs button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    $$('#funnelPeriodTabs button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    if($('#adminDateFrom')) $('#adminDateFrom').value = '';
+    if($('#adminDateTo')) $('#adminDateTo').value = '';
+    applyAdminPeriod(computeFunnelPeriodStart(btn.dataset.period), null, btn.textContent.trim());
+  });
+});
+if($('#adminDateSearchBtn')){
+  $('#adminDateSearchBtn').addEventListener('click', ()=>{
+    const fromVal = $('#adminDateFrom').value;
+    const toVal = $('#adminDateTo').value;
+    if(!fromVal && !toVal){ alert('시작일 또는 종료일을 선택해주세요.'); return; }
+    const startISO = fromVal ? new Date(fromVal + 'T00:00:00').toISOString() : null;
+    let endISO = null;
+    if(toVal){
+      // 종료일 하루 전체(자정까지)를 포함시키기 위해, 종료일 다음날 0시를 미만(<) 경계로 사용한다.
+      const endDate = new Date(toVal + 'T00:00:00');
+      endDate.setDate(endDate.getDate() + 1);
+      endISO = endDate.toISOString();
+    }
+    $$('#funnelPeriodTabs button').forEach(b=>b.classList.remove('active'));
+    applyAdminPeriod(startISO, endISO, `${fromVal||'처음'}~${toVal||'현재'}`);
+  });
+}
+async function openAdminModal(){
+  $('#adminModal').hidden = false;
+  if(!sb || !currentSession){
+    $('#adminPurchaseList').innerHTML = '<div class="history-empty">로그인이 필요해요.</div>';
+    const inquiryEl = $('#adminInquiryList');
+    if(inquiryEl) inquiryEl.innerHTML = '';
+    return;
+  }
+  if($('#adminDateFrom')) $('#adminDateFrom').value = '';
+  if($('#adminDateTo')) $('#adminDateTo').value = '';
+  $$('#funnelPeriodTabs button').forEach(b=>b.classList.toggle('active', b.dataset.period === 'all'));
+  applyAdminPeriod(null, null, '전체');
 }
 function closeAdminModal(){ $('#adminModal').hidden = true; }
 
