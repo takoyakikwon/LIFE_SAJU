@@ -4901,7 +4901,7 @@ function logFunnelEvent(eventType){
 // 결제ID(paymentId)를 포트원 REST API로 다시 조회해 상태/금액을 검증한 뒤에만 AI 해석을 생성한다.
 // → 실연동으로 전환할 때는 아래 두 값만 실 채널 값으로 바꾸면 된다.
 const PORTONE_STORE_ID = 'store-ab474ff3-11c5-4963-9a60-7fbc67ada5f4';
-const PORTONE_CHANNEL_KEY = 'channel-key-acfc500d-d775-440c-b903-05418eaa7a30';
+const PORTONE_CHANNEL_KEY = 'channel-key-f913b305-cbfb-4419-b631-b73e5cc25e4d';
 let pendingPaymentId = null; // 결제 성공 후 발급된 paymentId. buildAiPayload()가 서버 검증용으로 함께 보낸다.
 
 // 사용자가 입력한 문자열(닉네임 등)을 innerHTML에 꽂아넣을 때 HTML/스크립트로 해석되지 않도록 이스케이프.
