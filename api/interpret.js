@@ -130,7 +130,7 @@ async function recordPurchase({ userId, category, amount, payload, resultText, v
         // 2026-08-30: 포트원(PortOne)+KG이니시스 테스트 채널로 실제 결제 검증을 통과한 건만
         // 여기 도달한다(위 verifyPortOnePayment 게이트 참고). 실연동 전환 시 이 문자열만
         // 'portone_inicis'로 바꾸면 테스트/실결제 건을 구분해서 조회할 수 있다.
-        pg_provider: 'portone_inicis_test',
+        pg_provider: 'portone_inicis',
         payload,
         result_text: resultText,
       }),
