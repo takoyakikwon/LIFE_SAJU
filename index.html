@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>사주풀이 · 나의 사주팔자</title>
+<title>사주결 · 나의 사주팔자</title>
 <!-- PWA: 홈 화면에 추가/설치 -->
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0a0a14">
@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="사주풀이">
+<meta name="apple-mobile-web-app-title" content="사주결">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700;900&family=Noto+Sans+KR:wght@400;500;700;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -109,14 +109,19 @@
     border-bottom:1px solid var(--line);
   }
   .topbar .mark{
-    width:38px; height:38px; border-radius:9px;
-    background:linear-gradient(135deg,var(--violet),var(--pink));
-    color:#fff;
+    width:38px; height:38px; border-radius:50%;
+    background:radial-gradient(circle at 32% 28%, var(--gold), var(--violet) 55%, var(--pink) 100%);
+    color:#1a1330;
     display:flex; align-items:center; justify-content:center;
-    font-family:"Noto Serif KR"; font-weight:900; font-size:17px;
+    font-family:"Noto Serif KR"; font-weight:900; font-size:16px;
     letter-spacing:-1px;
     flex-shrink:0;
-    box-shadow:0 4px 14px rgba(167,139,250,.4);
+    box-shadow:0 0 0 1.5px rgba(244,196,99,.45), 0 4px 14px rgba(167,139,250,.4);
+    animation:markGlow 3.2s ease-in-out infinite;
+  }
+  @keyframes markGlow{
+    0%,100%{ box-shadow:0 0 0 1.5px rgba(244,196,99,.4), 0 4px 14px rgba(167,139,250,.35); }
+    50%{ box-shadow:0 0 0 1.5px rgba(244,196,99,.65), 0 4px 22px rgba(167,139,250,.65), 0 0 18px rgba(244,196,99,.35); }
   }
   /* 2026-08-30: flex 아이템은 기본적으로 내용물 크기보다 작게 줄어들지 않아(min-width:auto),
      제목+부제 글자가 길어지면 .topbar 전체가 화면 폭보다 넓어질 수 있음 — min-width:0으로
@@ -191,6 +196,27 @@
     box-shadow:0 10px 26px rgba(167,139,250,.38);
   }
   .submit-btn:active{transform:translateY(1px);}
+  /* 메인 입력화면 히어로 CTA만 은은하게 살아있는 느낌을 더함(다른 화면의 .submit-btn은 기존 그대로) */
+  #submitBtn{
+    position:relative;
+    background:linear-gradient(90deg,var(--violet),var(--pink),var(--gold),var(--violet));
+    background-size:300% 100%;
+    animation:heroBtnFlow 6s ease infinite;
+  }
+  @keyframes heroBtnFlow{
+    0%{ background-position:0% 50%; }
+    50%{ background-position:100% 50%; }
+    100%{ background-position:0% 50%; }
+  }
+  #submitBtn::after{
+    content:""; position:absolute; inset:0; border-radius:100px; pointer-events:none;
+    animation:heroBtnRing 3.4s ease-out infinite;
+  }
+  @keyframes heroBtnRing{
+    0%{ box-shadow:0 0 0 0 rgba(167,139,250,.35); }
+    70%{ box-shadow:0 0 0 14px rgba(167,139,250,0); }
+    100%{ box-shadow:0 0 0 0 rgba(167,139,250,0); }
+  }
   .disclaimer{
     margin-top:16px; font-size:11px; line-height:1.6; color:var(--ink-faint);
     padding:12px 13px; background:var(--paper-deep); border-radius:var(--radius-sm);
@@ -911,8 +937,18 @@
   .hero-tagline{
     font-family:"Noto Serif KR"; font-weight:900; font-size:22px; line-height:1.45;
     margin:6px 0 14px; letter-spacing:-0.3px;
-    background:linear-gradient(90deg,var(--gold),var(--pink) 55%,var(--violet));
+    background:linear-gradient(90deg,var(--gold),var(--pink) 40%,var(--violet) 60%,var(--gold));
+    background-size:220% 100%;
     -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+    animation:taglineShimmer 6.5s ease-in-out infinite;
+  }
+  @keyframes taglineShimmer{
+    0%{ background-position:0% 50%; }
+    50%{ background-position:100% 50%; }
+    100%{ background-position:0% 50%; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .hero-tagline, .topbar .mark, #submitBtn{ animation:none !important; }
   }
   /* 생년월일을 고르는 순간 바로 보여주는 일간 미리보기 */
   .dm-preview{
@@ -1043,9 +1079,9 @@
     <div class="reveal-msg" id="revealMsg">사주를 읽는 중<span class="reveal-dots"><i></i><i></i><i></i></span></div>
   </div>
   <header class="topbar">
-    <div class="mark">四柱</div>
+    <div class="mark">結</div>
     <div class="topbar-title">
-      <h1>사주풀이</h1>
+      <h1>사주결</h1>
       <div class="sub">전통 명리학 기반 사주팔자 계산</div>
     </div>
     <button class="account-btn" id="accountBtn" title="로그인"><span>👤</span></button>
@@ -1144,7 +1180,7 @@
           <b>사업장 소재지</b> 대구광역시 달서구 성서서로 371-1, 201(신당동)<br>
           <b>고객센터</b> 서비스 내 "문의하기" &nbsp;·&nbsp; 010-4827-7521
         </div>
-        <div class="app-footer-copy">© 2026 사주풀이</div>
+        <div class="app-footer-copy">© 2026 사주결</div>
       </footer>
     </section>
     <!-- 생년월일 휠 스크롤 피커 바텀시트 -->
@@ -4592,7 +4628,7 @@ $('#mockPayBtn').addEventListener('click', async ()=>{
       storeId: PORTONE_STORE_ID,
       channelKey: PORTONE_CHANNEL_KEY,
       paymentId,
-      orderName: `사주풀이 - ${(meta.desc || '심층풀이 리포트').split('.')[0]}`,
+      orderName: `사주결 - ${(meta.desc || '심층풀이 리포트').split('.')[0]}`,
       totalAmount: amount,
       currency: 'KRW',
       payMethod: 'CARD',
@@ -4797,7 +4833,7 @@ window.addEventListener('popstate', ()=>{
   if(aiResultPushedState && aiPanelActive && !$('#aiResult').hidden){
     // 1번째 뒤로가기: AI 결과 화면 → 카테고리 목록. 결제 전/후 경로를 통일하기 위해(2026-08-26),
     // 팝업 없는 카테고리에서 곧장 온 경우와 동일하게 "기본사주로 복귀" 트랩을 세운다 — 다음
-    // 뒤로가기는 곧장 종료 확인이 아니라 기본사주풀이 화면으로 이어진다.
+    // 뒤로가기는 곧장 종료 확인이 아니라 기본사주결 화면으로 이어진다.
     resetAiPanel();
     window.scrollTo(0,0);
     history.pushState({ view: 'aiGroupBackTrap' }, '');
@@ -5042,7 +5078,7 @@ async function downloadPurchasePdf(row, btnEl){
   wrap.style.color = '#1a1420';
   wrap.style.fontFamily = "'Noto Sans KR', sans-serif";
   wrap.innerHTML = `
-    <div style="font-family:'Noto Serif KR',serif; font-weight:900; font-size:12px; letter-spacing:.14em; color:#a78bfa; margin-bottom:8px;">사주풀이 · 심층풀이</div>
+    <div style="font-family:'Noto Serif KR',serif; font-weight:900; font-size:12px; letter-spacing:.14em; color:#a78bfa; margin-bottom:8px;">사주결 · 심층풀이</div>
     <div style="font-family:'Noto Serif KR',serif; font-weight:900; font-size:24px; margin-bottom:10px;">${escapeHtml(CATEGORY_LABEL[row.category]||row.category)}</div>
     <div style="font-size:12px; color:#6b6480; margin-bottom:28px; padding-bottom:16px; border-bottom:1px solid #e7e2f5;">결제일 ${formatDateTime(row.created_at)} · 결제금액 ${formatKRW(row.amount)}</div>
     <div style="white-space:pre-wrap; font-size:13.5px; line-height:1.9; color:#26202e;">${escapeHtml(row.result_text||'저장된 해석 내용이 없어요.')}</div>
@@ -5075,7 +5111,7 @@ async function downloadPurchasePdf(row, btnEl){
       pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, pageW, sliceImgH);
     }
     const safeDate = formatDateTime(row.created_at).replace(/[.: ]/g,'');
-    pdf.save(`사주풀이_${CATEGORY_LABEL[row.category]||row.category}_${safeDate}.pdf`);
+    pdf.save(`사주결_${CATEGORY_LABEL[row.category]||row.category}_${safeDate}.pdf`);
   } catch(err){
     alert('PDF를 만드는 중 문제가 생겼어요. 다시 시도해주세요.');
   } finally {
