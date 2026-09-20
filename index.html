@@ -102,6 +102,13 @@
     body{padding:0;}
     .phone{max-width:100%; min-height:100vh; border-radius:0; box-shadow:none;}
   }
+  /* 2026-09-20 QA 수정(P2-7): PC(대략 900px 이상 뷰포트)에서 결과화면이 모바일 카드 폭(430px)
+     그대로 좁게 나와 표·자미두수 명반·대운/세운이 답답해 보이는 문제 — 모바일 디자인/레이아웃
+     자체는 그대로 두고 컨테이너 폭만 넓힌다(내부 요소들은 원래도 %/flex 기반이라 별도 변경 없이
+     넓어진 폭에 맞춰 자연스럽게 확장됨). */
+  @media (min-width:900px){
+    .phone{max-width:760px;}
+  }
   .topbar{
     position:relative; z-index:1;
     display:flex; align-items:center; gap:10px;
@@ -158,6 +165,15 @@
     line-height:1.7; color:var(--ink); margin:4px 0 22px;
   }
   .hero-line b{color:var(--seal); font-weight:900;}
+  /* 2026-09-20 QA 수정(P2-6): 첫 화면에서 "무료로 뭘 볼 수 있고 유료로 뭘 볼 수 있는지"가
+     바로 안 보여서, 광고로 들어온 사용자가 이 서비스 성격을 헷갈릴 수 있다는 지적에 대응 —
+     감성 문구(hero-line) 바로 아래에 1~2줄짜리 범위 안내를 작게 추가. */
+  .hero-scope{
+    font-size:12px; line-height:1.6; color:var(--ink-faint);
+    margin:-14px 0 20px; padding:10px 12px;
+    background:var(--paper-deep); border-radius:var(--radius-sm);
+  }
+  .hero-scope b{color:var(--ink-soft); font-weight:700;}
   .field{margin-bottom:16px;}
   .field label{
     display:block; font-size:12px; font-weight:700; color:var(--ink-soft);
@@ -221,6 +237,19 @@
     margin-top:16px; font-size:11px; line-height:1.6; color:var(--ink-faint);
     padding:12px 13px; background:var(--paper-deep); border-radius:var(--radius-sm);
   }
+  /* 2026-09-20 QA 수정(P2-8): 정밀 계산 설명이 입력화면에서 너무 길어 보이던 것을 한 줄
+     요약 + accordion으로 축약. 계산 기능 자체는 전혀 안 건드림, 텍스트 노출 방식만 변경. */
+  .disclaimer-summary{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .calc-detail-toggle{
+    flex:none; background:none; border:none; padding:0; margin:0; cursor:pointer;
+    color:var(--seal, #c98a3f); font-size:11px; font-weight:700; text-decoration:underline;
+    text-underline-offset:2px; white-space:nowrap;
+  }
+  .calc-detail{
+    margin-top:16px; font-size:11px; line-height:1.6; color:var(--ink-faint);
+    padding:12px 13px; background:var(--paper-deep); border-radius:var(--radius-sm);
+  }
+  .calc-detail[hidden]{ display:none; }
   .app-footer{margin-top:20px; padding-top:16px; border-top:1px solid var(--line); text-align:center;}
   .app-footer-links{display:flex; justify-content:center; align-items:center; gap:8px; font-size:11.5px;}
   .app-footer-links a{color:var(--ink-faint); text-decoration:none; font-weight:700;}
@@ -394,6 +423,31 @@
     font-family:"Noto Serif KR"; font-weight:800; font-size:14.5px; line-height:1.65; color:var(--ink);
   }
   .cross-identity-headline b{ color:var(--gold); }
+  /* 2026-09-20 QA 수정(P2-11): 종합풀이 "근거 → 결론" 표 */
+  .cross-evidence-table{ margin-bottom:14px; }
+  .cross-evidence-row{
+    display:grid; grid-template-columns:52px 1fr 1fr 54px; gap:8px; align-items:center;
+    padding:9px 10px; border-radius:var(--radius-sm); background:var(--paper-deep);
+    border:1px solid var(--line); margin-bottom:6px; font-size:11.5px; line-height:1.5; color:var(--ink-soft);
+  }
+  .cross-evidence-row.match{ border-color:var(--gold-line); background:rgba(244,196,99,.08); }
+  .cross-evidence-label{ font-size:11px; font-weight:800; color:var(--ink-faint); }
+  .cross-evidence-cell{ min-width:0; }
+  .cross-evidence-tag{
+    display:block; font-size:9.5px; font-weight:800; color:var(--seal); margin-bottom:2px; letter-spacing:.2px;
+  }
+  .cross-evidence-verdict{ font-size:11px; font-weight:800; text-align:right; color:var(--ink-faint); }
+  .cross-evidence-row.match .cross-evidence-verdict{ color:var(--gold); }
+  .cross-evidence-summary-label{
+    font-size:11px; font-weight:800; color:var(--seal); margin-bottom:6px; letter-spacing:.2px;
+  }
+  @media (max-width:360px){
+    .cross-evidence-row{ grid-template-columns:1fr 1fr; grid-template-areas:"label label" "saju ziwei" "verdict verdict"; }
+    .cross-evidence-label{ grid-area:label; }
+    .cross-evidence-cell-saju{ grid-area:saju; }
+    .cross-evidence-cell-ziwei{ grid-area:ziwei; }
+    .cross-evidence-verdict{ grid-area:verdict; text-align:left; margin-top:4px; }
+  }
   /* 결과 화면 맨 위, 요약 카드 바로 아래에 오는 훅 티저 — 오행/십성/자미를 다 안 봐도
      생년월일 입력 직후 바로 눈에 띄도록 배치(2026-08-24, 결제 동선 단축 논의로 추가).
      타 사주앱 벤치마킹 후(같은 날 재작업) 주변 카드와 톤이 비슷해서 위계가 안 느껴진다는
@@ -1009,6 +1063,24 @@
   }
   .ai-cta-title{font-family:"Noto Serif KR"; font-weight:800; font-size:14.5px; color:var(--ink); line-height:1.55; margin-bottom:6px;}
   .ai-cta-desc{font-size:12px; color:var(--ink-soft); line-height:1.6; margin-bottom:16px;}
+  /* ---------- 무료/유료 경계 블러 락(2026-09-20 신규) ----------
+     사주팔자·오행분포·오늘의 사주까지만 무료로 보여주고, 십성부터 종합풀이까지는 심층풀이를
+     한 번이라도 결제하기 전까지 블러 처리해 숨긴다. .locked 클래스는 JS의 applyContentLockState()가
+     contentUnlocked 플래그에 따라 토글한다(결제 완료 시 해제, 이후 같은 결과에서는 새로고침해도 유지). */
+  .locked-zone{ position:relative; }
+  .locked-zone.locked .locked-zone-content{
+    filter:blur(7px); user-select:none; pointer-events:none;
+  }
+  .locked-zone-overlay{ display:none; }
+  .locked-zone.locked .locked-zone-overlay{
+    display:flex; position:absolute; inset:0; z-index:5;
+    align-items:flex-start; justify-content:center; padding-top:64px; pointer-events:none;
+  }
+  .locked-zone-badge{
+    background:rgba(20,16,12,.82); color:#f4e9d8; font-size:13px; font-weight:700;
+    padding:10px 18px; border-radius:999px; border:1px solid rgba(244,196,99,.38);
+    box-shadow:0 4px 16px rgba(0,0,0,.25); white-space:nowrap;
+  }
   /* 결과 화면의 어느 서브탭을 보고 있든 하단에 항상 떠 있는 CTA — 사주팔자/오행/십성/자미를
      다 봐야만 결제 유도를 만나던 문제를 줄이기 위해 추가(2026-08-24). AI 해석 탭에서는
      이미 그 화면 안에 있으니 중복이라 activateGroup()에서 숨긴다. */
@@ -1092,6 +1164,7 @@
     <section id="view-input">
       <p class="hero-tagline">당신이 모르는<br>당신의 이야기가 시작됩니다</p>
       <p class="hero-line">태어난 순간, 하늘은 <b>년·월·일·시</b> 네 개의 도장을 찍습니다.<br>그 도장을 함께 읽어볼까요?</p>
+      <p class="hero-scope"><b>무료</b>로 사주팔자와 자미두수 핵심 결과를 확인하고, <b>심층풀이</b>에서 재물·연애·직업·삶의 흐름을 자세히 볼 수 있어요.</p>
       <div class="field">
         <label for="inpName">이름 (선택)</label>
         <input type="text" id="inpName" placeholder="예: 홍길동">
@@ -1160,11 +1233,18 @@
       <!-- 실제 계산에 쓰이는 값 저장용(화면에는 노출 안 함) — 위 지역 검색 시트가 값을 채워 넣고, 기존 계산 로직은 그대로 이 값을 읽음 -->
       <div hidden><select id="inpCity"></select></div>
       <button class="submit-btn" id="submitBtn">내 사주 풀어보기</button>
-      <p class="disclaimer">
+      <p class="disclaimer disclaimer-summary">
+        <span>출생지역과 당시 표준시까지 반영해 정밀 계산합니다.</span>
+        <button type="button" class="calc-detail-toggle" id="calcDetailToggle" aria-expanded="false">계산 기준 자세히 보기 ▾</button>
+      </p>
+      <div class="calc-detail" id="calcDetailBox" hidden>
         태어난 곳의 경도로 <b>진태양시</b>를 보정하고, 대한민국의 <b>표준시 변경 이력(1954~1961 UTC+8:30)</b>과
         <b>서머타임 시행 기간(1948~51, 1955~60, 1987~88)</b>을 자동으로 반영합니다. 절기(24절기)는 태양의 실제 황경을,
         음력 날짜는 실제 삭望(신월) 시각을 계산해 분 단위로 정밀하게 구합니다. 사주팔자와 더불어 <b>자미두수</b> 명반도 함께 계산해
-        두 체계를 나란히 비교해볼 수 있어요. 다만 이것도 명리학 여러 유파 중 하나의 방식을 따른 참고·재미용 도구이며, 정밀 상담은 전문가와 나누시길 권해요.
+        두 체계를 나란히 비교해볼 수 있어요.
+      </div>
+      <p class="disclaimer">
+        다만 이것도 명리학 여러 유파 중 하나의 방식을 따른 참고·재미용 도구이며, 정밀 상담은 전문가와 나누시길 권해요.
       </p>
       <footer class="app-footer">
         <div class="app-footer-links">
@@ -1240,7 +1320,7 @@
       <div class="summary" id="summaryBox"></div>
       <div class="mascot-row">
         <svg class="mascot-icon" width="42" height="42"><use href="#mascotIcon"/></svg>
-        <div class="mascot-bubble" id="mascotIntroBubble">안녕! 나는 <b>별빛여우</b>야 🦊✨ 지금부터 사주를 차례대로 같이 풀어볼게, 천천히 내려가 봐!</div>
+        <div class="mascot-bubble" id="mascotIntroBubble"><b>별빛여우</b>가 안내할게요 🦊 지금부터 사주를 차례대로 함께 살펴봐요.</div>
       </div>
       <div class="hook-teaser" id="hookTeaserBox">
         <div class="hook-teaser-type-row">
@@ -1265,67 +1345,9 @@
         <div class="ohaeng-note interpret-box" id="ohaengNote"></div>
         <div class="hook-quote" id="hookQuote_ohaeng"></div>
       </div>
-      <div class="panel" data-panel="sipsung">
-        <h2 class="section-title">십성 <span class="en">TEN GODS</span></h2>
-        <p class="section-desc">일간(나)을 기준으로 다른 일곱 글자가 어떤 관계인지 보여줍니다.</p>
-        <table class="sipsung-table" id="sipsungTable"></table>
-        <div class="ohaeng-note interpret-box" id="sipsungNote" style="margin-top:16px;"></div>
-        <div class="hook-quote" id="hookQuote_sipsung"></div>
-      </div>
-      <div class="panel" data-panel="simhwa">
-        <h2 class="section-title">심화분석 <span class="en">DEEPER READING</span></h2>
-        <p class="section-desc">지장간, 12운성, 공망을 함께 봅니다.</p>
-        <table class="sipsung-table" id="simhwaTable"></table>
-        <div class="ohaeng-note interpret-box" id="simhwaPersonalNote" style="margin-top:16px;"></div>
-        <div class="ohaeng-note interpret-box" id="gongmangNote" style="margin-top:12px;"></div>
-        <div class="hook-quote" id="hookQuote_simhwa"></div>
-      </div>
       <div class="mascot-row">
         <svg class="mascot-icon" width="34" height="34"><use href="#mascotIcon"/></svg>
-        <div class="mascot-bubble">이번엔 <b>운세흐름</b>! 10년 단위 대운이랑 올해 세운까지 같이 볼게 🌊</div>
-      </div>
-      <div class="panel" data-panel="daeun">
-        <h2 class="section-title">대운 <span class="en">10-YEAR CYCLES</span></h2>
-        <p class="section-desc">10년마다 바뀌는 큰 흐름입니다. 좌우로 넘겨보세요.</p>
-        <div class="daeun-dir" id="daeunDir"></div>
-        <div class="daeun-scroll" id="daeunScroll"></div>
-        <div class="hook-quote" id="hookQuote_daeun"></div>
-      </div>
-      <div class="panel" data-panel="seun">
-        <h2 class="section-title">세운 <span class="en">YEARLY LUCK</span></h2>
-        <p class="section-desc">올해부터 10년간, 한 해 한 해의 간지입니다.</p>
-        <div class="seun-list" id="seunList"></div>
-        <div class="hook-quote" id="hookQuote_seun"></div>
-      </div>
-      <div class="mascot-row">
-        <svg class="mascot-icon" width="34" height="34"><use href="#mascotIcon"/></svg>
-        <div class="mascot-bubble">이번엔 <b>자미두수</b> 차례! 사주랑은 완전 다른 방식으로 한 번 더 비춰볼게 🌙</div>
-      </div>
-      <div class="panel" data-panel="ziwei">
-        <h2 class="section-title">자미두수 <span class="en">ZI WEI DOU SHU</span></h2>
-        <p class="section-desc">태어난 음력 날짜로 별들의 배치를 계산하는 또 다른 명리 체계입니다. 명궁(命宮)이 나를 상징하는 자리예요. 카드를 눌러보면 자세한 풀이가 펼쳐져요.</p>
-        <div class="ziwei-summary" id="ziweiSummary"></div>
-        <div class="ziwei-palace-grid" id="ziweiGrid"></div>
-        <div class="section-title" style="margin-top:20px;">사화(四化)</div>
-        <div class="ziwei-sihwa-list" id="ziweiSihwa"></div>
-        <div class="section-title" style="margin-top:20px;">대한(大限)</div>
-        <div class="daeun-scroll" id="ziweiDaehanScroll"></div>
-        <div class="hook-quote" id="hookQuote_ziwei"></div>
-      </div>
-      <div class="ai-cta-card">
-        <div class="ai-cta-title">지금까지 본 세 가지, 사실 같은 얘기를 하고 있어요</div>
-        <div class="ai-cta-desc">사주팔자·운세흐름·자미두수가 가리키는 방향이 겹쳐요 — 우연치곤 이상하죠. 이제 종합풀이로 이어볼게요.</div>
-        <button type="button" class="submit-btn" id="ziweiAiCtaBtn">내 사주 더 깊이 알아보기 →</button>
-      </div>
-      <div class="panel" data-panel="cross">
-        <h2 class="section-title">종합풀이 <span class="en">CROSS-CHECK</span></h2>
-        <p class="section-desc">사주팔자와 자미두수, 두 체계를 나란히 놓고 공통점과 차이점을 짚어봅니다.</p>
-        <div class="ziwei-summary interpret-box" id="crossBox"></div>
-        <div class="hook-quote" id="hookQuote_cross"></div>
-      </div>
-      <div class="mascot-row">
-        <svg class="mascot-icon" width="34" height="34"><use href="#mascotIcon"/></svg>
-        <div class="mascot-bubble">사주도 자미두수도 같은 얘길 하고 있어! 마지막으로 오늘 하루도 보고 갈까?</div>
+        <div class="mascot-bubble">오행 분포까지 살펴봤으니, 먼저 <b>오늘의 운세</b>부터 확인해볼게요 ☀</div>
       </div>
       <div class="panel" data-panel="today">
         <div class="today-dark">
@@ -1420,12 +1442,72 @@
       </div>
       <div class="mascot-row">
         <svg class="mascot-icon" width="42" height="42"><use href="#mascotIcon"/></svg>
-        <div class="mascot-bubble">여기까지가 <b>무료로 볼 수 있는 전부</b>야. 근데 사실... <b>진짜 재밌는 이야기는 아직 시작도 안 했어</b> 👇</div>
+        <div class="mascot-bubble">여기까지가 <b>무료로 볼 수 있는 부분</b>이에요. 더 깊은 이야기는 <b>심층풀이</b>에서 이어져요 👇</div>
       </div>
-      <div class="ai-cta-card" style="border-color:var(--seal);">
-        <div class="ai-cta-title">지금까지 본 다섯 가지, 아직 완성 전이에요</div>
-        <div class="ai-cta-desc">사주팔자·운세흐름·자미두수·종합·오늘 — 이 조각들을 하나로 엮으면 완전히 다른 이야기가 나와요.</div>
-        <button type="button" class="submit-btn" id="todayAiCtaBtn">✦ 심층풀이로 완성하기</button>
+      <div class="ai-cta-card" id="lockedZoneCta" style="border-color:var(--seal);">
+        <div class="ai-cta-title">여기서부터는 심층풀이 결제 후에 볼 수 있어요</div>
+        <div class="ai-cta-desc">십성·심화분석·대운·세운·자미두수·종합풀이 — 심층풀이를 한 번이라도 결제하시면 전체가 바로 열려요.</div>
+        <button type="button" class="submit-btn" id="todayAiCtaBtn">✦ 심층풀이로 열어보기</button>
+      </div>
+      <div class="locked-zone" id="lockedContentZone">
+        <div class="locked-zone-overlay">
+          <div class="locked-zone-badge">🔒 심층풀이 결제 후 열람 가능</div>
+        </div>
+        <div class="locked-zone-content">
+      <div class="panel" data-panel="sipsung">
+        <h2 class="section-title">십성 <span class="en">TEN GODS</span></h2>
+        <p class="section-desc">일간(나)을 기준으로 다른 일곱 글자가 어떤 관계인지 보여줍니다.</p>
+        <table class="sipsung-table" id="sipsungTable"></table>
+        <div class="ohaeng-note interpret-box" id="sipsungNote" style="margin-top:16px;"></div>
+        <div class="hook-quote" id="hookQuote_sipsung"></div>
+      </div>
+      <div class="panel" data-panel="simhwa">
+        <h2 class="section-title">심화분석 <span class="en">DEEPER READING</span></h2>
+        <p class="section-desc">지장간, 12운성, 공망을 함께 봅니다.</p>
+        <table class="sipsung-table" id="simhwaTable"></table>
+        <div class="ohaeng-note interpret-box" id="simhwaPersonalNote" style="margin-top:16px;"></div>
+        <div class="ohaeng-note interpret-box" id="gongmangNote" style="margin-top:12px;"></div>
+        <div class="hook-quote" id="hookQuote_simhwa"></div>
+      </div>
+      <div class="mascot-row">
+        <svg class="mascot-icon" width="34" height="34"><use href="#mascotIcon"/></svg>
+        <div class="mascot-bubble">이어서 <b>운세흐름</b>이에요. 10년 단위 대운과 올해 세운을 함께 볼게요 🌊</div>
+      </div>
+      <div class="panel" data-panel="daeun">
+        <h2 class="section-title">대운 <span class="en">10-YEAR CYCLES</span></h2>
+        <p class="section-desc">10년마다 바뀌는 큰 흐름입니다. 좌우로 넘겨보세요.</p>
+        <div class="daeun-dir" id="daeunDir"></div>
+        <div class="daeun-scroll" id="daeunScroll"></div>
+        <div class="hook-quote" id="hookQuote_daeun"></div>
+      </div>
+      <div class="panel" data-panel="seun">
+        <h2 class="section-title">세운 <span class="en">YEARLY LUCK</span></h2>
+        <p class="section-desc">올해부터 10년간, 한 해 한 해의 간지입니다.</p>
+        <div class="seun-list" id="seunList"></div>
+        <div class="hook-quote" id="hookQuote_seun"></div>
+      </div>
+      <div class="mascot-row">
+        <svg class="mascot-icon" width="34" height="34"><use href="#mascotIcon"/></svg>
+        <div class="mascot-bubble">다음은 <b>자미두수</b>예요. 사주와는 다른 방식으로 한 번 더 살펴볼게요 🌙</div>
+      </div>
+      <div class="panel" data-panel="ziwei">
+        <h2 class="section-title">자미두수 <span class="en">ZI WEI DOU SHU</span></h2>
+        <p class="section-desc">태어난 음력 날짜로 별들의 배치를 계산하는 또 다른 명리 체계입니다. 명궁(命宮)이 나를 상징하는 자리예요. 카드를 눌러보면 자세한 풀이가 펼쳐져요.</p>
+        <div class="ziwei-summary" id="ziweiSummary"></div>
+        <div class="ziwei-palace-grid" id="ziweiGrid"></div>
+        <div class="section-title" style="margin-top:20px;">사화(四化)</div>
+        <div class="ziwei-sihwa-list" id="ziweiSihwa"></div>
+        <div class="section-title" style="margin-top:20px;">대한(大限)</div>
+        <div class="daeun-scroll" id="ziweiDaehanScroll"></div>
+        <div class="hook-quote" id="hookQuote_ziwei"></div>
+      </div>
+      <div class="panel" data-panel="cross">
+        <h2 class="section-title">종합풀이 <span class="en">CROSS-CHECK</span></h2>
+        <p class="section-desc">사주팔자와 자미두수, 두 체계를 나란히 놓고 공통점과 차이점을 짚어봅니다.</p>
+        <div class="ziwei-summary interpret-box" id="crossBox"></div>
+        <div class="hook-quote" id="hookQuote_cross"></div>
+      </div>
+        </div>
       </div>
       <div class="panel" data-panel="ai">
         <button type="button" class="cat-back" id="aiBackToScrollBtn">← 이야기로 돌아가기</button>
@@ -2762,17 +2844,6 @@ function calcZiwei({ year, month, day, hour, minute, unknownTime, gender, trueHo
   const palaceByReduced = {};
   palaces.forEach(p=>{ palaceByReduced[p.reducedIdx]=p; });
 
-  // 8) 사화(四化)
-  const sihwaTargets = SIHWA_TABLE[yp.g]; // [화록스타,화권,화과,화기]
-  const sihwaInfo = []; // {label, starName, palaceName}
-  sihwaTargets.forEach((starName,i)=>{
-    let foundPalace = null;
-    for(const p of palaces){
-      if(p.stars.some(s=>s.name===starName)){ foundPalace = p; break; }
-    }
-    sihwaInfo.push({ label: SIHWA_LABEL[i], starName, palace: foundPalace? foundPalace.name : null });
-  });
-
   // 9) 대한 (오행국 시작 나이, 방향은 년지 음양 + 성별)
   const isYangYearZhi = yp.z % 2 === 0; // 子寅辰午申戌=양
   const isMale = gender==='남';
@@ -2818,6 +2889,21 @@ function calcZiwei({ year, month, day, hour, minute, unknownTime, gender, trueHo
     const reducedIdx = mod(s.stdZhi-2,12);
     const p = palaceByReduced[reducedIdx];
     if(p){ p.stars.push({name:s.name, hanja:s.hanja, aux:true}); }
+  });
+
+  // 11) 사화(四化) — 반드시 위 보조성(문창/문곡/좌보/우필/녹존/천괴천월/화성영성) 배치
+  // 이후에 계산해야 한다. 사화 대상이 문창처럼 보조성인 경우(예: 병간→화과=문창),
+  // 이 판정이 보조성 배치보다 먼저 실행되면 palaces[].stars에 아직 그 별이 없어
+  // "명반에 없음"으로 잘못 표시되는 버그가 있었다(2026-09-20 QA 발견, 명궁 표시와
+  // 사화 판정이 서로 다른 시점의 데이터를 참조해 같은 명반 안에서 결과가 엇갈렸음).
+  const sihwaTargets = SIHWA_TABLE[yp.g]; // [화록스타,화권,화과,화기]
+  const sihwaInfo = []; // {label, starName, palaceName}
+  sihwaTargets.forEach((starName,i)=>{
+    let foundPalace = null;
+    for(const p of palaces){
+      if(p.stars.some(s=>s.name===starName)){ foundPalace = p; break; }
+    }
+    sihwaInfo.push({ label: SIHWA_LABEL[i], starName, palace: foundPalace? foundPalace.name : null });
   });
 
   return {
@@ -3197,16 +3283,19 @@ function renderHookTeaser(saju, zw){
 // ---- 목차 미리보기(TOC 프리뷰) 데이터 ----
 // group/sub은 TAB_GROUPS(아래에서 정의)의 키와 맞춰서, 행을 누르면 activateGroup()으로 바로
 // 이동할 수 있게 한다. cat은 AI_CATEGORY_META/.cat-option[data-cat]과 동일한 키.
+// 2026-09-20: 화면 표시 순서(사주팔자→오행분포→오늘의 사주→[블러 락]십성~종합풀이)에 맞춰 정렬.
+// id/group/sub 값 자체는 그대로이므로 기능(renderChapterHooks가 각 hook-quote에 텍스트를 채우는 것)에는
+// 영향이 없고, 목록 순서만 실제 화면 순서와 일치시킨 것 — 잠긴 챕터도 결제 후 바로 보이도록 티저는 미리 채워둔다.
 const TOC_FREE_CHAPTERS = [
   {id:'palja', group:'palja_group', sub:'palja', emoji:'🀄', label:'사주팔자'},
   {id:'ohaeng', group:'palja_group', sub:'ohaeng', emoji:'🌳', label:'오행 분포'},
+  {id:'today', group:'today', sub:null, emoji:'☀️', label:'오늘의 사주'},
   {id:'sipsung', group:'palja_group', sub:'sipsung', emoji:'⚖️', label:'십성'},
   {id:'simhwa', group:'palja_group', sub:'simhwa', emoji:'🔎', label:'심화분석'},
   {id:'daeun', group:'unse_group', sub:'daeun', emoji:'🌊', label:'대운'},
   {id:'seun', group:'unse_group', sub:'seun', emoji:'📅', label:'세운'},
   {id:'ziwei', group:'ziwei', sub:null, emoji:'⭐', label:'자미두수'},
   {id:'cross', group:'cross', sub:null, emoji:'🔗', label:'종합풀이'},
-  {id:'today', group:'today', sub:null, emoji:'☀️', label:'오늘의 사주'},
 ];
 // 무료 챕터 한 줄 티저 — 새로 계산하지 않고, computeCrossIdentity()가 이미 뽑아둔 값과
 // 대운/세운/오늘의 사주 패널이 이미 렌더한 DOM(.current 카드)을 그대로 재사용한다. 이 함수는
@@ -3237,7 +3326,10 @@ function tocFreeTeaser(chapterId, saju, zw){
     }
     case 'seun': {
       const cur = document.querySelector('.seun-row.current .gz');
-      return cur ? `올해는 ${cur.textContent}이에요` : `올해부터 10년, 한 해씩 흐름을 봐보세요`;
+      // 2026-09-20 QA 수정: .gz의 textContent는 항상 "OO년 · OO띠 해"로 끝나 받침 없는
+      // '해'로 마무리된다 — 뒤에 붙는 조사를 받침 있는 단어 기준인 "이에요"로 잘못 고정해뒀던
+      // 것을 "예요"로 수정(예: "올해는 병오년 · 말띠 해이에요" → "올해는 병오년 · 말띠 해예요").
+      return cur ? `올해는 ${cur.textContent}예요` : `올해부터 10년, 한 해씩 흐름을 봐보세요`;
     }
     case 'ziwei':
       return `명궁은 ${ZHI[zw.soulZhiStd]}(${ZHI_HANJA[zw.soulZhiStd]}) — 사주와는 다른 체계로 나를 봐보세요`;
@@ -3263,7 +3355,7 @@ function renderChapterHooks(saju, zw){
   });
 }
 function renderCross(saju, zw){
-  const {maxEl, topGroup, matchCount} = computeCrossIdentity(saju, zw);
+  const {maxEl, topGroup, matchCount, bureauEl, sameYear, mingElement, dmElement} = computeCrossIdentity(saju, zw);
   const HEADLINE = [
     '이 성향, 사실 사주와 자미두수 두 체계의 계산 결과가 서로 다른 방향을 가리키고 있어요. 하나로 정의되지 않는, 상황에 따라 다른 얼굴이 나오는 사람이라는 뜻이에요.',
     '이 중 한 가지는 계산 방식이 전혀 다른 사주와 자미두수 두 체계에서 공통으로 나온 결과예요. 우연이라기엔 꽤 의미 있게 겹치는 지점이죠.',
@@ -3276,9 +3368,49 @@ function renderCross(saju, zw){
     `세 가지 중 둘이 겹친다는 건, 그 두 지점의 성향은 믿고 밀어붙여도 좋다는 뜻이에요. 반대로 겹치지 않는 한 지점은 평소와 다르게 반응하는 예외적인 상황에서 튀어나오는 또 다른 얼굴로 봐두면, 스스로를 더 정확하게 이해하는 데 도움이 될 거예요.`,
     `세 가지 비교가 전부 같은 방향을 가리킨다는 건 이 정체성이 임기응변이 아니라 타고난 뼈대라는 뜻이에요. 앞으로 진로든 관계든 중요한 선택을 할 때, 이 성향을 거스르려 애쓰기보다 ${ELEMENT_KEYWORD[maxEl]}과(와) ${TEN_GOD_GROUP_KEYWORD[topGroup]}을(를) 있는 그대로 활용하는 쪽이 훨씬 수월하게 풀릴 거예요.`,
   ][matchCount];
+  // 2026-09-20 QA 수정(P2-11): "두 체계에서 공통으로 나온 결과"라고만 말하고 정작 어느 부분이
+  // 공통인지 바로 안 보이던 것을, 실제 계산에 쓰인 세 가지 비교값(년주/오행 vs 오행국/일간 오행
+  // vs 명궁 오행)을 "사주 근거 → 자미두수 근거 → 일치 여부" 표로 먼저 보여준 뒤, 그 근거를 바탕
+  // 으로 한 결론(HEADLINE/CLOSING)이 이어지는 구조로 바꾼다. 새 계산은 없음 — matchCount를
+  // 이루는 세 비교를 그대로 표로 펼친 것뿐.
+  const bureauElName = ELEMENT_NAME[bureauEl];
+  const EVIDENCE_ROWS = [
+    {
+      label: '년주',
+      saju: `${GAN[saju.pillars.year.g]}${ZHI[saju.pillars.year.z]}년(${GAN_HANJA[saju.pillars.year.g]}${ZHI_HANJA[saju.pillars.year.z]})`,
+      ziwei: `년주(설날 기준) ${GAN[zw.yearPillar.g]}${ZHI[zw.yearPillar.z]}(${GAN_HANJA[zw.yearPillar.g]}${ZHI_HANJA[zw.yearPillar.z]})`,
+      match: sameYear,
+    },
+    {
+      label: '오행',
+      saju: `여덟 글자 중 <b>${ELEMENT_NAME[maxEl]}(${ELEMENT_HANJA[maxEl]})</b> 기운이 가장 강함`,
+      ziwei: `오행국 <b>${zw.bureau.name}</b>(${bureauElName} 계열)`,
+      match: maxEl===bureauEl,
+    },
+    {
+      label: '핵심 자리',
+      saju: `일간(나를 뜻하는 글자) <b>${ELEMENT_NAME[dmElement]}(${ELEMENT_HANJA[dmElement]})</b>`,
+      ziwei: `명궁 오행 <b>${ELEMENT_NAME[mingElement]}(${ELEMENT_HANJA[mingElement]})</b>`,
+      match: dmElement===mingElement,
+    },
+  ];
+  let evidenceHtml = '<div class="cross-evidence-table">';
+  EVIDENCE_ROWS.forEach(r=>{
+    evidenceHtml += `
+      <div class="cross-evidence-row ${r.match?'match':''}">
+        <div class="cross-evidence-label">${r.label}</div>
+        <div class="cross-evidence-cell cross-evidence-cell-saju"><span class="cross-evidence-tag">사주팔자</span>${r.saju}</div>
+        <div class="cross-evidence-cell cross-evidence-cell-ziwei"><span class="cross-evidence-tag">자미두수</span>${r.ziwei}</div>
+        <div class="cross-evidence-verdict">${r.match ? '✓ 일치' : '별개'}</div>
+      </div>`;
+  });
+  evidenceHtml += '</div>';
+
   let html = '';
   html += `<div class="cross-identity-headline">오행상 <b>${ELEMENT_NAME[maxEl]}(${ELEMENT_HANJA[maxEl]})</b> 기운이 강하고, 십성상 <b>${topGroup}</b>이 두드러진 사람이에요 — 한마디로 <b>${ELEMENT_KEYWORD[maxEl]}</b>에 <b>${TEN_GOD_GROUP_KEYWORD[topGroup]}</b>까지 함께 가진 쪽에 가까워요.</div>`;
-  html += `<div style="margin-bottom:10px; font-size:12px; color:var(--ink-faint);">위에서 본 성향, 사주와 자미두수 두 체계에서 실제로 얼마나 겹치는지 살펴볼게요.</div>`;
+  html += `<div style="margin-bottom:10px; font-size:12px; color:var(--ink-faint);">위에서 본 성향, 사주와 자미두수 두 체계에서 실제로 얼마나 겹치는지 세 가지 지점으로 비교해볼게요.</div>`;
+  html += evidenceHtml;
+  html += `<div class="cross-evidence-summary-label">공통 해석</div>`;
   html += `<div style="margin-bottom:14px; font-weight:700; line-height:1.6;">${HEADLINE}</div>`;
   html += `<div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line); line-height:1.65;">${CLOSING}</div>`;
   $('#crossBox').innerHTML = html;
@@ -3361,6 +3493,11 @@ function renderFreeCompat(a, b){
 let selectedGender = "남";
 let lastSajuResult = null, lastZiweiResult = null, lastName = "";
 let aiUnlocked = false;
+// 2026-09-20 신규: 무료/유료 경계 블러 락. aiUnlocked과 달리 "지금 심층풀이 화면을 보고 있는가"가
+// 아니라 "이 계산 결과에서 십성~종합풀이 블러를 한 번이라도 결제해서 풀었는가"를 나타내며,
+// resetAiPanel()(카테고리 목록으로 돌아가기 등)이 호출돼도 리셋되지 않는다 — 오직 완전히 새로운
+// #submitBtn 계산(fresh submit)에서만 false로 초기화된다.
+let contentUnlocked = false;
 // 결제 버튼 중복 클릭/이중 요청 방지용 플래그. 이게 없으면 버튼을 빠르게 두 번 누르거나
 // 네트워크가 느릴 때 AI 호출(OpenAI 과금)과 purchases 기록이 중복으로 발생할 수 있다.
 let aiInterpretInFlight = false;
@@ -3403,6 +3540,14 @@ let aiGroupPushedState = false;
 // 뒤로가기를 한 번 더 누르면 곧장 이탈하는 대신 "종료할까요?" 확인을 보여주기 위한 트랩.
 // 결제 전/후 모든 경로가 이제 이 트랩 하나로 종료 확인까지 도달한다.
 let resultExitTrapPushed = false;
+// 2026-09-20 QA 대응(P1-3): 위 트랩들은 전부 "심층풀이 화면을 한 번이라도 연 뒤"부터
+// 작동하는데, 정작 입력폼→결과화면 최초 전환에는 히스토리 트랩이 전혀 없어서, 방금 결과를
+// 본 사용자가 기기/브라우저 뒤로가기를 누르면 곧장 사이트 밖으로 나가버리는 문제가 있었다.
+// 결과화면에 최초 진입할 때도 resultExitTrapPushed를 세워 이 문제를 막되, 아직 심층풀이를
+// 한 번도 열어본 적 없는 "완전히 새 결과"인 경우엔(이 플래그가 true인 동안) 종료 확인 모달
+// 대신 곧장 입력화면으로 복귀시킨다(입력값은 그대로 남아있어 다시 잃지 않음) — 심층풀이를
+// 열어본 적이 있으면(진행 중인 유료 흐름을 보호해야 하므로) 기존처럼 종료 확인 모달을 띄운다.
+let freshResultNeverExplored = false;
 // 카카오 로그인은 페이지 전체를 리다이렉트하는 방식이라, 로그인 도중 입력해둔 내 정보가
 // 브라우저 메모리에서 전부 사라진다. 로그인 직전에 폼 스냅샷을 저장해두고, 로그인 후
 // 돌아왔을 때 자동으로 복원 + 재계산해서 사용자가 처음부터 다시 입력하지 않게 한다.
@@ -3416,6 +3561,9 @@ let pendingRestoreLoveStatus = null;
 let pendingRestoreJobStatus = null;
 let pendingRestorePartnerData = null;
 let pendingRestorePetData = null;
+// 2026-09-20: 새로고침 복구(sessionStorage) 시, 이전에 결제로 풀어뒀던 블러 락 상태(contentUnlocked)를
+// 재계산 이후 시점에 다시 적용하기 위한 중계 변수 — 다른 pendingRestore* 변수들과 동일한 패턴.
+let pendingRestoreContentUnlocked = null;
 let partnerData = null; // { name, gender, saju(calcSaju 결과), ziwei(calcZiwei 결과) }
 let petData = null; // { name, species, speciesLabel, birthYear, zodiac, ownerDayZhi, relationText }
 let petSpeciesVal = '강아지';
@@ -3903,6 +4051,15 @@ $('#partnerUnknown').addEventListener('change', (e)=>{
     $('#partnerTimeBtnVal').classList.add('placeholder');
   }
 });
+// 2026-09-20 QA 수정(P2-8): 정밀 계산 설명 accordion 토글
+$('#calcDetailToggle')?.addEventListener('click', ()=>{
+  const box = $('#calcDetailBox');
+  const btn = $('#calcDetailToggle');
+  const willShow = box.hidden;
+  box.hidden = !willShow;
+  btn.textContent = willShow ? '계산 기준 접기 ▴' : '계산 기준 자세히 보기 ▾';
+  btn.setAttribute('aria-expanded', String(willShow));
+});
 $('#submitBtn').addEventListener('click', ()=>{
   let y, m, d;
   if(mainLunarInput.getCalType() === 'lunar'){
@@ -3927,6 +4084,7 @@ $('#submitBtn').addEventListener('click', ()=>{
   }
   const lonVal = parseFloat(citySelect.value);
   const longitude = isNaN(lonVal) ? 127.5 : lonVal;
+  saveResultSnapshot(); // 2026-09-20: 새로고침 시 결과 복구용 — 유효성 검증을 통과한 시점에 저장
   playRevealSequence(()=>{
     const result = calcSaju({year:y, month:m, day:d, hour, minute, unknownTime, gender:selectedGender, longitude});
     render(result);
@@ -3958,6 +4116,7 @@ $('#submitBtn').addEventListener('click', ()=>{
     const restorePaymentId = pendingRestorePaymentId;
     const restoreLoveStatus = pendingRestoreLoveStatus, restoreJobStatus = pendingRestoreJobStatus;
     const restorePartnerData = pendingRestorePartnerData, restorePetData = pendingRestorePetData;
+    const restoreContentUnlocked = pendingRestoreContentUnlocked;
     pendingRestoreGroup = null;
     pendingRestoreCategory = null;
     pendingRestorePaymentId = null;
@@ -3965,6 +4124,21 @@ $('#submitBtn').addEventListener('click', ()=>{
     pendingRestoreJobStatus = null;
     pendingRestorePartnerData = null;
     pendingRestorePetData = null;
+    pendingRestoreContentUnlocked = null;
+    // 2026-09-20: 새로고침 복구(sessionStorage)에서 넘어온 값이 있으면 그대로 따르고, 그게
+    // 아니면(완전히 새로운 계산이면) 잠금 상태로 시작한다 — 아래 결제 리디렉션 복원 분기에서
+    // 실제 결제가 막 완료된 것으로 확인되면 다시 true로 덮어쓴다.
+    contentUnlocked = !!restoreContentUnlocked;
+    if(restoreGroup !== 'ai'){
+      // 2026-09-20 (P1-3): 입력폼→결과화면 최초 전환 시점에 히스토리 트랩이 전혀 없어서, 결과를
+      // 막 확인한 사용자가 뒤로가기를 누르면 곧장 사이트 밖으로 이탈해버리는 문제가 있었다.
+      // 로그인/결제 리디렉션 복원(restoreGroup==='ai')이 아닌 일반적인 진입(최초 제출/새로고침
+      // 복원)에서만 이 트랩을 세운다 — AI 복원 흐름은 곧이어 activateGroup('ai')가 자체적으로
+      // aiGroupBackTrap을 세우므로 여기서 별도로 쌓지 않는다(중복 스택 방지).
+      history.pushState({ view: 'freshResultBackTrap' }, '');
+      resultExitTrapPushed = true;
+      freshResultNeverExplored = true;
+    }
     activateGroup(restoreGroup || 'palja_group');
     // 로그인 복원으로 AI 해석 탭에 바로 착지하는 경우엔 강조 배지를 새로 띄울 필요가 없음
     if(restoreGroup !== 'ai'){ $('#aiTabBadge').hidden = false; }
@@ -3980,12 +4154,23 @@ $('#submitBtn').addEventListener('click', ()=>{
       petData = restorePetData;
       pendingPaymentId = restorePaymentId;
       aiUnlocked = true;
+      // 2026-09-20: 모바일 결제 리디렉션 복귀 = 방금 결제가 완료된 상태로 돌아온 것이므로,
+      // 무료 스크롤의 블러 락도 함께 해제한다(아래 applyContentLockState() + saveResultSnapshot()에서
+      // 화면 반영 및 새로고침 스냅샷 저장까지 함께 처리됨).
+      contentUnlocked = true;
       runAiInterpretation();
     } else if(restoreCategory && AI_CATEGORY_META[restoreCategory]){
       // 로그인 리다이렉트 복원 흐름이면, 로그인 전 골라뒀던 AI 카테고리까지 이어서 결제 단계로 바로 이동
       selectedAiCategory = restoreCategory;
       goToAiPayStep();
     }
+    applyContentLockState();
+    // 2026-09-20: 이 핸들러 맨 위(saveResultSnapshot() 최초 호출, 유효성 검증 직후)에서는
+    // contentUnlocked가 아직 이번 렌더의 최종값으로 확정되기 전이라 옛 값(주로 false)이 찍힌다.
+    // 여기서 contentUnlocked가 확정된 뒤 다시 한 번 저장해 새로고침 스냅샷이 항상 최신 잠금
+    // 상태를 반영하게 한다 — 안 그러면 "복원으로 풀림 → 곧바로 새로고침"을 반복할 때마다
+    // 스냅샷이 예전 값으로 되돌아가 다시 잠기는 문제가 있었다.
+    saveResultSnapshot();
     window.scrollTo(0,0);
   });
 });
@@ -3994,6 +4179,11 @@ $('#backBtn').addEventListener('click', ()=>{
   $('#tabbar').hidden = true;
   $('#backBtn').hidden = true;
   $('#view-input').hidden = false;
+  clearResultSnapshot(); // 2026-09-20: 사용자가 직접 입력화면으로 돌아갔으니, 다음 새로고침이 옛 결과로 되돌리지 않도록 정리
+  // 화면상의 "다시 보기" 버튼으로 직접 돌아간 경우, 방금 세워둔 결과화면 트랩이 아직 히스토리에
+  // 남아있을 수 있다 — 플래그만 정리해서, 이후 실제 뒤로가기가 한 번 헛돌지 않게 한다.
+  resultExitTrapPushed = false;
+  freshResultNeverExplored = false;
 });
 /* 하단 탭 10개 → 6개 그룹으로 통합. 사주/오행/십성/심화는 "사주팔자" 그룹,
    대운/세운은 "운세흐름" 그룹으로 묶고, 그룹 안에서는 서브탭(subtabBar)으로 전환한다. */
@@ -4040,8 +4230,18 @@ function activateGroup(groupKey){
   // 으로 돌아가면 이 트랩은 더 이상 유효하지 않으므로 내린다.
   if(groupKey === 'ai'){
     if(!aiGroupPushedState && !aiStepPushedState && !aiResultPushedState){
-      history.pushState({ view: 'aiGroupBackTrap' }, '');
+      // 2026-09-20: 결과화면 최초 진입 트랩(freshResultNeverExplored/resultExitTrapPushed)이
+      // 아직 소비되지 않은 채로 남아있다면(=심층풀이를 처음 열어보는 순간), 그 자리를 새로
+      // 쌓지 않고 AI 트랩으로 갈아끼운다 — 안 그러면 스택이 한 칸 더 늘어나 나중에 "나가기"가
+      // 한 번에 완전히 빠져나가지 못하는 불일치가 생긴다.
+      if(resultExitTrapPushed){
+        history.replaceState({ view: 'aiGroupBackTrap' }, '');
+        resultExitTrapPushed = false;
+      } else {
+        history.pushState({ view: 'aiGroupBackTrap' }, '');
+      }
       aiGroupPushedState = true;
+      freshResultNeverExplored = false;
     }
   } else if(groupKey === 'palja_group'){
     aiGroupPushedState = false;
@@ -4059,6 +4259,15 @@ function activateGroup(groupKey){
   // 2026-08-25 이어지는 스크롤 개편: 무료 5개 그룹은 하나의 스크롤로 항상 같이 보이고,
   // 심층풀이(ai)만 별도 화면으로 전환된다 — #view-result에 ai-mode 클래스로 표시.
   $('#view-result').classList.toggle('ai-mode', groupKey === 'ai');
+}
+// 2026-09-20 신규: 십성~종합풀이 블러 락 상태를 화면에 반영한다. contentUnlocked가 false면
+// #lockedContentZone에 .locked를 씌워 블러+잠금 배지를 보여주고, 안내 CTA 카드(#lockedZoneCta)도
+// 계속 노출한다. true면 블러를 걷고 안내 카드는 더 이상 필요 없으니 숨긴다.
+function applyContentLockState(){
+  const zone = $('#lockedContentZone');
+  if(zone) zone.classList.toggle('locked', !contentUnlocked);
+  const cta = $('#lockedZoneCta');
+  if(cta) cta.hidden = contentUnlocked;
 }
 $$('#tabbar button').forEach(btn=>{
   btn.addEventListener('click', ()=> activateGroup(btn.dataset.group));
@@ -4660,6 +4869,11 @@ $('#mockPayBtn').addEventListener('click', async ()=>{
     pendingPaymentId = paymentId;
     closePayModal();
     aiUnlocked = true;
+    // 2026-09-20: PC(팝업) 결제가 방금 이 자리에서 완료된 것이므로, 무료 스크롤의 블러 락도
+    // 함께 해제하고 곧바로 스냅샷에 반영해둔다(이후 새로고침해도 풀린 상태가 유지되도록).
+    contentUnlocked = true;
+    applyContentLockState();
+    saveResultSnapshot();
     await runAiInterpretation();
   } catch(err){
     alert('결제 진행 중 오류가 발생했어요. (' + err.message + ')');
@@ -4858,14 +5072,27 @@ window.addEventListener('popstate', ()=>{
     history.pushState({ view: 'freeScrollBackTrap' }, '');
     resultExitTrapPushed = true;
   } else if(resultExitTrapPushed){
-    // 기본사주(자유 스크롤) 화면에서 뒤로가기 → 곧장 이탈하는 대신 종료 확인 모달을 보여준다.
     resultExitTrapPushed = false;
-    $('#exitConfirmModal').hidden = false;
+    if(freshResultNeverExplored){
+      // 2026-09-20: 결과화면에 진입한 뒤 심층풀이를 한 번도 열어본 적 없는 "완전히 새 결과"
+      // 상태에서의 첫 뒤로가기 — 잃을 진행상황(AI/결제)이 없으므로 종료 확인 없이 곧장
+      // 입력 화면으로 복귀한다. 입력값은 DOM에 그대로 남아있어 다시 입력할 필요가 없다.
+      freshResultNeverExplored = false;
+      $('#view-result').hidden = true;
+      $('#tabbar').hidden = true;
+      $('#backBtn').hidden = true;
+      $('#view-input').hidden = false;
+      clearResultSnapshot();
+    } else {
+      // 기본사주(자유 스크롤) 화면에서 뒤로가기 → 곧장 이탈하는 대신 종료 확인 모달을 보여준다.
+      $('#exitConfirmModal').hidden = false;
+    }
   } else {
     aiResultPushedState = false;
     aiStepPushedState = false;
     aiGroupPushedState = false;
     resultExitTrapPushed = false;
+    freshResultNeverExplored = false;
   }
 });
 $('#exitConfirmCancel').addEventListener('click', ()=>{
@@ -4879,6 +5106,7 @@ $('#exitConfirmLeave').addEventListener('click', ()=>{
   // "나가기": 트랩 상태는 이미 popstate에서 한 번 소비된 상태이므로, 뒤로가기를 한 번 더
   // 실행해 이 페이지 이전의 실제 브라우저 히스토리로 빠져나가게 한다(사이트 이탈).
   $('#exitConfirmModal').hidden = true;
+  clearResultSnapshot(); // 2026-09-20: 사용자가 명시적으로 나가기를 선택했으니 새로고침 복구용 스냅샷도 정리
   history.back();
 });
 
@@ -5597,6 +5825,89 @@ function restorePaymentResumeSnapshotIfAny(){
   pendingRestorePetData = snap.petData || null;
   setTimeout(()=>{ $('#submitBtn').click(); }, 50);
 }
+// ---- 새로고침 시 무료 결과 복구 (2026-09-20 QA 대응) ----
+// 위 두 스냅샷(로그인/결제 리디렉션)은 "특정 액션 직전"에 저장해뒀다가 딱 한 번만 쓰고
+// 지우는 1회성 복원이지만, 이건 그냥 같은 브라우저 세션(탭)에서 사용자가 실수로 또는
+// 의도적으로 새로고침했을 때를 위한 것이라 sessionStorage를 쓰고, 복원 후에도 지우지 않는다
+// (다시 새로고침해도 계속 복원돼야 하므로) — 입력화면으로 직접 돌아가거나(#backBtn) 종료
+// 확인에서 "나가기"를 누르면 그때 지운다(clearResultSnapshot). 계산 결과 텍스트 자체가 아니라
+// 입력 파라미터만 저장해뒀다가 그대로 재계산하는 방식이라 저장 데이터가 작고, 항상 최신
+// 계산 로직으로 다시 그려진다(캐시 불일치 위험 없음).
+const RESULT_SNAPSHOT_KEY = 'sajuResultSnapshot_v1';
+function saveResultSnapshot(){
+  try{
+    const snapshot = {
+      name: $('#inpName').value || '',
+      calType: mainLunarInput.getCalType(),
+      solarDate: $('#inpDate').value || '',
+      lunarYear: $('#inpLunarYear').value || '',
+      lunarMonth: $('#inpLunarMonth').value || '',
+      lunarDay: $('#inpLunarDay').value || '',
+      lunarLeap: $('#inpLunarLeap').checked,
+      dateBtnLabel: $('#dateBtnVal').textContent,
+      unknownTime: $('#inpUnknown').checked,
+      time: $('#inpTime').value || '',
+      timeBtnLabel: $('#timeBtnVal').textContent,
+      gender: selectedGender,
+      cityLon: citySelect.value,
+      cityLabel: $('#cityBtnVal').textContent,
+      // 2026-09-20: 십성~종합풀이 블러 락을 이미 결제로 풀어둔 상태라면, 새로고침해도 다시
+      // 잠기지 않도록 그 상태까지 함께 저장한다.
+      contentUnlocked: contentUnlocked,
+    };
+    sessionStorage.setItem(RESULT_SNAPSHOT_KEY, JSON.stringify(snapshot));
+  } catch(err){ /* 저장소를 못 쓰는 환경이면 새로고침 복구만 안 될 뿐, 화면 자체는 정상 동작 */ }
+}
+function clearResultSnapshot(){
+  try{ sessionStorage.removeItem(RESULT_SNAPSHOT_KEY); } catch(err){}
+}
+function restoreResultSnapshotIfAny(){
+  // 로그인/결제 리디렉션 복원이 이미 예약돼 있으면(pendingRestoreGroup==='ai') 그쪽이 우선—
+  // 이 함수는 아무 것도 하지 않고 조용히 종료한다.
+  if(pendingRestoreGroup) return;
+  let raw;
+  try{ raw = sessionStorage.getItem(RESULT_SNAPSHOT_KEY); } catch(err){ return; }
+  if(!raw) return;
+  let snap;
+  try{ snap = JSON.parse(raw); } catch(err){ return; }
+  if(!snap || (!snap.solarDate && !snap.lunarYear)) return; // 복원할 실제 입력이 없으면 조용히 종료
+  $('#inpName').value = snap.name || '';
+  if(snap.calType === 'lunar'){
+    const lunarBtn = $('#inpCalSeg button[data-val="lunar"]');
+    if(lunarBtn && !lunarBtn.classList.contains('active')) lunarBtn.click();
+    if(snap.lunarYear) $('#inpLunarYear').value = snap.lunarYear;
+    if(snap.lunarMonth){ $('#inpLunarMonth').value = snap.lunarMonth; $('#inpLunarMonth').dispatchEvent(new Event('change')); }
+    if(snap.lunarDay) $('#inpLunarDay').value = snap.lunarDay;
+    $('#inpLunarLeap').checked = !!snap.lunarLeap;
+  } else if(snap.solarDate){
+    $('#inpDate').value = snap.solarDate;
+  }
+  if(snap.dateBtnLabel){
+    $('#dateBtnVal').textContent = snap.dateBtnLabel;
+    $('#dateBtnVal').classList.remove('placeholder');
+  }
+  $('#inpUnknown').checked = !!snap.unknownTime;
+  $('#timeBtn').classList.toggle('disabled', !!snap.unknownTime);
+  if(!snap.unknownTime && snap.time){ $('#inpTime').value = snap.time; }
+  if(snap.timeBtnLabel){
+    $('#timeBtnVal').textContent = snap.timeBtnLabel;
+    $('#timeBtnVal').classList.remove('placeholder');
+  }
+  if(snap.gender){
+    const gBtn = $(`#genderSeg button[data-val="${snap.gender}"]`);
+    if(gBtn) gBtn.click();
+  }
+  if(snap.cityLon){
+    citySelect.value = snap.cityLon;
+    if(snap.cityLabel) $('#cityBtnVal').textContent = snap.cityLabel;
+  }
+  updateDayStemPreview();
+  // 어느 탭을 보고 있었는지까지는 저장하지 않음 — 항상 기본(사주팔자) 탭으로 복원(단순하고 안전한 범위).
+  // 2026-09-20: 블러 락 해제 상태도 함께 복원 — #submitBtn 클릭(재계산) 핸들러가
+  // pendingRestoreContentUnlocked를 읽어 contentUnlocked에 반영한다.
+  pendingRestoreContentUnlocked = !!snap.contentUnlocked;
+  setTimeout(()=>{ $('#submitBtn').click(); }, 50);
+}
 async function loginWithKakao(){
   if(!sb){ alert('로그인 기능을 불러오지 못했어요. 잠시 후 다시 시도해주세요.'); return; }
   saveFormSnapshot();
@@ -5649,6 +5960,7 @@ initAuth();
 // 두 스냅샷은 서로 다른 localStorage 키를 쓰므로 평소엔 최대 하나만 존재한다.
 restorePaymentResumeSnapshotIfAny();
 restoreFormSnapshotIfAny();
+restoreResultSnapshotIfAny(); // 2026-09-20: 위 두 복원이 해당 없을 때만(pendingRestoreGroup 미설정) 동작
 })();
 </script>
 <script>
