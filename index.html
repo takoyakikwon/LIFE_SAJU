@@ -5725,8 +5725,11 @@ async function refreshInquiryList(startISO, endISO){
   const inquiryEl = $('#adminInquiryList');
   if(!inquiryEl || !sb) return;
   inquiryEl.innerHTML = '<div class="history-empty">불러오는 중...</div>';
+  // 2026-09-24: admin_reply/replied_at을 select에 추가 — 예전엔 렌더 코드가 q.admin_reply를
+  // 참조하면서도 정작 select에는 빠져 있어서, DB에 답변이 저장돼 있어도 화면엔 항상 안 보이는
+  // 상태였다(아래 CS 답변 작성 기능을 추가하며 함께 바로잡음).
   let q = sb.from('cs_inquiries')
-    .select('id,subject,message,status,guest_contact,created_at,profiles(nickname)')
+    .select('id,subject,message,status,guest_contact,created_at,admin_reply,replied_at,profiles(nickname)')
     .order('created_at', { ascending:false })
     .limit(200);
   if(startISO) q = q.gte('created_at', startISO);
@@ -5738,6 +5741,17 @@ async function refreshInquiryList(startISO, endISO){
     return;
   }
   lastInquiriesData = inquiries || [];
+  renderInquiryList(inquiryEl, lastInquiriesData);
+}
+// 2026-09-24: CS 문의 답변 작성 기능. 이 서비스엔 아직 이메일 자동 발송 인프라가 없어서
+// (Resend 등 별도 서비스 가입+도메인 인증이 필요), 여기서는 답변을 cs_inquiries.admin_reply에
+// 저장하고 status를 'answered'로 바꾸는 것까지만 한다 — 실제 고객 전달은 guest_contact(또는
+// 회원 연락처)를 복사해 운영자가 직접 이메일로 보내는 기존 방식 그대로 유지(admin_reply는
+// 그 답변 초안·기록 보관 + CS 상태 추적 목적). cs_inquiries_update RLS 정책(is_admin())이
+// 이미 있어 관리자 세션이면 update가 바로 통과된다.
+// renderPurchaseList와 같은 패턴으로 fetch(refreshInquiryList)와 render(이 함수)를 분리해둬서,
+// 답변 저장 후 재조회 없이 로컬 데이터만 갱신해 다시 그릴 수 있게 했다.
+function renderInquiryList(inquiryEl, inquiries){
   if(!inquiries || !inquiries.length){
     inquiryEl.innerHTML = '<div class="history-empty">해당 기간에 등록된 CS 문의가 없어요.</div>';
     return;
@@ -5746,19 +5760,86 @@ async function refreshInquiryList(startISO, endISO){
   inquiryEl.innerHTML = inquiries.map(q=>{
     const who = escapeHtml((q.profiles && q.profiles.nickname) || q.guest_contact || '비회원');
     const statusLabel = escapeHtml(CS_STATUS_LABEL[q.status] || q.status);
-    return `<div class="history-item">
+    const contactLine = q.guest_contact
+      ? `<div class="history-meta">📧 ${escapeHtml(q.guest_contact)} <button class="inquiry-copy-btn" type="button" data-copy="${escapeHtml(q.guest_contact)}" style="margin-left:6px;padding:2px 10px;border-radius:12px;border:1px solid rgba(212,175,99,.4);background:transparent;color:inherit;cursor:pointer;font-size:12px;">연락처 복사</button></div>`
+      : '';
+    const existingReply = q.admin_reply || '';
+    const replyPreview = existingReply
+      ? `<div style="margin-top:8px;padding:8px 10px;border-left:2px solid var(--gold,#d4af63);white-space:pre-wrap;font-size:13px;opacity:.85;">[답변]\n${escapeHtml(existingReply)}${q.replied_at ? ('\n— ' + formatDateTime(q.replied_at)) : ''}</div>`
+      : '';
+    return `<div class="history-item" data-inquiry-id="${escapeHtml(String(q.id))}">
         <div class="history-item-top">
           <span class="history-cat">${escapeHtml(q.subject)}</span>
           <span class="history-status ${escapeHtml(q.status)}">${statusLabel}</span>
         </div>
         <div class="history-meta">👤 ${who} · ${formatDateTime(q.created_at)}</div>
-        <div class="history-result" hidden>${escapeHtml(q.message)}${q.admin_reply ? ('\n\n[답변]\n' + escapeHtml(q.admin_reply)) : ''}</div>
+        ${contactLine}
+        <div class="history-result" hidden>
+          <div>${escapeHtml(q.message)}</div>
+          ${replyPreview}
+          <button class="inquiry-reply-toggle-btn" type="button" style="margin-top:8px;padding:6px 14px;border-radius:20px;border:1px solid var(--gold,#d4af63);background:transparent;color:inherit;cursor:pointer;font-size:13px;">${existingReply ? '답변 수정' : '답변 작성'}</button>
+          <div class="inquiry-reply-form" hidden style="margin-top:10px;display:flex;flex-direction:column;gap:6px;">
+            <textarea class="inquiry-reply-textarea" rows="4" placeholder="고객에게 보낼 답변 내용을 입력하세요" style="width:100%;min-height:80px;padding:8px;border-radius:8px;border:1px solid rgba(212,175,99,.35);background:rgba(0,0,0,.2);color:inherit;font-family:inherit;font-size:14px;box-sizing:border-box;">${escapeHtml(existingReply)}</textarea>
+            <div>
+              <button class="inquiry-reply-save-btn" type="button" style="padding:6px 14px;border-radius:20px;border:1px solid var(--gold,#d4af63);background:var(--gold,#d4af63);color:#1a1410;cursor:pointer;font-size:13px;font-weight:600;">답변 저장</button>
+              <span class="inquiry-reply-msg" style="margin-left:8px;font-size:12px;opacity:.75;"></span>
+            </div>
+          </div>
+        </div>
       </div>`;
   }).join('');
   inquiryEl.querySelectorAll('.history-item').forEach(el=>{
-    el.addEventListener('click', ()=>{
+    el.addEventListener('click', (e)=>{
+      if(e.target.closest('.inquiry-copy-btn') || e.target.closest('.inquiry-reply-toggle-btn') || e.target.closest('.inquiry-reply-form')) return;
       const box = el.querySelector('.history-result');
       if(box){ box.hidden = !box.hidden; }
+    });
+  });
+  inquiryEl.querySelectorAll('.inquiry-copy-btn').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const text = btn.dataset.copy || '';
+      const done = ()=>{ const orig = btn.textContent; btn.textContent = '복사됨'; setTimeout(()=>{ btn.textContent = orig; }, 1200); };
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(done).catch(()=>{ alert('복사에 실패했어요. 직접 선택해서 복사해주세요.'); });
+      }
+    });
+  });
+  inquiryEl.querySelectorAll('.inquiry-reply-toggle-btn').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const form = btn.nextElementSibling;
+      if(form){ form.hidden = !form.hidden; }
+    });
+  });
+  inquiryEl.querySelectorAll('.inquiry-reply-save-btn').forEach(btn=>{
+    btn.addEventListener('click', async (e)=>{
+      e.stopPropagation();
+      const item = btn.closest('.history-item');
+      const id = item && item.dataset.inquiryId;
+      const form = btn.closest('.inquiry-reply-form');
+      const textarea = form.querySelector('.inquiry-reply-textarea');
+      const msgEl = form.querySelector('.inquiry-reply-msg');
+      const replyText = (textarea.value || '').trim();
+      if(!replyText){ msgEl.textContent = '답변 내용을 입력해주세요.'; return; }
+      if(!sb || !id) return;
+      btn.disabled = true;
+      const origLabel = btn.textContent;
+      btn.textContent = '저장 중...';
+      const repliedAt = new Date().toISOString();
+      const { error } = await sb.from('cs_inquiries')
+        .update({ admin_reply: replyText, status: 'answered', replied_at: repliedAt })
+        .eq('id', id);
+      btn.disabled = false;
+      btn.textContent = origLabel;
+      if(error){
+        msgEl.textContent = '저장 실패: ' + error.message;
+        return;
+      }
+      msgEl.textContent = '저장됐어요. 위 연락처로 이 답변을 복사해서 직접 보내주세요.';
+      const target = lastInquiriesData.find(r => String(r.id) === String(id));
+      if(target){ target.admin_reply = replyText; target.status = 'answered'; target.replied_at = repliedAt; }
+      renderInquiryList(inquiryEl, lastInquiriesData);
     });
   });
 }
