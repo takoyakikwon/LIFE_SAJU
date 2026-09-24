@@ -1331,6 +1331,7 @@ window.SajuAnalytics = (function(){
   .city-item.sel{color:var(--gold); font-weight:800;}
   .city-empty{padding:26px 4px; text-align:center; color:var(--ink-faint); font-size:12.5px; line-height:1.6;}
 </style>
+<script src="https://developers.kakao.com/sdk/js/kakao.js"></script>
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute">
@@ -5238,16 +5239,58 @@ async function runAiInterpretation(){
 // 결과 화면 하단 안내 문구를 로그인 여부에 따라 다르게 그린다.
 // - 로그인 사용자: 기존처럼 "내 결제내역"에서 15일간 재열람 + PDF 저장 가능 안내
 // - 비회원: 다시 볼 수 없다는 점을 명확히 알리고, 지금 바로 PDF로 저장할 수 있는 버튼을 제공
+
+// 카카오톡 공유하기 — 심층풀이 결과 제목만 공유 (전체 텍스트 아님)
+const KAKAO_JS_KEY = 'f65da1661e7377b0b784cfd605523566';
+function initKakaoIfNeeded(){
+  if(window.Kakao && !Kakao.isInitialized()){
+    Kakao.init(KAKAO_JS_KEY);
+  }
+}
+// 받는 친구 입장에서 뜨는 제목 — 보낸 사람 본인 이름을 넣어 "OO님 사주는 어떤지
+// 같이 확인해볼까요?"처럼 직접적인 초대 문구로 만든다. lastName은 이미 buildAiPayload()가
+// payload.name으로 쓰고 있는 기존 전역변수라 새 입력 UI가 필요 없다. 이름이 없으면 "이 사람"으로 대체.
+// 보조 설명(description)은 쓰지 않는다 — 제목 한 줄만으로 궁금증을 유발하는 편이 낫다는 판단.
+function buildShareTitle(){
+  const label = (lastName || '').trim();
+  return `${label ? label + '님' : '이 사람'} 사주는 어떤지 같이 확인해볼까요?`;
+}
+function shareAiResultToKakao(){
+  initKakaoIfNeeded();
+  if(!window.Kakao || !Kakao.isInitialized()){
+    alert('카카오톡 공유 기능을 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
+    return;
+  }
+  const title = buildShareTitle();
+  const siteUrl = 'https://sajugyeol.co.kr/?ref=kakao_share';
+  Kakao.Share.sendDefault({
+    objectType: 'feed',
+    content: {
+      title,
+      imageUrl: 'https://sajugyeol.co.kr/icons/icon-512.png',
+      link: { mobileWebUrl: siteUrl, webUrl: siteUrl },
+    },
+    buttons: [
+      { title: '무료로 내 사주 보기', link: { mobileWebUrl: siteUrl, webUrl: siteUrl } },
+    ],
+  });
+}
+document.addEventListener('click', function(e){
+  const shareBtn = e.target.closest && e.target.closest('#aiResultShareBtn');
+  if(shareBtn) shareAiResultToKakao();
+});
+window.addEventListener('load', initKakaoIfNeeded);
+
 function renderAiResultNote(){
   const note = $('#aiResultNote');
   if(!note) return;
   if(currentSession){
     note.innerHTML = '📌 이 결과는 <b>마이페이지 &gt; 내 결제내역</b>에서 15일 동안 다시 볼 수 있고, PDF로도 저장할 수 있어요.'
-      + '<button class="ai-result-note-btn" id="aiResultHistoryBtn">내 결제내역 바로가기 →</button>';
+      + '<button class="ai-result-note-btn" id="aiResultHistoryBtn">내 결제내역 바로가기 →</button>' + '<button class="ai-result-note-btn" id="aiResultShareBtn">💬 카카오톡으로 공유하기</button>';
     $('#aiResultHistoryBtn').addEventListener('click', ()=>{ openHistoryModal(); });
   } else {
     note.innerHTML = '📌 비회원으로 결제하면 이 결과는 다시 볼 수 없어요. 지금 PDF로 저장해두시면 계속 보관할 수 있어요.'
-      + '<button class="ai-result-note-btn" id="aiResultPdfBtn">📄 지금 PDF로 저장하기</button>';
+      + '<button class="ai-result-note-btn" id="aiResultPdfBtn">📄 지금 PDF로 저장하기</button>' + '<button class="ai-result-note-btn" id="aiResultShareBtn">💬 카카오톡으로 공유하기</button>';
     $('#aiResultPdfBtn').addEventListener('click', (e)=>{ downloadCurrentResultPdf(e.currentTarget); });
   }
 }
