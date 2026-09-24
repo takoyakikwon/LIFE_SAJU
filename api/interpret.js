@@ -104,7 +104,10 @@ async function verifySupabaseUser(accessToken) {
 
 // purchases 테이블에 결제 1건을 기록한다(RLS 우회를 위해 서비스 롤 키 사용).
 // 실패해도 이미 생성된 AI 해석 응답 자체는 막지 않고, 서버 로그만 남긴다.
-async function recordPurchase({ userId, category, amount, payload, resultText, visitorId }) {
+// 2026-09-24: status 파라미터 추가(기본값 'paid', 기존 호출부는 그대로 동작). 아래
+// module.exports의 안전장치(OpenAI 생성 실패 시 status:'failed'로 기록)를 위해 추가한 것으로,
+// 결제 검증(verifyPortOnePayment)·금액·카테고리·계산 로직은 전혀 건드리지 않았다.
+async function recordPurchase({ userId, category, amount, payload, resultText, visitorId, status = 'paid' }) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     console.error('recordPurchase skipped: SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY not configured');
     return false;
@@ -126,7 +129,7 @@ async function recordPurchase({ userId, category, amount, payload, resultText, v
         visitor_id: visitorId || null,
         category,
         amount,
-        status: 'paid',
+        status,
         // 2026-08-30: 포트원(PortOne)+KG이니시스 테스트 채널로 실제 결제 검증을 통과한 건만
         // 여기 도달한다(위 verifyPortOnePayment 게이트 참고). 실연동 전환 시 이 문자열만
         // 'portone_inicis'로 바꾸면 테스트/실결제 건을 구분해서 조회할 수 있다.
@@ -514,7 +517,7 @@ function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 // 문자/숫자·일반 문장부호만 정상적으로 등장하므로, 응답을 사용자에게 보여주기 전에
 // 그 외 스크립트 범위를 후처리로 걸러낸다 — 근본 원인(모델의 토큰 선택 자체)은 고칠 수
 // 없지만, 사용자가 실제로 보는 화면에 이런 글자가 노출되는 것은 이 안전망으로 막는다.
-const UNEXPECTED_SCRIPT_RE = /[\u0590-\u05FF\u0600-\u06FF\u0700-\u074F\uFB50-\uFDFF\uFE70-\uFEFF\u0900-\u097F\u0980-\u09FF\u0A00-\u0A7F\u0E00-\u0E7F\u0400-\u04FF\u0500-\u052F\u0530-\u058F\u10A0-\u10FF\u1200-\u137F]/g;
+const UNEXPECTED_SCRIPT_RE = /[֐-׿؀-ۿ܀-ݏﭐ-﷿ﹰ-﻿ऀ-ॿঀ-৿਀-੿฀-๿Ѐ-ӿԀ-ԯ԰-֏Ⴀ-ჿሀ-፿]/g;
 function sanitizeAiText(text) {
   if (!text) return text;
   const cleaned = text.replace(UNEXPECTED_SCRIPT_RE, '').replace(/[ \t]{2,}/g, ' ');
@@ -646,6 +649,11 @@ module.exports = async (req, res) => {
     return;
   }
 
+  // access_token이 payload에 그대로 있으면 DB에 시크릿 성격의 값이 남으므로, 결제 검증
+  // 통과 직후(=이 시점부터는 실제로 돈이 청구된 결제라 아래 어떤 경로로 끝나든 흔적을
+  // 남겨야 하므로) 미리 한 번만 떼어둔다.
+  const { access_token, ...payloadWithoutToken } = payload;
+
   try {
     const first = await callOpenAI(apiKey, [
       { role: 'system', content: SYSTEM_PROMPT },
@@ -653,6 +661,28 @@ module.exports = async (req, res) => {
     ], maxTokens, model);
 
     if (!first.ok) {
+      // 2026-09-24 안전장치: 여기 도달했다는 건 바로 위 verifyPortOnePayment()가 이미
+      // 통과했다는 뜻 — 즉 결제(청구)는 실제로 이미 끝난 상태인데, OpenAI 호출이 끝내
+      // 실패해서 심층풀이를 못 만든 경우다. 예전엔 이 분기에서 바로 502를 반환하고 끝났기
+      // 때문에, 실제로 결제된 건이 purchases 테이블에 단 한 줄도 안 남는 문제가 있었다
+      // (2026-09-24 실제 사고: OpenAI 계정 크레딧 소진으로 결제 2건이 이렇게 흔적 없이
+      // 누락되어, 고객은 결제했는데 아무 결과도 못 받고 CS/관리자 페이지에서도 추적이
+      // 전혀 안 되는 상황이 발생했음). 결제 검증·금액·카테고리·계산 로직은 전혀 건드리지
+      // 않고, 이 실패를 status:'failed'로 최소한 기록만 남긴다 — recordPurchase 자체가
+      // 실패해도(Supabase 오류 등) 원래의 502 응답에는 절대 영향을 주지 않도록 감싼다.
+      try {
+        await recordPurchase({
+          userId: user ? user.id : null,
+          category: payload.category || 'comprehensive',
+          amount,
+          payload: payloadWithoutToken,
+          resultText: `[AI 생성 실패 — 결제는 완료됨] OpenAI 응답 오류 (status ${first.status})`,
+          visitorId: payload.visitorId || null,
+          status: 'failed',
+        });
+      } catch (recordErr) {
+        console.error('failed-purchase 기록 중 오류(원래 502 응답에는 영향 없음):', recordErr);
+      }
       res.status(502).json({ error: `AI 서버 응답 오류 (${first.status})` });
       return;
     }
@@ -681,8 +711,6 @@ module.exports = async (req, res) => {
     const finalText = text || '해석을 생성하지 못했습니다.';
 
     // 결제 기록 + 재열람용 캐시 저장. access_token 검증을 통과한 사용자이므로 여기서만 기록한다.
-    // (payload에 access_token이 그대로 들어있으면 DB에 시크릿 성격의 값이 남으므로 제외하고 저장)
-    const { access_token, ...payloadWithoutToken } = payload;
     await recordPurchase({
       userId: user ? user.id : null,
       category: payload.category || 'comprehensive',
