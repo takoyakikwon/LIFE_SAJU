@@ -5727,26 +5727,41 @@ async function downloadPurchasePdf(row, btnEl){
   const parsed = parseAiSections(row.result_text || '');
   const leadIn = (parsed[0] && !parsed[0].title) ? parsed[0].body : '';
   const sections = parsed.filter(s=>s.title);
+  const useStructured = sections.length >= 3;
   const catLabel = CATEGORY_LABEL[row.category] || row.category;
   const nameLabel0 = (row.name || '').trim();
 
-  const tocHtml = sections.length >= 3 ? `
+  const tocHtml = useStructured ? `
     <div style="display:flex; gap:10px; margin:22px 0 24px; padding:14px 16px; background:rgba(255,253,246,.55); border:1px solid rgba(178,59,46,.18); border-radius:10px;">
       <div style="flex:1; display:flex; flex-direction:column; gap:2px;">
         ${sections.map((s,i)=>`<div style="display:flex; align-items:center; gap:9px; padding:4px 2px; font-size:12px; color:#6b5c3f;"><span style="font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#b23b2e; width:18px;">${String(i+1).padStart(2,'0')}</span><span>${escapeHtml(s.title)}</span></div>`).join('')}
       </div>
     </div>` : '';
 
-  const bodyHtml = sections.length >= 3
+  const bodyHtml = useStructured
     ? sections.map((s,i)=>`
-      <div style="margin:22px 0;">
-        <div style="display:flex; align-items:center; gap:9px; margin-bottom:8px;">
+      <div style="margin:24px 0;">
+        <div style="display:flex; align-items:center; gap:9px; margin-bottom:9px;">
           <div style="width:22px; height:22px; border-radius:50%; background:rgba(178,59,46,.12); color:#b23b2e; font-family:'JetBrains Mono',monospace; font-size:11px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">${String(i+1).padStart(2,'0')}</div>
           <h3 style="font-family:'Noto Serif KR',serif; font-weight:700; font-size:14.5px; color:#241d13; margin:0;">${escapeHtml(s.title)}</h3>
         </div>
-        <p style="font-size:13px; line-height:1.85; color:#3a3020; padding-left:31px; white-space:pre-wrap; margin:0;">${escapeHtml(s.body)}</p>
+        <p style="font-size:13px; line-height:2; color:#3a3020; padding-left:31px; white-space:pre-wrap; margin:0;">${escapeHtml(s.body)}</p>
       </div>`).join('')
-    : `<p style="white-space:pre-wrap; font-size:13px; line-height:1.9; color:#3a3020; margin:0;">${escapeHtml(row.result_text||'저장된 해석 내용이 없어요.')}</p>`;
+    : String(row.result_text || '저장된 해석 내용이 없어요.')
+        .split(/\n\s*\n+/).map(p=>p.trim()).filter(Boolean)
+        .map(p=>{
+          // "1분기(1~3월) — ...", "총평 — ..." 처럼 한 문단 안에 소제목이 섞여 있는 경우
+          // (AI가 섹션을 줄바꿈으로 나누지 않고 한 문단에 이어 쓴 카테고리, 예: 신년운세)
+          // 앞의 소제목 부분만 굵게+포인트 컬러로 강조해 눈에 띄게 한다.
+          const dashIdx = p.indexOf('—');
+          const isLeadTitle = dashIdx > 0 && dashIdx <= 50 && !p.slice(0, dashIdx).includes('\n');
+          if(isLeadTitle){
+            const titlePart = p.slice(0, dashIdx).trim();
+            const restPart = p.slice(dashIdx + 1).trim();
+            return `<p style="font-size:13px; line-height:2; color:#3a3020; white-space:pre-wrap; margin:0 0 20px;"><strong style="font-family:'Noto Serif KR',serif; font-weight:700; color:#b23b2e;">${escapeHtml(titlePart)} —</strong> ${escapeHtml(restPart)}</p>`;
+          }
+          return `<p style="font-size:13px; line-height:2; color:#3a3020; white-space:pre-wrap; margin:0 0 20px;">${escapeHtml(p)}</p>`;
+        }).join('');
 
   wrap.innerHTML = `
     <div style="display:flex; align-items:center; gap:13px;">
@@ -5759,11 +5774,11 @@ async function downloadPurchasePdf(row, btnEl){
     </div>
     <div style="height:1.5px; margin:16px 0 14px; background:linear-gradient(90deg, #b8912f 0%, rgba(184,145,47,.1) 60%, transparent 100%);"></div>
     <div style="font-family:'Noto Serif KR',serif; font-weight:900; font-size:21px; color:#241d13; margin-bottom:4px;">${nameLabel0 ? escapeHtml(nameLabel0)+'님의 ' : ''}심층풀이</div>
-    <div style="display:flex; gap:16px; font-size:11px; color:#5c4d33; margin:6px 0 18px;">
+    <div style="display:flex; gap:16px; font-size:11px; color:#5c4d33; margin:6px 0 22px;">
       <div>결제일 ${formatDateTime(row.created_at)}</div>
       <div>결제금액 ${formatKRW(row.amount)}</div>
     </div>
-    ${leadIn ? `<p style="font-size:13px; line-height:1.85; color:#3a3020; white-space:pre-wrap; margin:0 0 6px;">${escapeHtml(leadIn)}</p>` : ''}
+    ${useStructured && leadIn ? `<p style="font-size:13px; line-height:2; color:#3a3020; white-space:pre-wrap; margin:0 0 6px;">${escapeHtml(leadIn)}</p>` : ''}
     ${tocHtml}
     ${bodyHtml}
     <div style="text-align:center; padding-top:18px; margin-top:26px; border-top:1px dashed rgba(178,59,46,.25); font-family:'Noto Serif KR',serif; font-size:10.5px; color:#8a7350; letter-spacing:.1em;">— 사 주 결 —</div>
