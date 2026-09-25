@@ -5428,7 +5428,8 @@ function downloadCurrentResultPdf(btnEl){
     category: selectedAiCategory || 'comprehensive',
     amount,
     created_at: new Date().toISOString(),
-    result_text: lastAiResultText
+    result_text: lastAiResultText,
+    name: (lastName || '').trim()
   };
   downloadPurchasePdf(row, btnEl);
 }
@@ -5584,7 +5585,8 @@ function escapeHtml(str){
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
-const CATEGORY_LABEL = { comprehensive:'종합 사주 해석', love:'연애·재회운', compatibility:'궁합&결혼', newyear:'2027 신년운세' };
+const CATEGORY_LABEL = { comprehensive:'종합 사주 해석', love:'연애·재회운', compatibility:'궁합&결혼', newyear:'2027 신년운세', wealth:'재물운', career:'취업·사업·이동운', pet:'반려동물궁합' };
+const CATEGORY_FILE_LABEL = { comprehensive:'종합사주', love:'연애운', compatibility:'궁합', newyear:'신년운세', wealth:'재물운', career:'취업사업운', pet:'반려동물궁합' };
 const PURCHASE_STATUS_LABEL = { paid:'결제완료', pending:'대기중', failed:'실패', refunded:'환불됨' };
 // 결제한 리포트를 "내 결제내역"에서 다시 볼 수 있는 기간(일). 이 기간이 지나면 화면에서는
 // 더 이상 다시 열어볼 수 없지만(서버 데이터는 그대로 남아있음), 그 안에 PDF로 받아두면
@@ -5694,7 +5696,7 @@ function renderPurchaseList(container, rows, showOwner){
     btn.addEventListener('click', (e)=>{
       e.stopPropagation();
       const row = rows.find(r=>String(r.id)===btn.dataset.purchaseId);
-      if(row) downloadPurchasePdf(row, btn);
+      if(row) downloadPurchasePdf({ ...row, name: (currentProfile && currentProfile.nickname) || '' }, btn);
     });
   });
 }
@@ -5752,8 +5754,12 @@ async function downloadPurchasePdf(row, btnEl){
       // JPEG(품질 0.92)로 저장 — 흰 배경+검은 글씨 위주라 PNG보다 훨씬 작아지면서도 읽기엔 충분히 선명하다.
       pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, pageW, sliceImgH);
     }
-    const safeDate = formatDateTime(row.created_at).replace(/[.: ]/g,'');
-    pdf.save(`사주결_${CATEGORY_LABEL[row.category]||row.category}_${safeDate}.pdf`);
+    const nameLabel = (row.name || '').trim();
+    const catFileLabel = CATEGORY_FILE_LABEL[row.category] || CATEGORY_LABEL[row.category] || row.category;
+    const dd = new Date(row.created_at);
+    const pad2 = v => String(v).padStart(2,'0');
+    const dateOnly = `${dd.getFullYear()}${pad2(dd.getMonth()+1)}${pad2(dd.getDate())}`;
+    pdf.save(`${nameLabel ? nameLabel+'님_' : '사주결_'}${catFileLabel} 해석_${dateOnly}.pdf`);
   } catch(err){
     alert('PDF를 만드는 중 문제가 생겼어요. 다시 시도해주세요.');
   } finally {
