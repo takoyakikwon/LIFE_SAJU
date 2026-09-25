@@ -5438,6 +5438,7 @@ async function shareAiResultToKakao(){
     objectType: 'feed',
     content: {
       title,
+      description: `👉 ${shareUrl}`,
       imageUrl: 'https://sajugyeol.co.kr/kakao-share.jpg',
       link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
     },
