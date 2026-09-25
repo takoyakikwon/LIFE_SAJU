@@ -922,6 +922,9 @@ window.SajuAnalytics = (function(){
     animation:spin 0.8s linear infinite;
   }
   @keyframes spin{ to{ transform:rotate(360deg); } }
+  .ai-loading-eta{
+    font-size:11.5px; color:var(--ink-soft); opacity:0.75;
+  }
   .ai-result-text{
     font-size:13.5px; line-height:1.9; color:var(--ink);
     background:var(--paper-card); border:1px solid var(--line); border-radius:var(--radius-sm);
@@ -1909,6 +1912,7 @@ window.SajuAnalytics = (function(){
           <div class="ai-loading-box">
             <div class="ai-spinner"></div>
             <div>사주를 읽고 있어요…</div>
+            <div class="ai-loading-eta" id="aiLoadingEta">보통 15~30초 정도 걸려요</div>
           </div>
         </div>
         <div id="aiResult" hidden>
@@ -3726,6 +3730,7 @@ let contentUnlocked = false;
 // 결제 버튼 중복 클릭/이중 요청 방지용 플래그. 이게 없으면 버튼을 빠르게 두 번 누르거나
 // 네트워크가 느릴 때 AI 호출(OpenAI 과금)과 purchases 기록이 중복으로 발생할 수 있다.
 let aiInterpretInFlight = false;
+let aiLoadingEtaTimer = null;
 // 비회원 구매 시 재열람이 안 되므로(내 결제내역에 안 남음), 결과 화면에서 바로 PDF로 저장할 수
 // 있도록 마지막으로 받은 해석 텍스트를 잠깐 들고 있는다. 로그인 사용자도 이 버튼으로 즉시 저장 가능.
 let lastAiResultText = '';
@@ -5215,6 +5220,27 @@ function renderAiResult(container, text){
     secEls.forEach(el=>io.observe(el));
   }
 }
+function startAiLoadingEta(){
+  const el = $('#aiLoadingEta');
+  if(!el) return;
+  const messages = [
+    { at: 0,  text: '보통 15~30초 정도 걸려요' },
+    { at: 10, text: '사주 데이터를 분석하고 있어요…' },
+    { at: 25, text: '조금만 더 기다려주세요, 거의 다 됐어요' }
+  ];
+  let elapsed = 0;
+  const render = () => {
+    let msg = null;
+    messages.forEach(m => { if(elapsed >= m.at) msg = m; });
+    el.textContent = msg ? msg.text : '';
+  };
+  render();
+  stopAiLoadingEta();
+  aiLoadingEtaTimer = setInterval(() => { elapsed += 1; render(); }, 1000);
+}
+function stopAiLoadingEta(){
+  if(aiLoadingEtaTimer){ clearInterval(aiLoadingEtaTimer); aiLoadingEtaTimer = null; }
+}
 async function runAiInterpretation(){
   if(aiInterpretInFlight) return; // 이중 호출 방지 (버튼 가드와 별개로 함수 자체도 재진입을 막아둠)
   const payload = buildAiPayload();
@@ -5224,6 +5250,7 @@ async function runAiInterpretation(){
   $('#aiError').hidden = true;
   $('#aiResult').hidden = true;
   $('#aiLoading').hidden = false;
+  startAiLoadingEta();
   try{
     const res = await fetch('/api/interpret', {
       method: 'POST',
@@ -5236,6 +5263,7 @@ async function runAiInterpretation(){
     }
     const data = await res.json();
     $('#aiLoading').hidden = true;
+    stopAiLoadingEta();
     lastAiResultText = data.interpretation || '해석 결과를 받아오지 못했어요.';
     // Meta Pixel: 서버(api/interpret.js)가 포트원 결제를 실제로 재조회·검증한 뒤에만
     // 도달하는 이 지점에서만 Purchase를 발생시킨다 (2026-09-23). 결제 실패/취소/중단이면
@@ -5264,6 +5292,7 @@ async function runAiInterpretation(){
     }
   } catch(err){
     $('#aiLoading').hidden = true;
+    stopAiLoadingEta();
     $('#aiError').hidden = false;
     const isLoginError = /로그인/.test(err.message);
     $('#aiError').textContent = isLoginError
