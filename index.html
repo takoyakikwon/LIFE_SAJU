@@ -5705,25 +5705,24 @@ function renderPurchaseList(container, rows, showOwner){
 // 보관할 수 있도록, 저장된 AI 해석을 PDF로 내려받는 기능. 서버에서 PDF를 만드는 게 아니라
 // 브라우저에서 인쇄용 레이아웃을 잠깐 그린 뒤 그걸 그대로 이미지로 캡처해 PDF에 붙이는
 // 방식(html2canvas+jsPDF)이라, 한글 폰트를 PDF 라이브러리에 별도로 심어줄 필요가 없다.
-async function downloadPurchasePdf(row, btnEl){
-  if(!window.jspdf || !window.html2canvas){
-    alert('PDF 생성 도구를 아직 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
-    return;
-  }
-  const origLabel = btnEl ? btnEl.textContent : '';
-  if(btnEl){ btnEl.disabled = true; btnEl.textContent = '만드는 중...'; }
-  const wrap = document.createElement('div');
-  wrap.style.position = 'fixed';
-  wrap.style.left = '-9999px';
-  wrap.style.top = '0';
-  wrap.style.width = '760px';
-  wrap.style.padding = '236px 54px 210px';
-  // 사용자가 업로드한 매화 장식 배경을 위/아래에 각각 원본 비율로 고정 배치하고,
-  // 그 사이는 종이 톤 단색으로 채운다. 문서 길이가 얼마든 위/아래 프레임 장식이 항상 정확히 보인다.
-  wrap.style.background = "url('https://sajugyeol.co.kr/pdf-bg-comprehensive.jpg') top center / 100% auto no-repeat, url('https://sajugyeol.co.kr/pdf-bg-comprehensive.jpg') bottom center / 100% auto no-repeat, #f4ecd8";
-  wrap.style.color = '#241d13';
-  wrap.style.fontFamily = "'Noto Sans KR', sans-serif";
+// ===== PDF 리포트: 배경 이미지를 A4 한 페이지짜리 고정 템플릿으로 취급하는 진짜 페이지네이션 엔진 =====
+// pdf-bg-comprehensive.jpg(매화 장식 배경)를 실측 분석해 장식(테두리·산수·매화·천문)이 없는
+// 안전영역만 계산했다. 본문은 이 안전영역 안에서만 흐르고, 넘치면 폰트를 줄이는 대신 페이지를
+// 늘린다. 배경은 페이지마다 새로 붙이며(늘리거나 여러 페이지에 걸쳐 재사용하지 않음), 각 페이지는
+// html2canvas로 따로 캡처해 jsPDF 페이지에 정확히 채운다.
+const PDF_PAGE_W = 595.28, PDF_PAGE_H = 841.89; // A4, pt (jsPDF 'a4' 기준과 동일)
+const PDF_MARGIN = {
+  top: PDF_PAGE_H * 0.20,
+  bottom: PDF_PAGE_H * 0.25,
+  left: PDF_PAGE_W * 0.23,
+  right: PDF_PAGE_W * 0.23,
+};
+const PDF_CONTENT_W = PDF_PAGE_W - PDF_MARGIN.left - PDF_MARGIN.right;
+const PDF_CONTENT_H = PDF_PAGE_H - PDF_MARGIN.top - PDF_MARGIN.bottom;
+const PDF_BG_URL = 'https://sajugyeol.co.kr/pdf-bg-comprehensive.jpg';
+const PDF_PAPER_FALLBACK = '#f4ecd8';
 
+function buildPdfBlocks(row){
   const parsed = parseAiSections(row.result_text || '');
   const leadIn = (parsed[0] && !parsed[0].title) ? parsed[0].body : '';
   const sections = parsed.filter(s=>s.title);
@@ -5731,85 +5730,172 @@ async function downloadPurchasePdf(row, btnEl){
   const catLabel = CATEGORY_LABEL[row.category] || row.category;
   const nameLabel0 = (row.name || '').trim();
 
-  const tocHtml = useStructured ? `
-    <div style="display:flex; gap:10px; margin:22px 0 24px; padding:14px 16px; background:rgba(255,253,246,.55); border:1px solid rgba(178,59,46,.18); border-radius:10px;">
-      <div style="flex:1; display:flex; flex-direction:column; gap:2px;">
-        ${sections.map((s,i)=>`<div style="display:flex; align-items:center; gap:9px; padding:4px 2px; font-size:12px; color:#6b5c3f;"><span style="font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#b23b2e; width:18px;">${String(i+1).padStart(2,'0')}</span><span>${escapeHtml(s.title)}</span></div>`).join('')}
-      </div>
-    </div>` : '';
-
-  const bodyHtml = useStructured
-    ? sections.map((s,i)=>`
-      <div style="margin:24px 0;">
-        <div style="display:flex; align-items:center; gap:9px; margin-bottom:9px;">
-          <div style="width:22px; height:22px; border-radius:50%; background:rgba(178,59,46,.12); color:#b23b2e; font-family:'JetBrains Mono',monospace; font-size:11px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">${String(i+1).padStart(2,'0')}</div>
-          <h3 style="font-family:'Noto Serif KR',serif; font-weight:700; font-size:14.5px; color:#241d13; margin:0;">${escapeHtml(s.title)}</h3>
-        </div>
-        <p style="font-size:13px; line-height:2; color:#3a3020; padding-left:31px; white-space:pre-wrap; margin:0;">${escapeHtml(s.body)}</p>
-      </div>`).join('')
-    : String(row.result_text || '저장된 해석 내용이 없어요.')
-        .split(/\n\s*\n+/).map(p=>p.trim()).filter(Boolean)
-        .map(p=>{
-          // "1분기(1~3월) — ...", "총평 — ..." 처럼 한 문단 안에 소제목이 섞여 있는 경우
-          // (AI가 섹션을 줄바꿈으로 나누지 않고 한 문단에 이어 쓴 카테고리, 예: 신년운세)
-          // 앞의 소제목 부분만 굵게+포인트 컬러로 강조해 눈에 띄게 한다.
-          const dashIdx = p.indexOf('—');
-          const isLeadTitle = dashIdx > 0 && dashIdx <= 50 && !p.slice(0, dashIdx).includes('\n');
-          if(isLeadTitle){
-            const titlePart = p.slice(0, dashIdx).trim();
-            const restPart = p.slice(dashIdx + 1).trim();
-            return `<p style="font-size:13px; line-height:2; color:#3a3020; white-space:pre-wrap; margin:0 0 20px;"><strong style="font-family:'Noto Serif KR',serif; font-weight:700; color:#b23b2e;">${escapeHtml(titlePart)} —</strong> ${escapeHtml(restPart)}</p>`;
-          }
-          return `<p style="font-size:13px; line-height:2; color:#3a3020; white-space:pre-wrap; margin:0 0 20px;">${escapeHtml(p)}</p>`;
-        }).join('');
-
-  wrap.innerHTML = `
-    <div style="display:flex; align-items:center; gap:13px;">
-      <div style="width:44px; height:44px; border-radius:9px; flex-shrink:0; background:linear-gradient(160deg, #c4432f, #b23b2e 60%, #8f2519); color:#f7ecd2; display:flex; align-items:center; justify-content:center; font-family:'Noto Serif KR',serif; font-weight:900; font-size:20px; box-shadow:0 0 0 1.5px rgba(212,175,99,.55), 0 4px 12px rgba(0,0,0,.25);">結</div>
+  const blocks = [];
+  blocks.push({ keepWithNext:true, html: `
+    <div style="display:flex; align-items:center; gap:11pt;">
+      <div style="width:34pt; height:34pt; border-radius:7pt; flex-shrink:0; background:linear-gradient(160deg, #c4432f, #b23b2e 60%, #8f2519); color:#f7ecd2; display:flex; align-items:center; justify-content:center; font-family:'Noto Serif KR',serif; font-weight:900; font-size:15pt; box-shadow:0 0 0 1pt rgba(212,175,99,.55);">結</div>
       <div>
-        <div style="font-family:'Noto Serif KR',serif; font-weight:900; font-size:18px; color:#241d13; letter-spacing:-.2px;">사주결</div>
-        <div style="font-size:10.5px; color:#7a6a4a; margin-top:2px;">전통 명리학 기반 사주풀이 · sajugyeol.co.kr</div>
+        <div style="font-family:'Noto Serif KR',serif; font-weight:900; font-size:13pt; color:#241d13;">사주결</div>
+        <div style="font-size:7.5pt; color:#7a6a4a; margin-top:1pt;">전통 명리학 기반 사주풀이 · sajugyeol.co.kr</div>
       </div>
-      <div style="margin-left:auto; padding:6px 15px; border:1px solid #b8912f; border-radius:999px; background:rgba(255,253,246,.55); color:#6e3d18; font-family:'Noto Serif KR',serif; font-weight:700; font-size:12px; white-space:nowrap;">${escapeHtml(catLabel)}</div>
     </div>
-    <div style="height:1.5px; margin:16px 0 14px; background:linear-gradient(90deg, #b8912f 0%, rgba(184,145,47,.1) 60%, transparent 100%);"></div>
-    <div style="font-family:'Noto Serif KR',serif; font-weight:900; font-size:21px; color:#241d13; margin-bottom:4px;">${nameLabel0 ? escapeHtml(nameLabel0)+'님의 ' : ''}심층풀이</div>
-    <div style="display:flex; gap:16px; font-size:11px; color:#5c4d33; margin:6px 0 22px;">
+    <div style="margin-top:8pt; display:flex; align-items:center; gap:8pt;">
+      <div style="font-family:'Noto Serif KR',serif; font-weight:900; font-size:16pt; color:#241d13;">${nameLabel0 ? escapeHtml(nameLabel0)+'님의 ' : ''}심층풀이</div>
+      <div style="padding:3pt 10pt; border:0.75pt solid #b8912f; border-radius:999pt; background:rgba(255,253,246,.55); color:#6e3d18; font-family:'Noto Serif KR',serif; font-weight:700; font-size:9pt; white-space:nowrap;">${escapeHtml(catLabel)}</div>
+    </div>
+    <div style="margin-top:6pt; display:flex; gap:12pt; font-size:8pt; color:#5c4d33;">
       <div>결제일 ${formatDateTime(row.created_at)}</div>
       <div>결제금액 ${formatKRW(row.amount)}</div>
     </div>
-    ${useStructured && leadIn ? `<p style="font-size:13px; line-height:2; color:#3a3020; white-space:pre-wrap; margin:0 0 6px;">${escapeHtml(leadIn)}</p>` : ''}
-    ${tocHtml}
-    ${bodyHtml}
-    <div style="text-align:center; padding-top:18px; margin-top:26px; border-top:1px dashed rgba(178,59,46,.25); font-family:'Noto Serif KR',serif; font-size:10.5px; color:#8a7350; letter-spacing:.1em;">— 사 주 결 —</div>
-  `;
-  document.body.appendChild(wrap);
+    <div style="height:1pt; margin:10pt 0 2pt; background:linear-gradient(90deg, #b8912f 0%, rgba(184,145,47,.1) 70%, transparent 100%);"></div>
+  ` });
+
+  if(useStructured && leadIn){
+    blocks.push({ keepWithNext:false, html: `<p style="font-size:11pt; line-height:1.7; color:#3a3020; white-space:pre-wrap; margin:10pt 0 0;">${escapeHtml(leadIn)}</p>` });
+  }
+
+  if(useStructured){
+    sections.forEach((s,i)=>{
+      blocks.push({ keepWithNext:true, html: `
+        <div style="display:flex; align-items:center; gap:8pt; margin:18pt 0 9pt;">
+          <div style="width:18pt; height:18pt; border-radius:50%; background:rgba(178,59,46,.14); color:#b23b2e; font-family:'JetBrains Mono',monospace; font-size:9pt; display:flex; align-items:center; justify-content:center; flex-shrink:0;">${String(i+1).padStart(2,'0')}</div>
+          <h3 style="font-family:'Noto Serif KR',serif; font-weight:700; font-size:13.5pt; color:#241d13; margin:0;">${escapeHtml(s.title)}</h3>
+        </div>` });
+      const paras = s.body.split(/\n\s*\n+/).map(p=>p.trim()).filter(Boolean);
+      paras.forEach(p=>{
+        blocks.push({ keepWithNext:false, html: `<p style="font-size:11pt; line-height:1.7; color:#3a3020; white-space:pre-wrap; margin:0 0 9pt;">${escapeHtml(p)}</p>` });
+      });
+    });
+  } else {
+    const paras = String(row.result_text || '저장된 해석 내용이 없어요.').split(/\n\s*\n+/).map(p=>p.trim()).filter(Boolean);
+    paras.forEach(p=>{
+      const dashIdx = p.indexOf('—');
+      const isLeadTitle = dashIdx > 0 && dashIdx <= 50 && !p.slice(0, dashIdx).includes('\n');
+      let html;
+      if(isLeadTitle){
+        const titlePart = p.slice(0, dashIdx).trim();
+        const restPart = p.slice(dashIdx + 1).trim();
+        html = `<p style="font-size:11pt; line-height:1.7; color:#3a3020; white-space:pre-wrap; margin:0 0 12pt;"><strong style="font-family:'Noto Serif KR',serif; font-weight:700; color:#b23b2e;">${escapeHtml(titlePart)} —</strong> ${escapeHtml(restPart)}</p>`;
+      } else {
+        html = `<p style="font-size:11pt; line-height:1.7; color:#3a3020; white-space:pre-wrap; margin:0 0 12pt;">${escapeHtml(p)}</p>`;
+      }
+      blocks.push({ keepWithNext:false, html });
+    });
+  }
+
+  blocks.push({ keepWithNext:false, html: `<div style="text-align:center; padding-top:10pt; margin-top:14pt; border-top:0.75pt dashed rgba(178,59,46,.3); font-family:'Noto Serif KR',serif; font-size:8pt; color:#8a7350; letter-spacing:.1em;">— 사 주 결 —</div>` });
+
+  return blocks;
+}
+
+function measurePdfBlocks(blocks){
+  // 각 블록을 따로 측정하면(별도 wrapper) 실제 렌더링(형제 요소로 이어붙임)과 마진 겹침 계산이
+  // 달라져 실제 높이와 어긋난다. 최종 렌더링과 완전히 동일하게 모든 블록을 한 번에 이어붙이고,
+  // 블록 사이에 높이 0짜리 마커만 끼워 넣어 그 위치 차이로 실제 높이를 역산한다.
+  const meas = document.createElement('div');
+  meas.style.position = 'fixed';
+  meas.style.left = '-99999pt';
+  meas.style.top = '0';
+  meas.style.width = PDF_CONTENT_W + 'pt';
+  meas.style.fontFamily = "'Noto Sans KR', sans-serif";
+  meas.innerHTML = blocks.map((b,i)=>`<div data-blk="${i}" style="margin:0;padding:0;border:0;height:0;line-height:0;font-size:0;"></div>${b.html}`).join('');
+  document.body.appendChild(meas);
+
+  const containerTop = meas.getBoundingClientRect().top;
+  const containerBottom = meas.getBoundingClientRect().bottom;
+  const markers = blocks.map((_,i)=> meas.querySelector(`[data-blk="${i}"]`));
+  const relTopsPx = markers.map(m => m.getBoundingClientRect().top - containerTop);
+  const totalPx = containerBottom - containerTop;
+
+  const heights = relTopsPx.map((t,i)=>{
+    const nextT = (i+1 < relTopsPx.length) ? relTopsPx[i+1] : totalPx;
+    return (nextT - t) * (72/96);
+  });
+  document.body.removeChild(meas);
+  return heights;
+}
+
+function paginatePdfBlocks(blocks, heights){
+  const pages = [];
+  let cur = [];
+  let curH = 0;
+  const MIN_ORPHAN_SPACE = 70;
+  // 측정 시점과 실제 캡처 시점의 서브픽셀 오차에 대비한 안전 여유분 — 절대 텍스트가 잘리거나
+  // 장식 영역을 침범하지 않도록 보수적으로 잡는다.
+  const SAFETY_BUFFER = 16;
+  const usableH = PDF_CONTENT_H - SAFETY_BUFFER;
+
+  for(let i=0; i<blocks.length; i++){
+    const b = blocks[i];
+    const h = heights[i];
+    // 제목(keepWithNext) 뒤에 본문이 통째로 들어갈 수 있으면 반드시 함께 배치하고(고아 제목 방지),
+    // 본문 자체가 한 페이지보다 커서 어차피 여러 페이지에 걸쳐야 하는 예외적인 경우에만 최소
+    // 여백만 확보한다.
+    let extra = 0;
+    if(b.keepWithNext && i+1 < blocks.length){
+      const nextH = heights[i+1];
+      extra = nextH <= usableH ? nextH : MIN_ORPHAN_SPACE;
+    }
+    if(curH > 0 && curH + h + extra > usableH){
+      pages.push(cur);
+      cur = [];
+      curH = 0;
+    }
+    cur.push(b);
+    curH += h;
+  }
+  if(cur.length) pages.push(cur);
+  return pages;
+}
+
+async function downloadPurchasePdf(row, btnEl){
+  if(!window.jspdf || !window.html2canvas){
+    alert('PDF 생성 도구를 아직 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
+    return;
+  }
+  const origLabel = btnEl ? btnEl.textContent : '';
+  if(btnEl){ btnEl.disabled = true; btnEl.textContent = '만드는 중...'; }
   try{
-    // scale 1.5면 인쇄해도 충분히 선명하면서 캔버스가 과도하게 커지지 않는다.
-    const canvas = await html2canvas(wrap, { scale:1.5, backgroundColor:'#f4ecd8', useCORS:true });
+    if(document.fonts && document.fonts.ready){ await document.fonts.ready; }
+    const blocks = buildPdfBlocks(row);
+    const heights = measurePdfBlocks(blocks);
+    const pages = paginatePdfBlocks(blocks, heights);
+
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF('p','pt','a4');
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
-    // 전체 이미지를 페이지마다 옵셋만 바꿔 통째로 다시 붙이면(예전 방식) 같은 이미지 데이터가
-    // 페이지 수만큼 중복 저장돼 파일이 비정상적으로 커진다(테스트 중 25MB짜리 PDF가 나온 원인).
-    // 대신 원본 캔버스를 페이지 분량만큼 실제로 잘라(slice) 각 페이지에 한 번씩만 넣는다.
-    const pxPerPage = Math.max(1, Math.floor(canvas.width * (pageH / pageW)));
-    const totalPages = Math.max(1, Math.ceil(canvas.height / pxPerPage));
-    for(let p=0; p<totalPages; p++){
-      const sliceHeight = Math.min(pxPerPage, canvas.height - p*pxPerPage);
-      const sliceCanvas = document.createElement('canvas');
-      sliceCanvas.width = canvas.width;
-      sliceCanvas.height = sliceHeight;
-      const ctx = sliceCanvas.getContext('2d');
-      ctx.fillStyle = '#f4ecd8';
-      ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
-      ctx.drawImage(canvas, 0, p*pxPerPage, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
-      const sliceImgH = pageW * (sliceHeight / canvas.width);
+
+    for(let p=0; p<pages.length; p++){
+      const pageDiv = document.createElement('div');
+      pageDiv.style.position = 'fixed';
+      pageDiv.style.left = '-9999pt';
+      pageDiv.style.top = '0';
+      pageDiv.style.width = PDF_PAGE_W + 'pt';
+      pageDiv.style.height = PDF_PAGE_H + 'pt';
+      // 페이지마다 배경을 새로 붙인다 — 하나의 긴 배경을 여러 페이지에 걸쳐 늘리지 않는다.
+      pageDiv.style.background = `url('${PDF_BG_URL}') 0 0 / 100% 100% no-repeat, ${PDF_PAPER_FALLBACK}`;
+      pageDiv.style.overflow = 'hidden';
+      pageDiv.style.color = '#241d13';
+      pageDiv.style.fontFamily = "'Noto Sans KR', sans-serif";
+
+      const inner = document.createElement('div');
+      inner.style.position = 'absolute';
+      inner.style.left = PDF_MARGIN.left + 'pt';
+      inner.style.top = PDF_MARGIN.top + 'pt';
+      inner.style.width = PDF_CONTENT_W + 'pt';
+      inner.style.height = PDF_CONTENT_H + 'pt';
+      inner.style.overflow = 'hidden';
+      inner.innerHTML = pages[p].map(b=>b.html).join('');
+      pageDiv.appendChild(inner);
+      document.body.appendChild(pageDiv);
+
+      const canvas = await html2canvas(pageDiv, { scale:2.5, backgroundColor: PDF_PAPER_FALLBACK, useCORS:true });
       if(p>0) pdf.addPage();
-      // JPEG(품질 0.92)로 저장 — 흰 배경+검은 글씨 위주라 PNG보다 훨씬 작아지면서도 읽기엔 충분히 선명하다.
-      pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, pageW, sliceImgH);
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.93), 'JPEG', 0, 0, pageW, pageH);
+      document.body.removeChild(pageDiv);
     }
+
     const nameLabel = (row.name || '').trim();
     const catFileLabel = CATEGORY_FILE_LABEL[row.category] || CATEGORY_LABEL[row.category] || row.category;
     const dd = new Date(row.created_at);
@@ -5819,7 +5905,6 @@ async function downloadPurchasePdf(row, btnEl){
   } catch(err){
     alert('PDF를 만드는 중 문제가 생겼어요. 다시 시도해주세요.');
   } finally {
-    document.body.removeChild(wrap);
     if(btnEl){ btnEl.disabled = false; btnEl.textContent = origLabel || '📄 PDF로 저장'; }
   }
 }
