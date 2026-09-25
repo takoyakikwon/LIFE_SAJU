@@ -22,6 +22,7 @@ const MODEL_BY_CATEGORY = {
   wealth: process.env.OPENAI_MODEL_WEALTH || DEFAULT_MODEL,
   pet: process.env.OPENAI_MODEL_PET || DEFAULT_MODEL,
   career: process.env.OPENAI_MODEL_CAREER || DEFAULT_MODEL,
+  lifetime: process.env.OPENAI_MODEL_LIFETIME || DEFAULT_MODEL,
 };
 
 // 결제 기록(purchases 테이블) 연동용. Vercel 환경변수에 아래 두 개가 등록되어 있어야 합니다.
@@ -79,6 +80,7 @@ const CATEGORY_AMOUNT_KRW = {
   wealth: 4900,
   pet: 1900,
   career: 3900,
+  lifetime: 24900,
 };
 
 // 클라이언트가 보낸 Supabase 액세스 토큰으로 실제 로그인한 사용자인지 서버에서 직접 확인한다.
@@ -251,6 +253,16 @@ function buildPrompt(payload) {
     lines.push('');
     lines.push('[오늘의 관측 정보]');
     lines.push(payload.오늘);
+  }
+
+  // 평생운 프리미엄(lifetime) 카테고리용. saju.현재대운/ziwei.현재대한은 "지금" 한 구간만
+  // 담고 있어서, 과거~미래 전체 대운 흐름을 다뤄야 하는 이 카테고리에는 부족하다. 프론트에서
+  // 계산해 보낸 평생 전체 대운/대한 목록 텍스트를 그대로 싣는다. 다른 카테고리는 이 필드를
+  // 보내지 않으므로 이 블록은 그때는 통째로 생략된다(payload.세운/payload.오늘과 동일한 패턴).
+  if (payload.평생대운) {
+    lines.push('');
+    lines.push('[평생 대운 전체 흐름 정보]');
+    lines.push(payload.평생대운);
   }
 
   return lines.join('\n');
@@ -471,11 +483,39 @@ const CATEGORY_PROMPT_TODAY = `
 // career는 buildCategoryPromptCareer(jobStatus)를 거쳐야 하는 함수형 프롬프트라(love·
 // compatibility와 동일한 패턴) 이 정적 맵에는 넣지 않는다 — 아래 SYSTEM_PROMPT 조립부의
 // 별도 분기에서 처리한다.
+
+// 평생운 프리미엄(lifetime) — 최상위 프리미엄 카테고리. 과거 서사 + 평생 대운 전체 흐름 +
+// 귀인/투자/건강 시기별 콜아웃까지 다루는 가장 긴 리포트라, 다른 카테고리와 별도로
+// 상세하게 구성한다. [평생 대운 전체 흐름 정보]는 buildPrompt()가 payload.평생대운을
+// 그대로 실어주므로(프론트 buildLifetimeDaeunText() 참고) 여기서는 그 데이터를 어떻게
+// 쓸지만 지시한다.
+const CATEGORY_PROMPT_LIFETIME = `
+[이 리포트는 최상위 프리미엄 상품 "평생운 프리미엄" 카테고리입니다 — 다른 카테고리보다 훨씬 깊고 길게 씁니다]
+
+- 가장 먼저 "[이름 또는 '당신']님, 당신은 아마 이렇게 살아왔을 것입니다"로 시작하는 도입부를 씁니다. [평생 대운 전체 흐름 정보]에서 "(이미 지나온 구간)"으로 표시된 대운 구간들을 근거로, 이 사람이 유년기부터 지금까지 실제로 겪어왔을 법한 삶의 국면을 구체적으로 그려냅니다. 나이대별 구체적 사건을 날조하지 말고, 그 시기 대운의 오행·십성이 만들어내는 "성향과 상황의 경향"을 서사로 풀어씁니다(예: 정관 대운이었던 20대 초반이면 "이 시기엔 조직이나 규율 안에서 인정받으려는 욕구가 유난히 강했을 것입니다"처럼). 지나온 대운 구간이 1개뿐이거나 없으면(아직 어린 경우) 무리하게 늘리지 말고 있는 만큼만 다룹니다.
+- 이어지는 본문은 아래 영역을 전부 다루되, 각 영역을 독립된 소주제로 충분히 길게(각 소주제 최소 500~800자 이상) 씁니다. 전체 소주제 개수는 12~18개 사이가 되도록 구성하세요:
+  1) 타고난 기질과 본질 — 일간·오행·자미두수 명궁을 종합한 이 사람의 핵심 성격.
+  2) [평생 대운 전체 흐름 정보]에서 "(앞으로 올 구간)"으로 표시된 대운 구간들을 하나씩 별도 소주제로 다룹니다. 각 구간마다 그 시기의 오행·십성이 만드는 삶의 국면(일/관계/재물/심리)을 구체적으로 그리세요. 구간이 여러 개면 전부 각각 다루고, 각 소제목에 나이대를 명시하세요(예: "40대, 조직을 벗어나 내 일을 만드는 시기 —"). "(현재 이 구간을 지나는 중)"으로 표시된 구간은 이 흐름의 시작점으로 함께 짚어줍니다.
+  3) 귀인이 찾아오는 시기 — 위 목록에서 인성·비겁 등 도움을 주는 기운이 강해지는 구간을 근거로, 어떤 시기에 어떤 성격의 사람(멘토·동료·협력자 등)이 힘이 되어줄 가능성이 높은지 짚어줍니다. 특정 개인을 지목하지 말고 관계의 성격으로 풀어씁니다. BASE_PROMPT에서 금지한 "귀인이 도와줍니다" 같은 상투구를 그대로 쓰지 말고, 반드시 구체적 시기·구간·관계의 성격을 담아서 씁니다.
+  4) 투자를 조심해야 할 시기 — 재성이 약해지거나 충·형이 겹치는 구간을 근거로, 무리한 확장이나 큰 지출을 특히 신중히 결정하면 좋을 시기를 짚어줍니다. 구체적인 투자 상품·종목을 언급하지 말고 "이 시기엔 새로운 투자보다 지키는 쪽에 무게를 두는 것이 유리해 보입니다" 같은 방향성으로만 씁니다.
+  5) 투자해도 좋은 시기 — 반대로 재성이 살아나는 구간을 근거로, 자산을 불리거나 새로운 시도를 해볼 만한 시기를 짚어줍니다. 마찬가지로 특정 투자처를 지목하지 않습니다.
+  6) 건강에서 조심하면 좋을 시기 — 오행이 한쪽으로 치우치거나 충이 겹치는 구간을 근거로 "컨디션 관리에 특히 신경 쓰면 좋은 시기"를 짚어줍니다. 특정 질병명이나 사고 유형을 지목하지 않고, 위 공통 규칙의 건강 관련 순화 지침을 그대로 따릅니다.
+  7) 직업적 적성과 어울리는 일의 결 — 관성·식상 등의 구조를 근거로 이 사람에게 잘 맞는 일의 방식(조직형/독립형, 사람을 상대하는 일/전문성을 쌓는 일 등)을 구체적으로 짚어줍니다.
+  8) 재물을 대하는 태도와 전략 — 특정 시기 얘기가 아니라, 이 사람이 평생에 걸쳐 돈을 대하는 성향과 자산을 키우는 데 유리한 방식(저축형/투자형, 안정형/공격형 등)을 짚어줍니다.
+  9) 연애와 인연 — 배우자궁·부처궁, 관련 십성을 근거로 이 사람의 연애 패턴과 인연이 무르익는 시기를 짚어줍니다.
+  10) 가족과의 관계 — 부모궁·형제궁 등 관련 데이터가 있으면 근거로, 가족 안에서 이 사람이 맡아온·맡게 될 역할과 관계의 결을 짚어줍니다.
+  11) 인생 전체를 관통하는 총평 — 도입부에서 그린 지나온 삶과, 본문에서 다룬 앞으로의 흐름을 하나로 엮어 마무리합니다.
+- 각 대운 구간을 다룰 때는 반드시 [평생 대운 전체 흐름 정보]에 실제로 나열된 구간의 나이대·간지·십성만 근거로 쓰고, 목록에 없는 나이대나 구간을 지어내지 않습니다.
+- 지나온 대운 구간은 맨 앞 도입부에서 이미 서사로 다뤘으므로, 본문에서 같은 구간을 다시 처음부터 설명하며 반복하지 않습니다.
+- 전체 분량은 15,000자 이상을 목표로 하고, 18,000자까지 늘어나도 좋습니다. 짧게 요약하지 말고 각 소주제를 실제 사례처럼 구체적으로 풀어써서 분량을 채웁니다. 다른 카테고리보다 훨씬 긴 프리미엄 리포트이므로, 분량을 줄이기 위해 내용을 압축하거나 나열식으로 쓰지 않습니다.
+`;
+
 const CATEGORY_PROMPTS = {
   comprehensive: CATEGORY_PROMPT_COMPREHENSIVE,
   newyear: CATEGORY_PROMPT_NEWYEAR,
   today: CATEGORY_PROMPT_TODAY,
   wealth: CATEGORY_PROMPT_WEALTH,
+  lifetime: CATEGORY_PROMPT_LIFETIME,
 };
 
 // ============================================================
@@ -510,6 +550,7 @@ const PET_SYSTEM_PROMPT = `당신은 반려동물과 집사의 케미를 유쾌�
 const MAX_TOKENS_BY_CATEGORY = {
   today: 700,
   pet: 1800,
+  lifetime: 8000,
 };
 
 // ============================================================
@@ -519,8 +560,9 @@ const MAX_TOKENS_BY_CATEGORY = {
 // 한계 — 2026-08-20 gpt-4o로 테스트해봐도 마찬가지로 분량 미달이 나서, 모델 문제가 아니라
 // 이 안전장치가 필요한 문제였음을 확인함). 모델을 바꾸지 않고, 1차 응답이 카테고리별 최소
 // 분량에 못 미치면 방금 쓴 응답을 대화 맥락에 그대로 넣고 "이어서 더 써달라"는 후속 호출을
-// 한 번 더 보내 그 결과를 이어 붙이는 방식으로 먼저 시도해본다. 최대 1회만 이어쓰기하며
-// (무한 재시도 없음), 실패해도 1차 응답은 이미 있으므로 그대로 반환한다.
+// 보내 그 결과를 이어 붙이는 방식으로 먼저 시도해본다. 카테고리별로 이어쓰기 최대 횟수를
+// 다르게 둘 수 있도록 MAX_CONTINUATION_ROUNDS_BY_CATEGORY를 두며(기본은 기존과 동일하게
+// 1회 — 무한 재시도 없음), 실패해도 이미 쓴 내용은 있으므로 그대로 반환한다.
 const MIN_LENGTH_BY_CATEGORY = {
   comprehensive: 3000,
   love: 4000,
@@ -528,7 +570,16 @@ const MIN_LENGTH_BY_CATEGORY = {
   newyear: 3500,
   wealth: 3000,
   career: 3000,
+  lifetime: 15000,
 };
+
+// 카테고리별 이어쓰기 최대 횟수. 평생운 프리미엄은 15,000자 이상을 목표로 하므로 1회
+// 이어쓰기로는 부족해 최대 3회(최초 응답 포함 총 4회 호출)까지 허용한다. 여기 없는
+// 카테고리는 DEFAULT_MAX_CONTINUATION_ROUNDS(기존과 동일한 1회)를 그대로 쓴다.
+const MAX_CONTINUATION_ROUNDS_BY_CATEGORY = {
+  lifetime: 3,
+};
+const DEFAULT_MAX_CONTINUATION_ROUNDS = 1;
 
 const CONTINUATION_PROMPT = `방금 작성한 리포트가 목표 분량에 못 미칩니다. 아래 규칙을 지켜서 이어지는 내용만 추가로 작성하세요.
 
@@ -730,9 +781,14 @@ module.exports = async (req, res) => {
 
     let text = first.text;
 
-    // 이어쓰기: 카테고리별 최소 분량에 못 미치면 후속 호출을 한 번 더 보내 이어 붙인다.
+    // 이어쓰기: 카테고리별 최소 분량에 못 미치면 후속 호출을 보내 이어 붙인다. 카테고리별로
+    // 최대 이어쓰기 횟수가 다를 수 있으므로(대부분 1회, 평생운 프리미엄은 3회) 반복문으로 처리한다.
+    // 기존 카테고리는 MAX_CONTINUATION_ROUNDS_BY_CATEGORY에 없으므로 DEFAULT_MAX_CONTINUATION_ROUNDS(1)가
+    // 적용되어 이전과 동일하게 최대 1회만 이어쓴다.
     const minLen = MIN_LENGTH_BY_CATEGORY[payload.category];
-    if (minLen && text.length < minLen) {
+    const maxContinuationRounds = MAX_CONTINUATION_ROUNDS_BY_CATEGORY[payload.category] || DEFAULT_MAX_CONTINUATION_ROUNDS;
+    let continuationRounds = 0;
+    while (minLen && text.length < minLen && continuationRounds < maxContinuationRounds) {
       try {
         const cont = await callOpenAI(apiKey, [
           { role: 'system', content: SYSTEM_PROMPT },
@@ -740,12 +796,16 @@ module.exports = async (req, res) => {
           { role: 'assistant', content: text },
           { role: 'user', content: CONTINUATION_PROMPT },
         ], maxTokens, model);
+        continuationRounds++;
         if (cont.ok && cont.text) {
           text = text + '\n\n' + cont.text;
+        } else {
+          break;
         }
       } catch (contErr) {
-        // 이어쓰기 호출이 실패해도 1차 응답은 이미 있으므로 그대로 반환한다.
+        // 이어쓰기 호출이 실패해도 지금까지 쓴 내용은 있으므로 그대로 반환한다.
         console.error('continuation call failed:', contErr);
+        break;
       }
     }
 
