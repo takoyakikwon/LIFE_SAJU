@@ -135,13 +135,72 @@ async function checkIsAdmin(userId) {
 // 2026-09-24: status 파라미터 추가(기본값 'paid', 기존 호출부는 그대로 동작). 아래
 // module.exports의 안전장치(OpenAI 생성 실패 시 status:'failed'로 기록)를 위해 추가한 것으로,
 // 결제 검증(verifyPortOnePayment)·금액·카테고리·계산 로직은 전혀 건드리지 않았다.
-async function recordPurchase({ userId, category, amount, payload, resultText, visitorId, status = 'paid', pgProvider = 'portone_inicis' }) {
+async function isPaymentAlreadyUsed(paymentId) {
+  // 2026-09-25: 보안 조치 — verifyPortOnePayment()는 "이 paymentId가 실제로 결제완료(PAID)
+  // 상태인지"와 "금액이 맞는지"만 확인하고, 그 paymentId가 이미 다른 요청에 쓰였는지는
+  // 확인하지 않았다. 그 결과 하나의 결제 건으로 같은 요청을 반복하거나(무제한 재생성),
+  // 가격이 같은 다른 카테고리로 category만 바꿔 재전송하면(예: 연애·재회운/취업·사업·이동운
+  // 둘 다 3,900원, 궁합&결혼/재물운 둘 다 4,900원) 결제 1건으로 유료 심층풀이 여러 건을
+  // 받아갈 수 있는 문제가 있었다. 이 함수는 OpenAI 호출(=과금) 직전에 purchases 테이블에서
+  // 같은 paymentId로 이미 status='paid' 기록이 있는지 확인해, 있으면 재사용으로 판단한다.
+  if (!paymentId || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return false;
+  try {
+    const r = await fetch(
+      `${SUPABASE_URL}/rest/v1/purchases?payment_id=eq.${encodeURIComponent(paymentId)}&status=eq.paid&select=id&limit=1`,
+      {
+        headers: {
+          'apikey': SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+      }
+    );
+    if (!r.ok) {
+      // purchases.payment_id 컬럼이 아직 없으면(Supabase SQL 마이그레이션 전) 여기서도
+      // 오류가 날 수 있다 — 이 경우 정상 결제까지 막아버리지 않도록 fail-open으로 통과시키고
+      // 로그만 남긴다(재사용 방지 기능만 일시적으로 비활성 상태가 됨).
+      console.error('isPaymentAlreadyUsed lookup failed:', r.status, await r.text());
+      return false;
+    }
+    const rows = await r.json();
+    return Array.isArray(rows) && rows.length > 0;
+  } catch (e) {
+    console.error('isPaymentAlreadyUsed error:', e);
+    return false;
+  }
+}
+
+async function recordPurchase({ userId, category, amount, payload, resultText, visitorId, status = 'paid', pgProvider = 'portone_inicis', paymentId = null }) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     console.error('recordPurchase skipped: SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY not configured');
     return false;
   }
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/purchases`, {
+  function buildBody(includePaymentId) {
+    const body = {
+      user_id: userId,
+      // 2026-09-02: 유입 퍼널(방문→기본운세 확인→결제) 집계용 익명 방문자 ID. 로그인 여부와
+      // 무관하게 항상 채워지므로, 비회원 결제까지 포함해 "몇 명이 결제까지 왔는지"를 정확히
+      // 셀 수 있다(관리자 페이지의 admin_funnel_summary() RPC가 이 컬럼을 사용).
+      visitor_id: visitorId || null,
+      category,
+      amount,
+      status,
+      // 2026-08-30: 포트원(PortOne)+KG이니시스 테스트 채널로 실제 결제 검증을 통과한 건만
+      // 여기 도달한다(위 verifyPortOnePayment 게이트 참고). 실연동 전환 시 이 문자열만
+      // 'portone_inicis'로 바꾸면 테스트/실결제 건을 구분해서 조회할 수 있다.
+      // 2026-09-24: 관리자 무료 열람 기록은 'admin_bypass'로 남겨 실결제와 구분한다 —
+      // 아래 module.exports에서 isAdmin일 때만 pgProvider를 'admin_bypass'로 넘긴다.
+      pg_provider: pgProvider,
+      payload,
+      result_text: resultText,
+    };
+    // 2026-09-25: 결제 재사용 방지용 컬럼(위 isPaymentAlreadyUsed 참고). Supabase에 컬럼을
+    // 추가하는 SQL을 아직 실행하지 않았다면 PostgREST가 모르는 컬럼이라며 거부할 수 있어,
+    // 아래에서 그런 경우 이 필드를 뺀 채로 한 번 더 시도한다.
+    if (includePaymentId) body.payment_id = paymentId;
+    return body;
+  }
+  async function doInsert(includePaymentId) {
+    return fetch(`${SUPABASE_URL}/rest/v1/purchases`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -149,27 +208,18 @@ async function recordPurchase({ userId, category, amount, payload, resultText, v
         'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
         'Prefer': 'return=minimum',
       },
-      body: JSON.stringify({
-        user_id: userId,
-        // 2026-09-02: 유입 퍼널(방문→기본운세 확인→결제) 집계용 익명 방문자 ID. 로그인 여부와
-        // 무관하게 항상 채워지므로, 비회원 결제까지 포함해 "몇 명이 결제까지 왔는지"를 정확히
-        // 셀 수 있다(관리자 페이지의 admin_funnel_summary() RPC가 이 컬럼을 사용).
-        visitor_id: visitorId || null,
-        category,
-        amount,
-        status,
-        // 2026-08-30: 포트원(PortOne)+KG이니시스 테스트 채널로 실제 결제 검증을 통과한 건만
-        // 여기 도달한다(위 verifyPortOnePayment 게이트 참고). 실연동 전환 시 이 문자열만
-        // 'portone_inicis'로 바꾸면 테스트/실결제 건을 구분해서 조회할 수 있다.
-        // 2026-09-24: 관리자 무료 열람 기록은 'admin_bypass'로 남겨 실결제와 구분한다 —
-        // 아래 module.exports에서 isAdmin일 때만 pgProvider를 'admin_bypass'로 넘긴다.
-        pg_provider: pgProvider,
-        payload,
-        result_text: resultText,
-      }),
+      body: JSON.stringify(buildBody(includePaymentId)),
     });
+  }
+  try {
+    let r = await doInsert(true);
+    let errText = r.ok ? '' : await r.text();
+    if (!r.ok && /payment_id/i.test(errText) && /(column|schema cache)/i.test(errText)) {
+      console.error('recordPurchase: purchases.payment_id 컬럼이 없어 재시도(SQL 마이그레이션 필요):', errText);
+      r = await doInsert(false);
+      errText = r.ok ? '' : await r.text();
+    }
     if (!r.ok) {
-      const errText = await r.text();
       console.error('recordPurchase insert failed:', r.status, errText);
       return false;
     }
@@ -738,6 +788,14 @@ module.exports = async (req, res) => {
     return;
   }
 
+  // 2026-09-25: 보안 조치 — 결제 자체는 유효해도 이미 다른 요청에 한 번 쓰인 paymentId라면
+  // 차단한다(관리자 무료열람은 실제 paymentId가 없으므로 제외). 배경은 위
+  // isPaymentAlreadyUsed() 주석 참고.
+  if (!isAdmin && await isPaymentAlreadyUsed(payload.paymentId)) {
+    res.status(409).json({ error: '이미 사용된 결제입니다. 같은 결제로 다시 요청할 수 없습니다.' });
+    return;
+  }
+
   // access_token이 payload에 그대로 있으면 DB에 시크릿 성격의 값이 남으므로, 결제 검증
   // 통과 직후(=이 시점부터는 실제로 돈이 청구된 결제라 아래 어떤 경로로 끝나든 흔적을
   // 남겨야 하므로) 미리 한 번만 떼어둔다.
@@ -771,6 +829,7 @@ module.exports = async (req, res) => {
           visitorId: payload.visitorId || null,
           status: 'failed',
           pgProvider: isAdmin ? 'admin_bypass' : 'portone_inicis',
+          paymentId: payload.paymentId || null,
         });
       } catch (recordErr) {
         console.error('failed-purchase 기록 중 오류(원래 502 응답에는 영향 없음):', recordErr);
@@ -820,6 +879,7 @@ module.exports = async (req, res) => {
       resultText: finalText,
       visitorId: payload.visitorId || null,
       pgProvider: isAdmin ? 'admin_bypass' : 'portone_inicis',
+      paymentId: payload.paymentId || null,
     });
 
     res.status(200).json({ interpretation: finalText });
