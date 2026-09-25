@@ -5942,18 +5942,18 @@ function applyAdminPeriod(startISO, endISO, label){
   refreshPurchaseList(startISO, endISO);
   refreshInquiryList(startISO, endISO);
 }
-$('#funnelPeriodTabs button').forEach(btn=>{
+$$('#funnelPeriodTabs button').forEach(btn=>{
   btn.addEventListener('click', ()=>{
-    $('#funnelPeriodTabs button').forEach(b=>b.classList.remove('active'));
+    $$('#funnelPeriodTabs button').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     if($('#adminDateFrom')) $('#adminDateFrom').value = '';
     if($('#adminDateTo')) $('#adminDateTo').value = '';
     applyAdminPeriod(computeFunnelPeriodStart(btn.dataset.period), null, btn.textContent.trim());
   });
 });
-$('#purchaseProviderTabs button').forEach(btn=>{
+$$('#purchaseProviderTabs button').forEach(btn=>{
   btn.addEventListener('click', ()=>{
-    $('#purchaseProviderTabs button').forEach(b=>b.classList.remove('active'));
+    $$('#purchaseProviderTabs button').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     applyPurchaseProviderFilter(btn.dataset.provider);
   });
@@ -5985,9 +5985,9 @@ async function openAdminModal(){
   }
   if($('#adminDateFrom')) $('#adminDateFrom').value = '';
   if($('#adminDateTo')) $('#adminDateTo').value = '';
-  $('#funnelPeriodTabs button').forEach(b=>b.classList.toggle('active', b.dataset.period === 'all'));
+  $$('#funnelPeriodTabs button').forEach(b=>b.classList.toggle('active', b.dataset.period === 'all'));
   purchaseProviderFilter = 'real';
-  $('#purchaseProviderTabs button').forEach(b=>b.classList.toggle('active', b.dataset.provider === 'real'));
+  $$('#purchaseProviderTabs button').forEach(b=>b.classList.toggle('active', b.dataset.provider === 'real'));
   applyAdminPeriod(null, null, '전체');
 }
 function closeAdminModal(){ $('#adminModal').hidden = true; }
