@@ -5379,8 +5379,11 @@ function renderAiResultNote(){
   if(!note) return;
   if(currentSession){
     note.innerHTML = '📌 이 결과는 <b>마이페이지 &gt; 내 결제내역</b>에서 15일 동안 다시 볼 수 있고, PDF로도 저장할 수 있어요.'
-      + '<button class="ai-result-note-btn" id="aiResultHistoryBtn">내 결제내역 바로가기 →</button>' + '<button class="ai-result-note-btn" id="aiResultShareBtn">💬 카카오톡으로 공유하기</button>';
+      + '<button class="ai-result-note-btn" id="aiResultHistoryBtn">내 결제내역 바로가기 →</button>'
+      + '<button class="ai-result-note-btn" id="aiResultPdfBtn">📄 PDF로 다운받기</button>'
+      + '<button class="ai-result-note-btn" id="aiResultShareBtn">💬 카카오톡으로 공유하기</button>';
     $('#aiResultHistoryBtn').addEventListener('click', ()=>{ openHistoryModal(); });
+    $('#aiResultPdfBtn').addEventListener('click', (e)=>{ downloadCurrentResultPdf(e.currentTarget); });
   } else {
     note.innerHTML = '📌 비회원으로 결제하면 이 결과는 다시 볼 수 없어요. 지금 PDF로 저장해두시면 계속 보관할 수 있어요.'
       + '<button class="ai-result-note-btn" id="aiResultPdfBtn">📄 지금 PDF로 저장하기</button>' + '<button class="ai-result-note-btn" id="aiResultShareBtn">💬 카카오톡으로 공유하기</button>';
