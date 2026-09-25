@@ -102,12 +102,38 @@ async function verifySupabaseUser(accessToken) {
   }
 }
 
+// 관리자 계정은 결제 없이 심층풀이를 볼 수 있게 한다(2026-09-24). 클라이언트가 보낸 "나는
+// 관리자다" 값은 신뢰할 수 없으므로, 위 verifySupabaseUser()로 이미 검증된 user.id를 다시
+// Supabase profiles 테이블에 서비스 롤 키로 직접 조회해(RLS 우회) is_admin 값을 확인한다.
+// 이 함수가 true를 반환하는 유일한 경로는 "실제 로그인 토큰이 유효하고 + 그 계정의
+// profiles.is_admin이 true"뿐이라, 관리자가 아닌 계정은 이 분기를 흉내 낼 수 없다.
+async function checkIsAdmin(userId) {
+  if (!userId || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return false;
+  try {
+    const r = await fetch(
+      `${SUPABASE_URL}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=is_admin`,
+      {
+        headers: {
+          'apikey': SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+      }
+    );
+    if (!r.ok) return false;
+    const rows = await r.json();
+    return !!(rows && rows[0] && rows[0].is_admin);
+  } catch (e) {
+    console.error('checkIsAdmin failed:', e);
+    return false;
+  }
+}
+
 // purchases 테이블에 결제 1건을 기록한다(RLS 우회를 위해 서비스 롤 키 사용).
 // 실패해도 이미 생성된 AI 해석 응답 자체는 막지 않고, 서버 로그만 남긴다.
 // 2026-09-24: status 파라미터 추가(기본값 'paid', 기존 호출부는 그대로 동작). 아래
 // module.exports의 안전장치(OpenAI 생성 실패 시 status:'failed'로 기록)를 위해 추가한 것으로,
 // 결제 검증(verifyPortOnePayment)·금액·카테고리·계산 로직은 전혀 건드리지 않았다.
-async function recordPurchase({ userId, category, amount, payload, resultText, visitorId, status = 'paid' }) {
+async function recordPurchase({ userId, category, amount, payload, resultText, visitorId, status = 'paid', pgProvider = 'portone_inicis' }) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     console.error('recordPurchase skipped: SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY not configured');
     return false;
@@ -133,7 +159,9 @@ async function recordPurchase({ userId, category, amount, payload, resultText, v
         // 2026-08-30: 포트원(PortOne)+KG이니시스 테스트 채널로 실제 결제 검증을 통과한 건만
         // 여기 도달한다(위 verifyPortOnePayment 게이트 참고). 실연동 전환 시 이 문자열만
         // 'portone_inicis'로 바꾸면 테스트/실결제 건을 구분해서 조회할 수 있다.
-        pg_provider: 'portone_inicis',
+        // 2026-09-24: 관리자 무료 열람 기록은 'admin_bypass'로 남겨 실결제와 구분한다 —
+        // 아래 module.exports에서 isAdmin일 때만 pgProvider를 'admin_bypass'로 넘긴다.
+        pg_provider: pgProvider,
         payload,
         result_text: resultText,
       }),
@@ -618,6 +646,11 @@ module.exports = async (req, res) => {
   // 없거나 검증에 실패하면 비회원으로 간주하고 계속 진행한다(결제 기록은 user_id 없이 남는다).
   const user = payload.access_token ? await verifySupabaseUser(payload.access_token) : null;
 
+  // 관리자 계정은 결제 없이 심층풀이를 볼 수 있다(2026-09-24). user가 이미 서버에서 검증된
+  // 계정일 때만 profiles.is_admin을 다시 조회하므로, 로그인하지 않았거나 access_token이
+  // 유효하지 않은 요청은 절대 이 분기를 탈 수 없다.
+  const isAdmin = user ? await checkIsAdmin(user.id) : false;
+
   // 반려동물궁합(pet)은 BASE_PROMPT + 오버레이 구조를 아예 타지 않는 완전 독립 프롬프트라
   // (위 PET_SYSTEM_PROMPT 주석 참고) 여기서 따로 분기한다. userPrompt도 무거운 원국 데이터
   // 대신 buildPetPrompt()가 만든 간단한 텍스트를 쓴다.
@@ -640,10 +673,15 @@ module.exports = async (req, res) => {
   const maxTokens = MAX_TOKENS_BY_CATEGORY[payload.category] || 4000;
   const model = MODEL_BY_CATEGORY[payload.category] || DEFAULT_MODEL;
   const amount = CATEGORY_AMOUNT_KRW[payload.category] || CATEGORY_AMOUNT_KRW.comprehensive;
+  // 관리자 무료 열람 기록용 금액. 실제 매출 통계(결제 요약 합계 등)를 왜곡하지 않도록
+  // 0원으로 남긴다 — 아래 두 recordPurchase 호출부에서 amount 대신 이 값을 쓴다.
+  const recordAmount = isAdmin ? 0 : amount;
 
   // 2026-08-30: 결제 검증 게이트. OpenAI를 호출(=과금)하기 전에 먼저 포트원에서 실제 결제
   // 완료 여부를 확인한다. paymentId가 없거나 검증에 실패하면 AI 해석을 아예 생성하지 않는다.
-  const paymentCheck = await verifyPortOnePayment(payload.paymentId, amount);
+  // 2026-09-24: 단, 관리자 계정(위 checkIsAdmin으로 서버가 직접 재검증한 값만 신뢰)은 이
+  // 게이트를 건너뛰어 결제 없이 바로 심층풀이를 볼 수 있게 한다.
+  const paymentCheck = isAdmin ? { ok: true } : await verifyPortOnePayment(payload.paymentId, amount);
   if (!paymentCheck.ok) {
     res.status(402).json({ error: `결제 확인에 실패했습니다. (${paymentCheck.reason})` });
     return;
@@ -674,11 +712,14 @@ module.exports = async (req, res) => {
         await recordPurchase({
           userId: user ? user.id : null,
           category: payload.category || 'comprehensive',
-          amount,
+          amount: recordAmount,
           payload: payloadWithoutToken,
-          resultText: `[AI 생성 실패 — 결제는 완료됨] OpenAI 응답 오류 (status ${first.status})`,
+          resultText: isAdmin
+            ? '[AI 생성 실패 — 관리자 무료 열람]'
+            : `[AI 생성 실패 — 결제는 완료됨] OpenAI 응답 오류 (status ${first.status})`,
           visitorId: payload.visitorId || null,
           status: 'failed',
+          pgProvider: isAdmin ? 'admin_bypass' : 'portone_inicis',
         });
       } catch (recordErr) {
         console.error('failed-purchase 기록 중 오류(원래 502 응답에는 영향 없음):', recordErr);
@@ -714,10 +755,11 @@ module.exports = async (req, res) => {
     await recordPurchase({
       userId: user ? user.id : null,
       category: payload.category || 'comprehensive',
-      amount,
+      amount: recordAmount,
       payload: payloadWithoutToken,
       resultText: finalText,
       visitorId: payload.visitorId || null,
+      pgProvider: isAdmin ? 'admin_bypass' : 'portone_inicis',
     });
 
     res.status(200).json({ interpretation: finalText });
