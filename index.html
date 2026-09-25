@@ -930,6 +930,12 @@ window.SajuAnalytics = (function(){
     background:var(--paper-card); border:1px solid var(--line); border-radius:var(--radius-sm);
     padding:16px 16px; white-space:pre-wrap;
   }
+  .ai-flat-block{ margin:0 0 22px; }
+  .ai-flat-block:last-child{ margin-bottom:0; }
+  .ai-flat-title-row{ display:flex; align-items:center; gap:8px; margin:0 0 7px; }
+  .ai-flat-bar{ width:3px; height:14px; border-radius:2px; background:var(--gold); flex-shrink:0; }
+  .ai-flat-title{ font-family:"Noto Serif KR",serif; font-weight:900; font-size:15.5px; color:var(--gold); letter-spacing:-.1px; }
+  .ai-flat-p{ font-size:13.5px; line-height:1.9; color:var(--ink); white-space:pre-wrap; margin:0; }
   .ai-error{
     font-size:12.5px; color:var(--seal); background:var(--fire-soft);
     border-radius:var(--radius-sm); padding:12px 14px; line-height:1.6;
@@ -5189,7 +5195,21 @@ function renderAiResult(container, text){
   const leadIn = (parsed[0] && !parsed[0].title) ? parsed[0].body : '';
   const sections = parsed.filter(s=>s.title);
   if(sections.length < 3){
-    container.innerHTML = `<p style="white-space:pre-wrap; margin:0;">${escapeHtml(raw)}</p>`;
+    const paras = raw.split(/\n\s*\n+/).map(p=>p.trim()).filter(Boolean);
+    const flatHtml = paras.map(p=>{
+      const dashIdx = p.indexOf('—');
+      const isLeadTitle = dashIdx > 0 && dashIdx <= 50 && !p.slice(0, dashIdx).includes('\n');
+      if(isLeadTitle){
+        const titlePart = p.slice(0, dashIdx).trim();
+        const restPart = p.slice(dashIdx + 1).trim();
+        return `<div class="ai-flat-block">
+          <div class="ai-flat-title-row"><span class="ai-flat-bar"></span><span class="ai-flat-title">${escapeHtml(titlePart)}</span></div>
+          <p class="ai-flat-p">${escapeHtml(restPart)}</p>
+        </div>`;
+      }
+      return `<div class="ai-flat-block"><p class="ai-flat-p">${escapeHtml(p)}</p></div>`;
+    }).join('');
+    container.innerHTML = flatHtml;
     return;
   }
   const leadInHtml = leadIn ? `<p style="white-space:pre-wrap; margin:0 0 18px;">${escapeHtml(leadIn)}</p>` : '';
@@ -5771,15 +5791,18 @@ function buildPdfBlocks(row){
     paras.forEach(p=>{
       const dashIdx = p.indexOf('—');
       const isLeadTitle = dashIdx > 0 && dashIdx <= 50 && !p.slice(0, dashIdx).includes('\n');
-      let html;
       if(isLeadTitle){
         const titlePart = p.slice(0, dashIdx).trim();
         const restPart = p.slice(dashIdx + 1).trim();
-        html = `<p style="font-size:11pt; line-height:1.7; color:#3a3020; white-space:pre-wrap; margin:0 0 12pt;"><strong style="font-family:'Noto Serif KR',serif; font-weight:700; color:#b23b2e;">${escapeHtml(titlePart)} —</strong> ${escapeHtml(restPart)}</p>`;
+        blocks.push({ keepWithNext:true, html: `
+          <div style="display:flex; align-items:center; gap:8pt; margin:14pt 0 7pt;">
+            <span style="width:3pt; height:12pt; border-radius:2pt; background:#b23b2e; flex-shrink:0; display:inline-block;"></span>
+            <span style="font-family:'Noto Serif KR',serif; font-weight:900; font-size:13pt; color:#b23b2e;">${escapeHtml(titlePart)}</span>
+          </div>` });
+        blocks.push({ keepWithNext:false, html: `<p style="font-size:11pt; line-height:1.7; color:#3a3020; white-space:pre-wrap; margin:0 0 12pt;">${escapeHtml(restPart)}</p>` });
       } else {
-        html = `<p style="font-size:11pt; line-height:1.7; color:#3a3020; white-space:pre-wrap; margin:0 0 12pt;">${escapeHtml(p)}</p>`;
+        blocks.push({ keepWithNext:false, html: `<p style="font-size:11pt; line-height:1.7; color:#3a3020; white-space:pre-wrap; margin:0 0 12pt;">${escapeHtml(p)}</p>` });
       }
-      blocks.push({ keepWithNext:false, html });
     });
   }
 
