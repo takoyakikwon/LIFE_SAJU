@@ -1096,6 +1096,18 @@ window.SajuAnalytics = (function(){
   .cat-option-name{font-family:"Noto Serif KR"; font-weight:900; font-size:15px; color:var(--ink);}
   .cat-option-desc{font-size:12px; color:var(--ink-soft); margin-top:5px; line-height:1.55;}
   .cat-option-price{font-family:"Noto Serif KR"; font-weight:900; font-size:13.5px; color:var(--seal); margin-top:9px;}
+  .cat-option-premium{
+    position:relative;
+    border:1px solid var(--gold-line);
+    background:linear-gradient(160deg, rgba(224,187,90,.14), rgba(212,175,99,.05));
+  }
+  .cat-option-badge{
+    position:absolute; top:10px; right:10px;
+    padding:2px 8px; border-radius:999px;
+    background:linear-gradient(160deg, var(--gold), #b8912f);
+    color:#241d13; font-family:"JetBrains Mono",monospace; font-weight:700; font-size:9px;
+    letter-spacing:.05em;
+  }
   .cat-back{
     background:none; border:none; padding:0; margin-bottom:2px;
     color:var(--ink-faint); font-size:12.5px; cursor:pointer; font-family:"Noto Sans KR"; font-weight:500;
@@ -1778,6 +1790,12 @@ window.SajuAnalytics = (function(){
                 <div class="cat-option-name">반려동물궁합 🐾</div>
                 <div class="cat-option-desc">우리 아이와 나, 얼마나 잘 통하는 콤비일까요? 유쾌하고 행복한 궁합 이야기예요.</div>
                 <div class="cat-option-price">1,900원</div>
+              </button>
+              <button type="button" class="cat-option cat-option-premium" data-cat="lifetime">
+                <div class="cat-option-badge">PREMIUM</div>
+                <div class="cat-option-name">평생운 프리미엄 👑</div>
+                <div class="cat-option-desc">과거부터 지금, 그리고 앞으로의 대운까지 — 이 사람의 인생 전체를 하나의 이야기로 풀어드려요. 귀인이 오는 시기, 투자와 건강까지 챙기는 가장 깊은 리포트예요.</div>
+                <div class="cat-option-price">24,900원</div>
               </button>
             </div>
           </div>
@@ -3811,6 +3829,7 @@ const AI_CATEGORY_META = {
   wealth: { price: '4,900원', desc: '1회 결제로 재물운 리포트를 확인할 수 있어요.' },
   pet: { price: '1,900원', desc: '1회 결제로 반려동물궁합 리포트를 확인할 수 있어요.' },
   career: { price: '3,900원', desc: '1회 결제로 취업·사업·이동운 리포트를 확인할 수 있어요.' },
+  lifetime: { price: '24,900원', desc: '1회 결제로 평생운 프리미엄 리포트를 확인할 수 있어요.' },
 };
 // 2026-09-23: Meta Pixel InitiateCheckout의 content_name용 — .cat-option-name의 표시 문구와
 // 동일하게(이모지만 제외) 맞춰뒀다. 다른 로직에서는 쓰지 않는, Pixel 전용 상품명 매핑이다.
@@ -3822,6 +3841,7 @@ const AI_CATEGORY_DISPLAY_NAME = {
   wealth: '재물운',
   career: '취업·사업·이동운',
   pet: '반려동물궁합',
+  lifetime: '평생운 프리미엄',
 };
 $$('#genderSeg button').forEach(btn=>{
   btn.addEventListener('click', ()=>{
@@ -4895,6 +4915,34 @@ function buildSeunText(s, targetYear){
   const god = tenGodOf(dmG, GAN_ELEMENT[yp.g], yp.g % 2);
   return `${targetYear}년 세운: ${GAN[yp.g]}${ZHI[yp.z]}(${GAN_HANJA[yp.g]}${ZHI_HANJA[yp.z]})년, ${ELEMENT_NAME[GAN_ELEMENT[yp.g]]}${ELEMENT_NAME[ZHI_ELEMENT[yp.z]]} 기운. 일간 ${GAN[dmG]}(${ELEMENT_NAME[GAN_ELEMENT[dmG]]})과의 십성 관계: ${god}.`;
 }
+// 평생운 프리미엄(lifetime) 카테고리용. saju.현재대운/ziwei.현재대한은 "지금" 한 구간만
+// 담고 있어서 부족하다 — s.daeun.list/z.daeHan.list에 이미 있는 평생 전체 구간 목록을
+// 그대로 텍스트로 풀어, 각 구간이 지나온/현재/앞으로 올 구간인지 태그를 붙여 반환한다.
+function buildLifetimeDaeunText(s, z){
+  const dmG = s.pillars.day.g;
+  const today = new Date();
+  const birthLocal = new Date(s.input.year, s.input.month-1, s.input.day);
+  let curAge = today.getFullYear() - birthLocal.getFullYear();
+  const hadBirthday = (today.getMonth()>birthLocal.getMonth()) || (today.getMonth()===birthLocal.getMonth() && today.getDate()>=birthLocal.getDate());
+  if(!hadBirthday) curAge -= 1;
+
+  const lines = [];
+  lines.push('[사주 대운 전체 목록 — 태어날 때부터 평생에 걸친 10년 단위 흐름, 각 구간의 간지와 일간 기준 십성 관계]');
+  s.daeun.list.forEach(d=>{
+    const god = tenGodOf(dmG, GAN_ELEMENT[d.g], d.g % 2);
+    const tag = curAge>=d.startAge && curAge<=d.endAge ? ' (현재 이 구간을 지나는 중)' : (d.startAge > curAge ? ' (앞으로 올 구간)' : ' (이미 지나온 구간)');
+    lines.push(`${d.startAge}-${d.endAge}세: ${GAN[d.g]}${ZHI[d.z]}(${ELEMENT_NAME[GAN_ELEMENT[d.g]]}${ELEMENT_NAME[ZHI_ELEMENT[d.z]]}), 십성 ${god}${tag}`);
+  });
+  if(z){
+    lines.push('');
+    lines.push('[자미두수 대한 전체 목록 — 평생에 걸친 구간별 궁위]');
+    z.daeHan.list.forEach(d=>{
+      const tag = curAge>=d.startAge && curAge<=d.endAge ? ' (현재)' : (d.startAge > curAge ? ' (앞으로)' : ' (지나온 구간)');
+      lines.push(`${d.startAge}-${d.endAge}세: ${d.palaceName}${tag}`);
+    });
+  }
+  return lines.join('\n');
+}
 // 반려동물궁합(pet) 카테고리용. 태어난 해(연도)만으로 띠(12지)를 구하고, 집사의 일지와
 // 전통 육합(六合)/충(沖) 관계인지 판정해 짧은 사실 문장으로 만든다. 판정 자체는 담백한
 // 사실 문장이고, 이걸 유쾌하게 재해석하는 건 전적으로 PET_SYSTEM_PROMPT(백엔드)의 몫이다.
@@ -4943,6 +4991,9 @@ function buildAiPayload(){
   }
   if(selectedAiCategory === 'newyear'){
     payload.세운 = buildSeunText(s, 2027);
+  }
+  if(selectedAiCategory === 'lifetime'){
+    payload.평생대운 = buildLifetimeDaeunText(s, z);
   }
   if(selectedAiCategory === 'pet' && petData){
     payload.pet = petData;
@@ -5605,8 +5656,8 @@ function escapeHtml(str){
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
-const CATEGORY_LABEL = { comprehensive:'종합 사주 해석', love:'연애·재회운', compatibility:'궁합&결혼', newyear:'2027 신년운세', wealth:'재물운', career:'취업·사업·이동운', pet:'반려동물궁합' };
-const CATEGORY_FILE_LABEL = { comprehensive:'종합사주', love:'연애운', compatibility:'궁합', newyear:'신년운세', wealth:'재물운', career:'취업사업운', pet:'반려동물궁합' };
+const CATEGORY_LABEL = { comprehensive:'종합 사주 해석', love:'연애·재회운', compatibility:'궁합&결혼', newyear:'2027 신년운세', wealth:'재물운', career:'취업·사업·이동운', pet:'반려동물궁합', lifetime:'평생운 프리미엄' };
+const CATEGORY_FILE_LABEL = { comprehensive:'종합사주', love:'연애운', compatibility:'궁합', newyear:'신년운세', wealth:'재물운', career:'취업사업운', pet:'반려동물궁합', lifetime:'평생운프리미엄' };
 const PURCHASE_STATUS_LABEL = { paid:'결제완료', pending:'대기중', failed:'실패', refunded:'환불됨' };
 // 결제한 리포트를 "내 결제내역"에서 다시 볼 수 있는 기간(일). 이 기간이 지나면 화면에서는
 // 더 이상 다시 열어볼 수 없지만(서버 데이터는 그대로 남아있음), 그 안에 PDF로 받아두면
