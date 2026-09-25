@@ -25,7 +25,7 @@
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const VALID_CATEGORIES = ['comprehensive', 'love', 'compatibility', 'newyear', 'wealth', 'pet', 'career'];
+const VALID_CATEGORIES = ['comprehensive', 'love', 'compatibility', 'newyear', 'wealth', 'pet', 'career', 'lifetime'];
 const MAX_EXCERPT_LEN = 220;
 const MAX_NAME_LEN = 20;
 
