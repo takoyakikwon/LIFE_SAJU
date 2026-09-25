@@ -5717,20 +5717,61 @@ async function downloadPurchasePdf(row, btnEl){
   wrap.style.left = '-9999px';
   wrap.style.top = '0';
   wrap.style.width = '760px';
-  wrap.style.padding = '44px 40px';
-  wrap.style.background = '#ffffff';
-  wrap.style.color = '#1a1420';
+  wrap.style.padding = '236px 54px 210px';
+  // 사용자가 업로드한 매화 장식 배경을 위/아래에 각각 원본 비율로 고정 배치하고,
+  // 그 사이는 종이 톤 단색으로 채운다. 문서 길이가 얼마든 위/아래 프레임 장식이 항상 정확히 보인다.
+  wrap.style.background = "url('https://sajugyeol.co.kr/pdf-bg-comprehensive.jpg') top center / 100% auto no-repeat, url('https://sajugyeol.co.kr/pdf-bg-comprehensive.jpg') bottom center / 100% auto no-repeat, #f4ecd8";
+  wrap.style.color = '#241d13';
   wrap.style.fontFamily = "'Noto Sans KR', sans-serif";
+
+  const parsed = parseAiSections(row.result_text || '');
+  const leadIn = (parsed[0] && !parsed[0].title) ? parsed[0].body : '';
+  const sections = parsed.filter(s=>s.title);
+  const catLabel = CATEGORY_LABEL[row.category] || row.category;
+  const nameLabel0 = (row.name || '').trim();
+
+  const tocHtml = sections.length >= 3 ? `
+    <div style="display:flex; gap:10px; margin:22px 0 24px; padding:14px 16px; background:rgba(255,253,246,.55); border:1px solid rgba(178,59,46,.18); border-radius:10px;">
+      <div style="flex:1; display:flex; flex-direction:column; gap:2px;">
+        ${sections.map((s,i)=>`<div style="display:flex; align-items:center; gap:9px; padding:4px 2px; font-size:12px; color:#6b5c3f;"><span style="font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#b23b2e; width:18px;">${String(i+1).padStart(2,'0')}</span><span>${escapeHtml(s.title)}</span></div>`).join('')}
+      </div>
+    </div>` : '';
+
+  const bodyHtml = sections.length >= 3
+    ? sections.map((s,i)=>`
+      <div style="margin:22px 0;">
+        <div style="display:flex; align-items:center; gap:9px; margin-bottom:8px;">
+          <div style="width:22px; height:22px; border-radius:50%; background:rgba(178,59,46,.12); color:#b23b2e; font-family:'JetBrains Mono',monospace; font-size:11px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">${String(i+1).padStart(2,'0')}</div>
+          <h3 style="font-family:'Noto Serif KR',serif; font-weight:700; font-size:14.5px; color:#241d13; margin:0;">${escapeHtml(s.title)}</h3>
+        </div>
+        <p style="font-size:13px; line-height:1.85; color:#3a3020; padding-left:31px; white-space:pre-wrap; margin:0;">${escapeHtml(s.body)}</p>
+      </div>`).join('')
+    : `<p style="white-space:pre-wrap; font-size:13px; line-height:1.9; color:#3a3020; margin:0;">${escapeHtml(row.result_text||'저장된 해석 내용이 없어요.')}</p>`;
+
   wrap.innerHTML = `
-    <div style="font-family:'Noto Serif KR',serif; font-weight:900; font-size:12px; letter-spacing:.14em; color:#d4af37; margin-bottom:8px;">사주결 · 심층풀이</div>
-    <div style="font-family:'Noto Serif KR',serif; font-weight:900; font-size:24px; margin-bottom:10px;">${escapeHtml(CATEGORY_LABEL[row.category]||row.category)}</div>
-    <div style="font-size:12px; color:#6b6480; margin-bottom:28px; padding-bottom:16px; border-bottom:1px solid #e7e2f5;">결제일 ${formatDateTime(row.created_at)} · 결제금액 ${formatKRW(row.amount)}</div>
-    <div style="white-space:pre-wrap; font-size:13.5px; line-height:1.9; color:#26202e;">${escapeHtml(row.result_text||'저장된 해석 내용이 없어요.')}</div>
+    <div style="display:flex; align-items:center; gap:13px;">
+      <div style="width:44px; height:44px; border-radius:9px; flex-shrink:0; background:linear-gradient(160deg, #c4432f, #b23b2e 60%, #8f2519); color:#f7ecd2; display:flex; align-items:center; justify-content:center; font-family:'Noto Serif KR',serif; font-weight:900; font-size:20px; box-shadow:0 0 0 1.5px rgba(212,175,99,.55), 0 4px 12px rgba(0,0,0,.25);">結</div>
+      <div>
+        <div style="font-family:'Noto Serif KR',serif; font-weight:900; font-size:18px; color:#241d13; letter-spacing:-.2px;">사주결</div>
+        <div style="font-size:10.5px; color:#7a6a4a; margin-top:2px;">전통 명리학 기반 사주풀이 · sajugyeol.co.kr</div>
+      </div>
+      <div style="margin-left:auto; padding:6px 15px; border:1px solid #b8912f; border-radius:999px; background:rgba(255,253,246,.55); color:#6e3d18; font-family:'Noto Serif KR',serif; font-weight:700; font-size:12px; white-space:nowrap;">${escapeHtml(catLabel)}</div>
+    </div>
+    <div style="height:1.5px; margin:16px 0 14px; background:linear-gradient(90deg, #b8912f 0%, rgba(184,145,47,.1) 60%, transparent 100%);"></div>
+    <div style="font-family:'Noto Serif KR',serif; font-weight:900; font-size:21px; color:#241d13; margin-bottom:4px;">${nameLabel0 ? escapeHtml(nameLabel0)+'님의 ' : ''}심층풀이</div>
+    <div style="display:flex; gap:16px; font-size:11px; color:#5c4d33; margin:6px 0 18px;">
+      <div>결제일 ${formatDateTime(row.created_at)}</div>
+      <div>결제금액 ${formatKRW(row.amount)}</div>
+    </div>
+    ${leadIn ? `<p style="font-size:13px; line-height:1.85; color:#3a3020; white-space:pre-wrap; margin:0 0 6px;">${escapeHtml(leadIn)}</p>` : ''}
+    ${tocHtml}
+    ${bodyHtml}
+    <div style="text-align:center; padding-top:18px; margin-top:26px; border-top:1px dashed rgba(178,59,46,.25); font-family:'Noto Serif KR',serif; font-size:10.5px; color:#8a7350; letter-spacing:.1em;">— 사 주 결 —</div>
   `;
   document.body.appendChild(wrap);
   try{
     // scale 1.5면 인쇄해도 충분히 선명하면서 캔버스가 과도하게 커지지 않는다.
-    const canvas = await html2canvas(wrap, { scale:1.5, backgroundColor:'#ffffff' });
+    const canvas = await html2canvas(wrap, { scale:1.5, backgroundColor:'#f4ecd8', useCORS:true });
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF('p','pt','a4');
     const pageW = pdf.internal.pageSize.getWidth();
@@ -5746,7 +5787,7 @@ async function downloadPurchasePdf(row, btnEl){
       sliceCanvas.width = canvas.width;
       sliceCanvas.height = sliceHeight;
       const ctx = sliceCanvas.getContext('2d');
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = '#f4ecd8';
       ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
       ctx.drawImage(canvas, 0, p*pxPerPage, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
       const sliceImgH = pageW * (sliceHeight / canvas.width);
