@@ -1235,6 +1235,21 @@ window.SajuAnalytics = (function(){
   .dm-preview-label{font-size:10.5px; color:var(--ink-faint); font-weight:700;}
   .dm-preview-value{font-size:12.5px; color:var(--ink); font-weight:700; margin-top:1px;}
   @keyframes dmPreviewIn{ 0%{opacity:0; transform:translateY(-4px);} 100%{opacity:1; transform:none;} }
+  /* 2026-09-25: 카카오톡 공유 링크로 들어왔을 때(보낸 사람의 심층풀이 총평 일부를 미리 보여주는 카드) */
+  .share-preview-card{
+    margin:0 0 18px; padding:16px 16px 14px; background:var(--paper-card);
+    border:1.5px solid var(--gold); border-radius:var(--radius-sm);
+    animation:dmPreviewIn .4s cubic-bezier(.34,1.56,.64,1);
+  }
+  .share-preview-label{
+    display:block; font-size:10.5px; font-weight:700; color:var(--gold); margin-bottom:8px;
+  }
+  .share-preview-excerpt{
+    font-size:13px; line-height:1.75; color:var(--ink); margin:0 0 10px; white-space:pre-wrap;
+  }
+  .share-preview-cta{
+    font-size:11.5px; color:var(--ink-faint); margin:0; text-align:center; font-weight:700;
+  }
   /* 제출 직후 사주가 도장처럼 찍히며 드러나는 리빌 연출 오버레이 */
   .reveal-overlay{
     position:absolute; inset:0; z-index:200;
@@ -1384,6 +1399,11 @@ window.SajuAnalytics = (function(){
       <p class="hero-tagline">당신이 모르는<br>당신의 이야기가 시작됩니다</p>
       <p class="hero-line">태어난 순간, 하늘은 <b>년·월·일·시</b> 네 개의 도장을 찍습니다.<br>그 도장의 비밀을 알려드리겠습니다.</p>
       <p class="hero-scope"><b>무료</b>로 사주팔자를 확인하고, <b>심층풀이</b>를 통해 나의 재물·연애·직업·삶의 흐름을 자세히 볼 수 있어요.</p>
+      <div class="share-preview-card" id="sharePreviewCard" hidden>
+        <div class="share-preview-label" id="sharePreviewLabel"></div>
+        <p class="share-preview-excerpt" id="sharePreviewExcerpt"></p>
+        <p class="share-preview-cta">나의 사주도 무료로 확인해볼까요? 아래에 생년월일을 입력해보세요 👇</p>
+      </div>
       <div class="field">
         <label for="inpName">이름 (선택)</label>
         <input type="text" id="inpName" placeholder="예: 홍길동">
@@ -5258,7 +5278,12 @@ async function runAiInterpretation(){
 // - 로그인 사용자: 기존처럼 "내 결제내역"에서 15일간 재열람 + PDF 저장 가능 안내
 // - 비회원: 다시 볼 수 없다는 점을 명확히 알리고, 지금 바로 PDF로 저장할 수 있는 버튼을 제공
 
-// 카카오톡 공유하기 — 심층풀이 결과 제목만 공유 (전체 텍스트 아님)
+// 카카오톡 공유하기 — 심층풀이 결과의 총평 일부를 미리보기로 함께 공유한다(2026-09-25).
+// 원래는 제목 한 줄만 공유했었는데("전체 텍스트 아님"), 받는 사람이 아무 내용도 못 보고
+// 바로 입력 화면만 보게 되는 게 이상하다는 피드백을 받아, 공유 링크에 짧은 미리보기가
+// 붙도록 확장했다. 저장/전달되는 건 리포트 원문 전체가 아니라 항상 서버가 길이를 다시
+// 잘라내는 짧은 총평 한 문단(api/share.js 참고)이고, 생년월일시 등 개인정보는 아예
+// 공유 데이터에 포함하지 않는다.
 const KAKAO_JS_KEY = 'f65da1661e7377b0b784cfd605523566';
 function initKakaoIfNeeded(){
   if(window.Kakao && !Kakao.isInitialized()){
@@ -5273,23 +5298,51 @@ function buildShareTitle(){
   const label = (lastName || '').trim();
   return `${label ? label + '님' : '이 사람'} 사주는 어떤지 같이 확인해볼까요?`;
 }
-function shareAiResultToKakao(){
+// parseAiSections()가 이미 분해해주는 "무제목 리드인 문단"(BASE_PROMPT가 항상
+// "[이름]님, 한마디로 보면"으로 시작하는 도입부)을 그대로 재사용해 미리보기 총평으로 쓴다.
+// 서버(api/share.js)가 길이를 다시 한 번 강제로 잘라내므로 여기 슬라이스는 1차 방어일 뿐이다.
+function buildShareExcerpt(){
+  const sections = parseAiSections(lastAiResultText || '');
+  const leadIn = (sections[0] && !sections[0].title) ? sections[0].body : (lastAiResultText || '');
+  return leadIn.trim().slice(0, 220);
+}
+// 공유 토큰을 서버에 발급받는다. 실패(네트워크 오류 등)해도 카카오 공유 자체는 막지 않고
+// null을 돌려줘 호출부가 기존 홈페이지 링크로 폴백하게 한다.
+async function createShareLink(){
+  try{
+    const res = await fetch('/api/share', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        category: selectedAiCategory,
+        name: lastName,
+        excerpt: buildShareExcerpt(),
+      }),
+    });
+    if(!res.ok) return null;
+    const data = await res.json();
+    return data && data.token ? `https://sajugyeol.co.kr/?share=${data.token}` : null;
+  } catch(e){
+    return null;
+  }
+}
+async function shareAiResultToKakao(){
   initKakaoIfNeeded();
   if(!window.Kakao || !Kakao.isInitialized()){
     alert('카카오톡 공유 기능을 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
     return;
   }
   const title = buildShareTitle();
-  const siteUrl = 'https://sajugyeol.co.kr/?ref=kakao_share';
+  const shareUrl = (await createShareLink()) || 'https://sajugyeol.co.kr/?ref=kakao_share';
   Kakao.Share.sendDefault({
     objectType: 'feed',
     content: {
       title,
       imageUrl: 'https://sajugyeol.co.kr/icons/icon-512.png',
-      link: { mobileWebUrl: siteUrl, webUrl: siteUrl },
+      link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
     },
     buttons: [
-      { title: '무료로 내 사주 보기', link: { mobileWebUrl: siteUrl, webUrl: siteUrl } },
+      { title: '무료로 내 사주 보기', link: { mobileWebUrl: shareUrl, webUrl: shareUrl } },
     ],
   });
 }
@@ -5298,6 +5351,28 @@ document.addEventListener('click', function(e){
   if(shareBtn) shareAiResultToKakao();
 });
 window.addEventListener('load', initKakaoIfNeeded);
+// URL에 ?share=토큰이 있으면(카카오톡 공유 링크로 들어온 경우) 입력 화면 상단에
+// 보낸 사람의 총평 미리보기 카드를 띄운다. 토큰이 없거나 조회 실패/만료 시에는 조용히
+// 넘어가고 기존 입력 폼만 그대로 보여준다(에러를 사용자에게 노출하지 않는다).
+async function showSharePreviewIfAny(){
+  const token = new URLSearchParams(location.search).get('share');
+  if(!token) return;
+  try{
+    const res = await fetch(`/api/share?token=${encodeURIComponent(token)}`);
+    if(!res.ok) return;
+    const data = await res.json();
+    if(!data || !data.excerpt) return;
+    const card = $('#sharePreviewCard');
+    if(!card) return;
+    const catLabel = AI_CATEGORY_DISPLAY_NAME[data.category] || '심층풀이';
+    const name = String(data.sender_name || '').trim();
+    $('#sharePreviewLabel').textContent = `${name ? name + '님의 ' : ''}${catLabel} 미리보기`;
+    $('#sharePreviewExcerpt').textContent = data.excerpt;
+    card.hidden = false;
+  } catch(e){
+    // 미리보기 실패는 조용히 무시 — 기존 입력 폼 동작에는 영향을 주지 않는다.
+  }
+}
 
 function renderAiResultNote(){
   const note = $('#aiResultNote');
@@ -6386,6 +6461,7 @@ initAuth();
 restorePaymentResumeSnapshotIfAny();
 restoreFormSnapshotIfAny();
 restoreResultSnapshotIfAny(); // 2026-09-20: 위 두 복원이 해당 없을 때만(pendingRestoreGroup 미설정) 동작
+showSharePreviewIfAny(); // 2026-09-25: ?share=토큰으로 들어온 경우 보낸 사람 총평 미리보기 카드 표시
 })();
 </script>
 <script>
