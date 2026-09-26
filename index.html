@@ -1157,13 +1157,14 @@ window.SajuAnalytics = (function(){
   .picker-btn .ic{color:var(--ink-soft); font-size:15px;}
   .picker-btn.disabled{opacity:.4; pointer-events:none;}
   .sheet-bg{
-    position:fixed; inset:0; background:rgba(5,5,12,.65); backdrop-filter:blur(3px);
+    position:fixed; top:0; left:0; right:0; height:var(--app-vvh, 100vh); background:rgba(5,5,12,.65); backdrop-filter:blur(3px);
     z-index:60; display:none; align-items:flex-end; justify-content:center;
   }
   .sheet-bg.open{display:flex;}
   .sheet{
     width:100%; max-width:430px; background:var(--paper-deep); border:1px solid var(--line); border-bottom:none;
     border-radius:24px 24px 0 0; padding:10px 20px calc(22px + env(safe-area-inset-bottom));
+    max-height:calc(var(--app-vvh, 100vh) - 20px); overflow-y:auto; -webkit-overflow-scrolling:touch;
     transform:translateY(100%); transition:transform .28s cubic-bezier(.32,.72,0,1);
   }
   .sheet-bg.open .sheet{transform:translateY(0);}
@@ -3196,6 +3197,19 @@ function calcZiwei({ year, month, day, hour, minute, unknownTime, gender, trueHo
    ========================================================= */
 const $ = sel => document.querySelector(sel);
 const $$ = sel => Array.from(document.querySelectorAll(sel));
+// 2026-09-26: 모바일 키보드가 올라올 때 바텀시트(태어난 곳 검색 등)가 position:fixed;inset:0 기준
+// 전체 화면 높이만큼 깔리면서 하단(키보드 뒤)에 가려지는 문제 수정 — visualViewport로 실제 보이는
+// 높이를 추적해 --app-vvh 변수에 반영, .sheet-bg가 그 높이만큼만 차지하도록 해 시트가 항상 키보드
+// 위쪽에 붙도록 한다(모든 바텀시트가 공유하는 클래스라 한 번에 전부 적용됨).
+function syncViewportHeight(){
+  const vv = window.visualViewport;
+  document.documentElement.style.setProperty('--app-vvh', (vv ? vv.height : window.innerHeight) + 'px');
+}
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize', syncViewportHeight);
+  window.visualViewport.addEventListener('scroll', syncViewportHeight);
+}
+syncViewportHeight();
 function ganSeal(gIdx, opts){
   opts = opts || {};
   const el = GAN_ELEMENT[gIdx];
