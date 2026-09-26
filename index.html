@@ -947,7 +947,7 @@ window.SajuAnalytics = (function(){
   .ai-flat-title{ font-family:"Noto Serif KR",serif; font-weight:900; font-size:15.5px; color:var(--gold); letter-spacing:-.1px; }
   .ai-flat-p{ font-size:13.5px; line-height:1.9; color:var(--ink); white-space:pre-wrap; margin:0; }
   .ai-error{
-    font-size:12.5px; color:var(--seal); background:var(--fire-soft);
+    font-size:12.5px; color:#ff9382; background:var(--fire-soft);
     border-radius:var(--radius-sm); padding:12px 14px; line-height:1.6;
   }
   .ai-result-note{
@@ -1563,13 +1563,21 @@ window.SajuAnalytics = (function(){
         <div class="sheet-handle"></div>
         <div class="sheet-title">태어난 시간</div>
         <div class="manual-panel active" id="time-manual">
+          <div class="seg" id="pkAmPmSeg" style="margin-bottom:10px;">
+            <button type="button" data-val="AM" class="active">오전</button>
+            <button type="button" data-val="PM">오후</button>
+          </div>
           <div class="manual-row">
-            <div class="mfield"><label>시 (0~23)</label><input type="text" inputmode="numeric" maxlength="2" id="pkManualHour" placeholder="14"></div>
+            <div class="mfield"><label>시 (1~12)</label><input type="text" inputmode="numeric" maxlength="2" id="pkManualHour" placeholder="2"></div>
             <div class="mfield"><label>분 (0~59)</label><input type="text" inputmode="numeric" maxlength="2" id="pkManualMinute" placeholder="30"></div>
           </div>
-          <p class="manual-hint">24시간제로 입력해주세요. 예: 오후 2시 30분 → 14 / 30</p>
+          <p class="manual-hint">예: 오후 2시 30분생이면 오후 · 2 · 30</p>
           <div class="sijin-hint" id="manualSijinLabel"></div>
           <div id="pkManualTimeError" hidden class="ai-error" style="margin-top:8px;"></div>
+          <div class="checkline" id="pkTimeUnknownRow" style="margin-top:10px;">
+            <input type="checkbox" id="pkTimeUnknown">
+            <label for="pkTimeUnknown" style="margin:0;">태어난 시간을 몰라요</label>
+          </div>
         </div>
         <button type="button" class="sheet-confirm" id="timeConfirmBtn">완료</button>
       </div>
@@ -2015,6 +2023,8 @@ window.SajuAnalytics = (function(){
     </div>
     <div class="admin-section-title">유입 퍼널</div>
     <div class="admin-summary" id="funnelSummary"></div>
+    <div class="admin-section-title">단계별 이탈 현황</div>
+    <div class="admin-summary" id="funnelStepsSummary"></div>
     <div class="admin-section-title">결제 요약</div>
     <div class="admin-summary" id="adminSummary"></div>
     <div class="admin-section-title-row">
@@ -4190,16 +4200,30 @@ function openSheet(type, target){
     setTimeout(pkInitDateWheels, 10);
     history.pushState({ view: 'sheetOpen', sheet: 'date' }, '');
     sheetPushedType = 'date';
+    if(pkTarget === 'main') logFunnelEvent('date_sheet_open');
   } else {
     if($('#'+t.unknownId).checked) return;
-    $('#pkManualHour').value = p.timeSet ? p.hour : '';
-    $('#pkManualMinute').value = p.timeSet ? p.minute : '';
+    $('#pkTimeUnknown').checked = false;
+    $('#pkManualHour').disabled = false;
+    $('#pkManualMinute').disabled = false;
+    if(p.timeSet){
+      const h12 = p.hour % 12 === 0 ? 12 : p.hour % 12;
+      const ampm = p.hour < 12 ? 'AM' : 'PM';
+      $('#pkManualHour').value = h12;
+      $('#pkManualMinute').value = p.minute;
+      $$('#pkAmPmSeg button').forEach(b=> b.classList.toggle('active', b.dataset.val === ampm));
+    } else {
+      $('#pkManualHour').value = '';
+      $('#pkManualMinute').value = '';
+      $$('#pkAmPmSeg button').forEach(b=> b.classList.toggle('active', b.dataset.val === 'AM'));
+    }
     $('#pkManualTimeError').hidden = true;
     pkUpdateSijinLabel(p.hour);
     $('#timeSheetBg').classList.add('open');
     setTimeout(pkInitTimeWheels, 10);
     history.pushState({ view: 'sheetOpen', sheet: 'time' }, '');
     sheetPushedType = 'time';
+    if(pkTarget === 'main') logFunnelEvent('time_sheet_open');
   }
 }
 function closeSheet(type){
@@ -4244,6 +4268,7 @@ function confirmDatePicker(){
     if(!valid){
       $('#pkManualDateError').textContent = '년/월/일을 모두 정확히 입력해주세요.';
       $('#pkManualDateError').hidden = false;
+      if(pkTarget === 'main') logFunnelEvent('date_input_error');
       return;
     }
     $('#pkManualDateError').hidden = true;
@@ -4271,18 +4296,30 @@ function confirmDatePicker(){
 function confirmTimePicker(){
   const t = PICKER_TARGETS[pkTarget];
   const p = pk();
+  const unkEl = $('#'+t.unknownId);
   const manualActive = $('#time-manual').classList.contains('active');
+  if($('#pkTimeUnknown').checked){
+    if(!unkEl.checked){ unkEl.checked = true; unkEl.dispatchEvent(new Event('change')); }
+    $('#pkManualTimeError').hidden = true;
+    closeSheet('time');
+    return;
+  }
+  if(unkEl.checked){ unkEl.checked = false; unkEl.dispatchEvent(new Event('change')); }
   if(manualActive){
     const hRaw = $('#pkManualHour').value.trim();
     const minRaw = $('#pkManualMinute').value.trim();
-    const h = parseInt(hRaw, 10), mi = parseInt(minRaw, 10);
-    const valid = hRaw && minRaw && Number.isInteger(h) && Number.isInteger(mi) && h >= 0 && h <= 23 && mi >= 0 && mi <= 59;
+    const h12 = parseInt(hRaw, 10), mi = parseInt(minRaw, 10);
+    const ampm = $('#pkAmPmSeg button.active')?.dataset.val || 'AM';
+    const valid = hRaw && minRaw && Number.isInteger(h12) && Number.isInteger(mi) && h12 >= 1 && h12 <= 12 && mi >= 0 && mi <= 59;
     if(!valid){
-      $('#pkManualTimeError').textContent = '시/분을 모두 정확히 입력해주세요(0~23시, 0~59분).';
+      $('#pkManualTimeError').textContent = '오전/오후와 시(1~12)·분(0~59)을 모두 정확히 입력해주세요.';
       $('#pkManualTimeError').hidden = false;
+      if(pkTarget === 'main') logFunnelEvent('time_input_error');
       return;
     }
     $('#pkManualTimeError').hidden = true;
+    let h = h12 % 12;
+    if(ampm === 'PM') h += 12;
     p.hour = h; p.minute = mi;
   }
   p.timeSet = true;
@@ -4292,9 +4329,32 @@ function confirmTimePicker(){
 }
 $('#dateConfirmBtn').addEventListener('click', confirmDatePicker);
 $('#timeConfirmBtn').addEventListener('click', confirmTimePicker);
+$$('#pkAmPmSeg button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    $$('#pkAmPmSeg button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const h12 = parseInt($('#pkManualHour').value.trim(), 10);
+    if(Number.isInteger(h12) && h12>=1 && h12<=12){
+      let h = h12 % 12;
+      if(btn.dataset.val === 'PM') h += 12;
+      pkUpdateSijinLabel(h);
+    }
+  });
+});
+$('#pkTimeUnknown').addEventListener('change', (e)=>{
+  const checked = e.target.checked;
+  $('#pkManualHour').disabled = checked;
+  $('#pkManualMinute').disabled = checked;
+  if(checked) $('#pkManualTimeError').hidden = true;
+});
 $('#pkManualHour').addEventListener('input', ()=>{
-  const h = parseInt($('#pkManualHour').value.trim(), 10);
-  if(Number.isInteger(h) && h>=0 && h<=23) pkUpdateSijinLabel(h);
+  const h12 = parseInt($('#pkManualHour').value.trim(), 10);
+  const ampm = $('#pkAmPmSeg button.active')?.dataset.val || 'AM';
+  if(Number.isInteger(h12) && h12>=1 && h12<=12){
+    let h = h12 % 12;
+    if(ampm === 'PM') h += 12;
+    pkUpdateSijinLabel(h);
+  }
 });
 // 제출 직후 계산 결과를 곧바로 보여주지 않고, 사주 여덟 글자가 도장처럼 하나씩
 // 찍히는 리빌 연출을 짧게 보여준 다음 실제 렌더링(onComplete)을 실행한다.
@@ -4345,6 +4405,7 @@ $('#calcDetailToggle')?.addEventListener('click', ()=>{
   btn.setAttribute('aria-expanded', String(willShow));
 });
 $('#submitBtn').addEventListener('click', ()=>{
+  logFunnelEvent('submit_click');
   let y, m, d;
   if(mainLunarInput.getCalType() === 'lunar'){
     try{
@@ -4352,18 +4413,19 @@ $('#submitBtn').addEventListener('click', ()=>{
       y = solar.year; m = solar.month; d = solar.day;
     } catch(err){
       alert(err.message);
+      logFunnelEvent('submit_blocked');
       return;
     }
   } else {
     const dateVal = $('#inpDate').value;
-    if(!dateVal){ alert('생년월일을 입력해주세요.'); return; }
+    if(!dateVal){ alert('생년월일을 입력해주세요.'); logFunnelEvent('submit_blocked'); return; }
     [y,m,d] = dateVal.split('-').map(Number);
   }
   const unknownTime = $('#inpUnknown').checked;
   let hour=12, minute=0;
   if(!unknownTime){
     const timeVal = $('#inpTime').value;
-    if(!timeVal){ alert('태어난 시간을 선택하거나, 모르신다면 "태어난 시간을 몰라요"를 체크해주세요.'); return; }
+    if(!timeVal){ alert('태어난 시간을 선택하거나, 모르신다면 "태어난 시간을 몰라요"를 체크해주세요.'); logFunnelEvent('submit_blocked'); return; }
     [hour,minute] = timeVal.split(':').map(Number);
   }
   const lonVal = parseFloat(citySelect.value);
@@ -6038,6 +6100,37 @@ async function refreshFunnelSummary(startISO, endISO){
     `<div class="stat"><div class="n">${submitters}</div><div class="l">기본운세 확인 (${pctSubmit}%)</div></div>` +
     `<div class="stat"><div class="n">${purchasers}</div><div class="l">결제완료 (${pctPay}%)</div></div>`;
 }
+
+const FUNNEL_STEP_LABELS = {
+  visit: '방문',
+  date_sheet_open: '생년월일 입력 시도',
+  date_input_error: '생년월일 입력 오류',
+  time_sheet_open: '태어난 시간 입력 시도',
+  time_input_error: '시간 입력 오류',
+  submit_click: "'내 사주 보기' 클릭",
+  submit_blocked: '제출 막힘(필수값 누락)',
+  form_submit: '기본운세 확인 완료',
+};
+const FUNNEL_STEP_ORDER = ['visit','date_sheet_open','date_input_error','time_sheet_open','time_input_error','submit_click','submit_blocked','form_submit'];
+// 2026-09-26: 방문 이후 어느 입력 단계에서 이탈하는지 세분화해서 보여주는 패널.
+// funnel_events에 쌓이는 세분화 이벤트(date_sheet_open 등)를 event_type별 방문자 수로 집계하는
+// admin_funnel_steps RPC를 호출한다(위 admin_funnel_summary와 별개 RPC — 기존 요약 로직은 그대로 둠).
+async function refreshFunnelSteps(startISO, endISO){
+  const el = $('#funnelStepsSummary');
+  if(!el || !sb) return;
+  el.style.flexWrap = 'wrap';
+  el.innerHTML = '<div class="history-empty">불러오는 중...</div>';
+  const { data: steps, error: sErr } = await sb.rpc('admin_funnel_steps', { p_start: startISO, p_end: endISO });
+  if(sErr){
+    el.innerHTML = '<div class="history-empty">불러오지 못했어요 (' + escapeHtml(sErr.message) + ')</div>';
+    return;
+  }
+  const counts = {};
+  (steps||[]).forEach(r=>{ counts[r.event_type] = r.visitors || 0; });
+  el.innerHTML = FUNNEL_STEP_ORDER.map(k=>
+    `<div class="stat" style="flex:1 1 28%; min-width:84px;"><div class="n">${counts[k]||0}</div><div class="l">${escapeHtml(FUNNEL_STEP_LABELS[k]||k)}</div></div>`
+  ).join('');
+}
 // 관리자 CSV 다운로드(2026-09-02 신규) — 지금 화면에 로드된(=현재 기간 필터가 적용된) 결제내역/
 // CS 문의를 그대로 CSV로 내려받는다. 별도로 다시 조회하지 않고, refreshPurchaseList/
 // refreshInquiryList가 마지막으로 받아온 결과(lastPurchasesData/lastInquiriesData)를 재사용해
@@ -6278,6 +6371,7 @@ function renderInquiryList(inquiryEl, inquiries){
 function applyAdminPeriod(startISO, endISO, label){
   currentPeriodLabel = label || '전체';
   refreshFunnelSummary(startISO, endISO);
+  refreshFunnelSteps(startISO, endISO);
   refreshPurchaseList(startISO, endISO);
   refreshInquiryList(startISO, endISO);
 }
