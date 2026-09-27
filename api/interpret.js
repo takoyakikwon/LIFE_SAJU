@@ -688,6 +688,27 @@ const CONTINUATION_PROMPT_LIFETIME = `방금 작성한 "평생운 프리미엄" 
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
+// 평생운 프리미엄 전용: 지금까지 작성된 텍스트에 "16개 항목" 소제목이 몇 개나 이미
+// 만들어졌는지 세는 함수. 소제목은 공통 규칙에 따라 "[짧은 주제어] — [문장]" 형식으로
+// 독립된 한 줄에 쓰고 앞뒤로 빈 줄이 오도록 지시되어 있으므로, 빈 줄로 문단을 나눈 뒤
+// (1) 줄바꿈이 없는 한 줄짜리 블록이면서 (2) em dash("—")를 포함하고 (3) 너무 길지
+// 않은(소제목치고 비정상적으로 긴 문단이 아닌) 블록만 소제목 후보로 센다. 완벽한 파서는
+// 아니지만, "이미 16개를 다 썼는데 분량만 모자라서 이어쓰기가 다시 처음부터 항목을
+// 반복 생성하는" 문제(2026-09-27 실사용 테스트에서 재현: 일/가족/연애/건강/총평 등이
+// 2~3번씩 중복 출력됨)를 막기 위한 목적으로는 충분히 신뢰할 수 있는 근사치다.
+function countLifetimeSubtitles(text) {
+  if (!text) return 0;
+  const blocks = text.split(/\n\s*\n/);
+  let count = 0;
+  for (const block of blocks) {
+    const trimmed = block.trim();
+    if (!trimmed || trimmed.includes('\n')) continue;
+    if (trimmed.length > 120) continue;
+    if (/\s—\s/.test(trimmed)) count++;
+  }
+  return count;
+}
+
 // gpt-4o-mini가 긴 한국어 텍스트를 생성할 때, 드물게 문장 중간에 한글과 전혀 무관한
 // 스크립트(아랍어·키릴 문자·타이 문자 등) 토큰 하나를 잘못 골라 끼워 넣는 결함이 있다는
 // 사용자 신고가 반복됨(2026-08-24). 이 서비스 결과물에는 한글·한자(사주 용어 병기)·라틴
@@ -895,7 +916,17 @@ module.exports = async (req, res) => {
     const minLen = MIN_LENGTH_BY_CATEGORY[payload.category];
     const maxContinuationRounds = MAX_CONTINUATION_ROUNDS_BY_CATEGORY[payload.category] || DEFAULT_MAX_CONTINUATION_ROUNDS;
     let continuationRounds = 0;
-    while (minLen && text.length < minLen && continuationRounds < maxContinuationRounds) {
+    // 평생운 프리미엄은 "글자 수가 모자라면 무조건 이어쓴다"는 조건만으로는, 16개 항목을
+    // 이미 다 쓴 응답도 분량 미달이라는 이유로 이어쓰기를 또 부르게 되고, 그 이어쓰기가
+    // (프롬프트로 "반복하지 말라" 지시해도) 이미 쓴 항목을 처음부터 다시 쓰며 중복되는
+    // 사고가 실사용 테스트에서 반복 확인됨. 그래서 lifetime 카테고리는 16개 소제목이
+    // 이미 다 세어지면, 분량이 모자라도 이어쓰기를 더 이상 부르지 않는다.
+    const needsContinuation = (currentText) => {
+      if (!minLen || currentText.length >= minLen) return false;
+      if (payload.category === 'lifetime' && countLifetimeSubtitles(currentText) >= 16) return false;
+      return true;
+    };
+    while (needsContinuation(text) && continuationRounds < maxContinuationRounds) {
       try {
         const cont = await callOpenAI(apiKey, [
           { role: 'system', content: SYSTEM_PROMPT },
