@@ -655,14 +655,14 @@ const MIN_LENGTH_BY_CATEGORY = {
   newyear: 3500,
   wealth: 3000,
   career: 3000,
-  lifetime: 15000,
+  lifetime: 8000,
 };
 
-// 카테고리별 이어쓰기 최대 횟수. 평생운 프리미엄은 15,000자 이상을 목표로 하므로 1회
-// 이어쓰기로는 부족해 최대 3회(최초 응답 포함 총 4회 호출)까지 허용한다. 여기 없는
-// 카테고리는 DEFAULT_MAX_CONTINUATION_ROUNDS(기존과 동일한 1회)를 그대로 쓴다.
+// 카테고리별 이어쓰기 최대 횟수. 평생운 프리미엄은 기본 목표 10,000~14,000자(중장년은
+// 15,000자 안팎까지 허용) 수준이라 다른 카테고리처럼 이어쓰기 1회(최초 응답 포함 총
+// 2회 호출)이면 충분하다고 보고, 과도한 이어쓰기로 인한 반복·부풀리기를 막는다.
 const MAX_CONTINUATION_ROUNDS_BY_CATEGORY = {
-  lifetime: 3,
+  lifetime: 1,
 };
 const DEFAULT_MAX_CONTINUATION_ROUNDS = 1;
 
