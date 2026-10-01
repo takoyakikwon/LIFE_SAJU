@@ -232,7 +232,15 @@ async function recordPurchase({ userId, category, amount, payload, resultText, v
 
 // 사주/자미두수 기본+상세 텍스트 블록을 한 사람 분량으로 만든다. 궁합&결혼처럼 2인 입력을
 // 받는 카테고리에서 상대방(partner) 데이터도 같은 형식으로 재사용하기 위해 분리해뒀다.
-function buildPersonSajuZiweiBlock(saju, ziwei, labelPrefix) {
+// STEP 5.2 PHASE B 보강(출생시간 미상 중앙 처리) — timeKnown은 이 사람의 person_profile에서
+// 확인된 data_status.birth_time_known을 그대로 전달받는다. 넘기지 않으면(undefined — 이번
+// 변경 이전부터 존재하는 모든 호출 경로: person_profile이 없는 비-V3/구카테고리 폴백 등)
+// 아래 분기를 전혀 타지 않고 기존과 완전히 동일하게 동작한다. timeKnown===false일
+// 때만 자미두수의 시간 의존 궁 정보(명궁·신궁·12궁 상세·사화·현재대한)를 원자료 단계에서부터
+// 생략하고 일반화된 한 줄로 대체한다 — "카테고리별 프롬프트에 경고문 추가" 대신 이 함수(=Narrative
+// 입력 조립 단계) 한 곳에서 처리해 모든 카테고리에 동일하게 적용되게 한다. 사주 쪽 현재대운은
+// 시간(시주)이 아니라 월주 기준으로 파생되는 값이라 이 가드 대상이 아니다 — 그대로 둔다.
+function buildPersonSajuZiweiBlock(saju, ziwei, labelPrefix, timeKnown) {
   const lines = [];
   lines.push(`[${labelPrefix}사주팔자 기본]`);
   if (saju) {
@@ -252,29 +260,156 @@ function buildPersonSajuZiweiBlock(saju, ziwei, labelPrefix) {
     lines.push(`[${labelPrefix}자미두수 기본]`);
     lines.push(`음력 생일: ${ziwei.음력생일}`);
     lines.push(`오행국: ${ziwei.오행국}`);
-    lines.push(`명궁: ${ziwei.명궁}`);
-    if (ziwei.신궁) lines.push(`신궁: ${ziwei.신궁}`);
-    if (ziwei.명궁의별) lines.push(`명궁에 있는 별: ${ziwei.명궁의별}`);
-    if (ziwei.사화) lines.push(`사화: ${ziwei.사화}`);
-    if (ziwei.현재대한) lines.push(`현재 대한: ${ziwei.현재대한}`);
-    if (ziwei.궁위상세) {
-      lines.push('');
-      lines.push(`[${labelPrefix}자미두수 12궁 전체 상세 — 각 궁의 지지와 포함된 별]`);
-      lines.push(ziwei.궁위상세);
+    if (timeKnown === false) {
+      lines.push(`[${labelPrefix}자미두수 참고 신호] 출생시간 미상으로 명궁·신궁·12궁 구체 궁명·주성·대한·사화 소재궁은 확정 근거로 제공하지 않습니다. 이 사람에 대해서는 시간 의존 궁 정보를 확정된 궁명/별명으로 직접 인용하지 말고, person_profile에 이미 정리된 성향/행동/관계 판단만 근거로 쓰세요.`);
+    } else {
+      lines.push(`명궁: ${ziwei.명궁}`);
+      if (ziwei.신궁) lines.push(`신궁: ${ziwei.신궁}`);
+      if (ziwei.명궁의별) lines.push(`명궁에 있는 별: ${ziwei.명궁의별}`);
+      if (ziwei.사화) lines.push(`사화: ${ziwei.사화}`);
+      if (ziwei.현재대한) lines.push(`현재 대한: ${ziwei.현재대한}`);
+      if (ziwei.궁위상세) {
+        lines.push('');
+        lines.push(`[${labelPrefix}자미두수 12궁 전체 상세 — 각 궁의 지지와 포함된 별]`);
+        lines.push(ziwei.궁위상세);
+      }
     }
   }
   return lines.join('\n');
 }
 
+// ============================================================
+// Narrative V3 (STEP 5) — person_profile(=사람→실제 행동→감정/내면→삶의 패턴→이유→명리근거로
+// 이미 정리된 최우선 판단 결과)을 프롬프트 입력 텍스트로 바꾼다. 원자료(saju/ziwei 텍스트
+// 블록)를 대체하는 게 아니라 그 위에 얹는 추가 블록이다 — 기존 블록은 전혀 건드리지 않는다.
+// STEP 5.2 PHASE B(2026-10) — 연애·재회운/취업·사업·이동운/신년운세/궁합&결혼 4개 카테고리로
+// 확대했다(아래 buildPrompt의 분기, 그리고 module.exports의 SYSTEM_PROMPT 분기 참고). today·pet은
+// 이번 확대에서 제외한다(today는 분량이 너무 짧아 이 구조를 넣을 공간이 없고, pet은 애초에
+// person_profile/원자료를 쓰지 않는 완전 별도 시스템이라 적용 자체가 의미가 없음).
+// ============================================================
+const NARRATIVE_V3_CATEGORIES = ['comprehensive', 'lifetime', 'wealth', 'love', 'career', 'newyear', 'compatibility'];
+
+function formatAxisLine(a) {
+  if (!a) return null;
+  return `- [${a.topic}.${a.axis}] 관계=${a.relationship} / 확신도=${a.confidence} — ${a.synthesis}`;
+}
+
+// STEP 5.2 PHASE B — personLabel은 궁합&결혼처럼 두 사람(나/상대방)의 person_profile을 한
+// 프롬프트 안에 나란히 실어야 할 때만 넘긴다. 생략하면(기존 기본/종합사주·평생운·재물운 3개
+// 카테고리) 아래 모든 줄이 기존과 완전히 동일하게 출력된다 — STEP5.1에서 이미 검증된 이
+// 3개 카테고리의 프롬프트 텍스트는 이번 변경으로 단 한 글자도 바뀌지 않는다.
+function buildPersonProfileNarrativeBlock(pp, personLabel) {
+  if (!pp) return '';
+  const tag = personLabel ? `[${personLabel}] ` : '';
+  const lines = [];
+  lines.push(`${tag}[person_profile — 최우선 판단 결과. 아래는 이미 내려진 판단입니다. 이 판단을 뒤집거나, 원자료를 근거로 처음부터 다시 재해석하지 마세요. 이 구조를 사람 이야기로 번역하는 것이 이번 작업입니다.]`);
+  if (pp.data_status && pp.data_status.note) {
+    lines.push('');
+    lines.push(`${tag}[데이터 주의] ${pp.data_status.note}`);
+  }
+  // STEP 5.2 PHASE A — 출생시간 미상 Narrative guard. STEP 1~4(buildSajuCore/buildZiweiCore/
+  // buildIntegratedProfile/buildPersonProfile)의 판단 구조는 전혀 건드리지 않고, Narrative
+  // 출력 단계에서만 "이 사람은 시간 미상이니 궁 기반 정보를 참고 신호로 다뤄라"는 구체적
+  // 안전장치를 추가한다. data_status.note(자유 텍스트)만으로는 매번 다르게 해석될 수 있어,
+  // 어떤 궁이 시간 의존인지와 신뢰 우선순위를 여기서 고정 문구로 명시해 모델이 놓치지 않게 한다.
+  if (pp.data_status && pp.data_status.birth_time_known === false) {
+    lines.push('');
+    lines.push(`${tag}[출생시간 미상 — 아래 우선순위와 문체 규칙을 반드시 따르세요]`);
+    lines.push('이 사람은 출생시간이 확인되지 않았습니다. 현재 계산 구조상 자미두수 12궁(명궁·신궁·관록궁·재백궁·부처궁·부모궁·형제궁·자녀궁·천이궁·질액궁·전택궁·복덕궁)과 대한, 사화가 떨어지는 궁은 모두 임시 시간을 기준으로 파생된 값이므로 확정된 사실이 아니라 참고 신호로만 다루세요. 사주 쪽에서도 시주에 직접 의존하는 세부 판단과, 시주를 전제로 한 자녀·말년 관련 세부 결론은 확정적으로 말하지 마세요.');
+    lines.push('신뢰 우선순위: (1) 출생시간과 무관하게 확정 가능한 person_profile 신호 > (2) 사주의 시간 비의존 근거 > (3) 사주·자미두수 두 체계가 일치하는 신호 > (4) 시간 의존 자미두수 신호(위 12궁·대한·사화 소재궁) > (5) 시주 의존 사주 신호. 4~5번 근거만으로 핵심 결론을 단독으로 만들지 마세요.');
+    lines.push('단, "출생시간이 없기 때문에 정확하지 않습니다" 같은 문장을 매 문단 반복하지 마세요. 핵심 결론이 4~5번 근거에 직접 기대고 있을 때만 "~가능성이 높습니다", "~일 수 있습니다", "출생시간에 따라 세부 모습은 달라질 수 있지만, 현재 확인되는 흐름에서는 ~" 식으로 자연스럽게 낮춰 쓰고, 1~3번 근거가 충분하고 다른 신호와 일치하는 부분까지 전부 약하게 쓰지 않습니다.');
+    // STEP 5.2 중앙가드 보강(2026-10) — 원자료 단계에서 궁명을 지워도(buildPersonSajuZiweiBlock/
+    // 위 6.명리근거 참고), 모델이 자미두수 일반 지식만으로 "복덕 쪽에 걸려 있다" 같은 궁명의 변형
+    // 표현을 만들어 쓰는 사례가 실사용 테스트(lifetime_P2)에서 확인됐다. 데이터를 지우는 것만으론
+    // 부족하고, 이 사람에 대해서는 궁명 자체와 "~쪽"류 변형 표현까지 어휘 차원에서 쓰지 말라고
+    // 명시해야 한다. 이 블록은 birth_time_known===false일 때만 추가되므로 시간확정 사람·다른
+    // 카테고리에는 전혀 영향이 없다.
+    lines.push(`${tag}[표현 금지 — 이 사람에 대해서는 아래 궁명과 그 변형 표현을 문장 어디에도 쓰지 마세요: 명궁, 신궁, 관록궁, 재백궁, 부처궁, 부모궁, 형제궁, 자녀궁, 천이궁, 질액궁, 전택궁, 복덕궁, 대한, 사화. "궁"을 빼고 "쪽"을 붙인 변형(명궁 쪽/부처 쪽/재백 쪽/관록 쪽/복덕 쪽 등)도 동일하게 금지입니다 — 궁명을 생략해도 가리키는 대상이 같으면 똑같이 확정 근거처럼 읽힙니다. 자미두수 관련 흐름을 언급할 때는 궁 이름을 전혀 쓰지 않고 "자미두수 참고 신호상 ~가능성이 있습니다" 식으로만 쓰세요(예: "자미두수 참고 신호상 바깥 사건보다 마음의 방향 전환이 먼저 나타날 가능성이 있습니다"). 이렇게 문장 자체를 처음부터 안전하게 일반화하면, 그 뒤에 "출생시간 미상이라 단정하지 않겠습니다" 같은 별도 면책 문장을 또 붙일 필요가 없습니다 — 붙이지 마세요.]`);
+  }
+
+  lines.push('');
+  lines.push(`${tag}[1. 사람 — personality 축]`);
+  lines.push(`전체 관계=${pp.person.overall_relationship} / 확신도=${pp.person.integrated_confidence}`);
+  pp.person.axes.forEach(a => lines.push(formatAxisLine(a)));
+
+  lines.push('');
+  lines.push(`${tag}[2. 실제 행동 — career/mobility 축]`);
+  lines.push(`career 전체 관계=${pp.behavior.career.overall_relationship} / 확신도=${pp.behavior.career.integrated_confidence}`);
+  pp.behavior.career.axes.forEach(a => lines.push(formatAxisLine(a)));
+  lines.push(`mobility 전체 관계=${pp.behavior.mobility.overall_relationship} / 확신도=${pp.behavior.mobility.integrated_confidence}`);
+  pp.behavior.mobility.axes.forEach(a => lines.push(formatAxisLine(a)));
+
+  lines.push('');
+  lines.push(`${tag}[3. 감정/내면 — 여러 주제를 가로지르는 정서 축]`);
+  pp.emotional_inner.axes.forEach(a => lines.push(formatAxisLine(a)));
+
+  lines.push('');
+  lines.push(`${tag}[4. 삶에서 나타나는 패턴 — wealth/family/relationship/timing 축]`);
+  lines.push(`wealth 전체 관계=${pp.life_patterns.wealth.overall_relationship} / 확신도=${pp.life_patterns.wealth.integrated_confidence}`);
+  pp.life_patterns.wealth.axes.forEach(a => lines.push(formatAxisLine(a)));
+  lines.push(`family 전체 관계=${pp.life_patterns.family.overall_relationship} / 확신도=${pp.life_patterns.family.integrated_confidence}`);
+  pp.life_patterns.family.axes.forEach(a => lines.push(formatAxisLine(a)));
+  lines.push('relationship(연애/관계, wealth·family에 없는 잔여 축):');
+  pp.life_patterns.relationship_remainder.forEach(a => lines.push(formatAxisLine(a)));
+  lines.push(`timing(현재 시기) 전체 관계=${pp.life_patterns.timing.overall_relationship} / 확신도=${pp.life_patterns.timing.integrated_confidence}`);
+  pp.life_patterns.timing.axes.forEach(a => lines.push(formatAxisLine(a)));
+
+  lines.push('');
+  lines.push(`${tag}[5. 이유 — confirmed는 확신 있게 단정해도 되는 축, tensions는 반드시 양면으로 서술할 축]`);
+  lines.push('confirmed(일치 + 뚜렷한 신호 — 이 축들만 단정적으로 서술 가능):');
+  pp.reasons.confirmed.forEach(a => lines.push(`- [${a.topic}.${a.axis}] ${a.synthesis}`));
+  lines.push('tensions(충돌 — 절대 한쪽으로 봉합하지 말고 이 사람의 양면성을 설명하는 재료로 사용):');
+  pp.reasons.tensions.forEach(a => lines.push(`- [${a.topic}.${a.axis}] ${a.synthesis}`));
+  if (pp.reasons.gaps && pp.reasons.gaps.length) {
+    lines.push('gaps(데이터부족 — 억지로 채우지 말고 생략하거나 아주 짧게만 언급):');
+    pp.reasons.gaps.forEach(a => lines.push(`- [${a.topic}.${a.axis}] ${a.synthesis}`));
+  }
+
+  lines.push('');
+  lines.push(`${tag}[6. 명리 근거 — 본문 마지막에 아주 짧게만 인용하고, 이 데이터로 새로운 설명을 시작하지 마세요]`);
+  const me = pp.myeongri_evidence;
+  if (me && me.saju) {
+    lines.push(`사주: 일간 ${me.saju.day_master.gan}(${me.saju.day_master.element}), ${me.saju.strength.level}, ${me.saju.month_command.note || ''}, 구조=${me.saju.structural_pattern}, 오행분포=${me.saju.five_elements_summary}${me.saju.current_daeun ? `, 현재 대운=${me.saju.current_daeun.ganzhi}(${me.saju.current_daeun.age_range})` : ''}`);
+  }
+  // STEP 5.2 PHASE B 보강 — me.ziwei(=myeongri_evidence.ziwei)는 명궁/신궁/대한을 요약
+  // 인용하는 "명리 근거" 줄이다. 이 사람이 출생시간 미상이면(pp.data_status.birth_time_known
+  // === false) 여기서도 구체 궁명/주성/대한을 확정 근거로 적지 않고 일반화한다 — 본문 마지막에
+  // 쓰이는 짧은 근거 인용 문장이 바로 이 줄이라, 여기를 고치지 않으면 위의 [출생시간 미상] 안내
+  // 문구만으로는 모델이 종종 이 줄을 그대로 베껴 "명궁 천량" 식으로 확정 인용하는 문제가 있었다.
+  const timeKnownForEvidence = !(pp.data_status && pp.data_status.birth_time_known === false);
+  if (me && me.ziwei) {
+    if (timeKnownForEvidence) {
+      lines.push(`자미두수: 명궁=${(me.ziwei.life_palace.main_stars || []).join('·')}, 신궁=${me.ziwei.body_palace.location}(${(me.ziwei.body_palace.main_stars || []).join('·')})${me.ziwei.major_period ? `, 현재 대한=${me.ziwei.major_period.age_range}(${me.ziwei.major_period.activated_palace})` : ''}`);
+    } else {
+      lines.push('자미두수 참고 신호: 출생시간 미상으로 명궁·신궁·대한 등 구체 궁명/주성명은 확정 근거로 제공하지 않습니다. 본문 마지막에 이 줄을 인용할 때도 궁명·별명·대한을 직접 적지 말고 "자미두수 참고 신호상" 정도로 일반화해서 아주 짧게만 언급하세요.');
+    }
+  }
+
+  return lines.filter(l => l !== null).join('\n');
+}
+
 function buildPrompt(payload) {
   const { name, gender, birth, saju, ziwei, partner } = payload;
+
+  // STEP 5.2 PHASE B 보강 — person_profile이 있을 때만(=NARRATIVE_V3_CATEGORIES 요청) 거기 실린
+  // data_status.birth_time_known을 원자료 블록(buildPersonSajuZiweiBlock)에도 그대로 전달해,
+  // 출생시간 미상인 사람의 자미두수 궁 기반 세부 정보가 "확정 근거"로 노출되지 않게 한다.
+  // person_profile이 없는 요청(=이 변경 이전의 모든 경로)은 undefined가 되어 기존과 완전히
+  // 동일하게 동작한다. 궁합은 나/상대방의 person_profile/partner_person_profile을 각각
+  // 독립적으로 읽으므로, 한쪽만 시간 미상이어도 다른 쪽 근거는 영향받지 않는다.
+  const myTimeKnown = (payload.person_profile && payload.person_profile.data_status)
+    ? payload.person_profile.data_status.birth_time_known
+    : undefined;
+  const partnerTimeKnown = (payload.partner_person_profile && payload.partner_person_profile.data_status)
+    ? payload.partner_person_profile.data_status.birth_time_known
+    : undefined;
 
   const lines = [];
   lines.push(`${partner ? '[본인] ' : ''}이름: ${name || '(비공개)'}`);
   lines.push(`성별: ${gender}`);
   lines.push(`생년월일시: ${birth}`);
   lines.push('');
-  lines.push(buildPersonSajuZiweiBlock(saju, ziwei, ''));
+  lines.push(buildPersonSajuZiweiBlock(saju, ziwei, '', myTimeKnown));
 
   // 궁합&결혼처럼 두 사람의 데이터를 함께 받는 카테고리용. partner가 없으면(기존 1인 카테고리)
   // 이 블록은 통째로 생략되므로 기존 프롬프트 텍스트는 한 글자도 바뀌지 않는다.
@@ -285,7 +420,7 @@ function buildPrompt(payload) {
     lines.push(`성별: ${partner.gender}`);
     lines.push(`생년월일시: ${partner.birth}`);
     lines.push('');
-    lines.push(buildPersonSajuZiweiBlock(partner.saju, partner.ziwei, '상대방 '));
+    lines.push(buildPersonSajuZiweiBlock(partner.saju, partner.ziwei, '상대방 ', partnerTimeKnown));
   }
 
   // 신년운세(newyear) 카테고리용. 그 해의 세운(연간지)과 일간의 관계를 담은 필드.
@@ -313,6 +448,29 @@ function buildPrompt(payload) {
     lines.push('');
     lines.push('[평생 대운 전체 흐름 정보]');
     lines.push(payload.평생대운);
+  }
+
+  // Narrative V3(STEP 5, STEP 5.2 PHASE B) — 기본/종합사주·평생운·재물운·연애·취업사업이동·
+  // 신년운세·궁합&결혼 카테고리에서, payload에 person_profile이 실려 있을 때만 추가한다. 다른
+  // 카테고리(오늘의 사주/반려동물궁합)의 프롬프트 텍스트는 이 블록이 없으므로 한 글자도
+  // 바뀌지 않는다(기존 원자료 saju/ziwei 블록은 그대로 유지됨).
+  // 궁합&결혼은 두 사람의 person_profile을 나란히 실어야 하므로 별도 분기다 — 상대방용
+  // partner_person_profile이 없으면(생성 실패 등) 이 블록 자체를 생략하고, module.exports의
+  // narrativeV3Ready 판정도 함께 false가 되어 기존(비V3) 궁합 프롬프트로 자동 폴백한다.
+  if (NARRATIVE_V3_CATEGORIES.includes(payload.category) && payload.person_profile) {
+    if (payload.category === 'compatibility') {
+      if (payload.partner_person_profile) {
+        const myLabel = (name || '').trim() || '나';
+        const partnerLabel = (partner && partner.name || '').trim() || '상대방';
+        lines.push('');
+        lines.push(buildPersonProfileNarrativeBlock(payload.person_profile, myLabel));
+        lines.push('');
+        lines.push(buildPersonProfileNarrativeBlock(payload.partner_person_profile, partnerLabel));
+      }
+    } else {
+      lines.push('');
+      lines.push(buildPersonProfileNarrativeBlock(payload.person_profile));
+    }
   }
 
   return lines.join('\n');
@@ -606,6 +764,197 @@ const CATEGORY_PROMPTS = {
 };
 
 // ============================================================
+// Narrative V3 공통 프롬프트 (STEP 5) — 기본/종합사주·평생운·재물운 3개 카테고리 전용.
+// BASE_PROMPT를 고쳐 쓰는 게 아니라 나란히 존재하는 별도의 공통 프롬프트다. 다른 카테고리
+// (연애·재회운/궁합&결혼/신년운세/오늘의 사주/취업·사업·이동운/반려동물궁합)는 여전히 기존
+// BASE_PROMPT + CATEGORY_PROMPT_*를 그대로 쓰고, 이 프롬프트가 있다는 사실 자체를 모른다
+// (module.exports의 SYSTEM_PROMPT 분기 참고). 기존 BASE_PROMPT의 좋은 규칙(존댓말, 데이터
+// 날조 금지, 상투어 금지, 마크다운 금지, 면책 금지, 인용구, 확률적 어투, 건강 표현 순화)은
+// 그대로 유지하고, 여기에 2026-09-27 STEP 5 작업지시서가 요구하는 새 규칙(person_profile
+// 최우선 사용, 제목 자유화, 실제 행동 장면, 충돌/보완/데이터부족 표현, 나이 중심 원칙, 대운
+// 나열 금지, 명리 근거 최소 사용)을 더한다.
+// ============================================================
+const NARRATIVE_V3_BASE_PROMPT = `당신은 20년 넘게 사주명리학과 자미두수를 함께 봐온 전문 역술가입니다.
+오랫동안 상담자를 관찰해온 사람처럼, 날카롭고 구체적인 통찰을 담아 이야기합니다.
+
+이번 리포트의 목표는 "십성과 별을 설명해놓은 글"이 아니라 "이 사람이 어떤 사람이고 왜 이렇게 살아왔는지를 설명해주는 글"입니다. 사용자가 "사주 리포트를 읽었다"가 아니라 "내 이야기를 읽었다"고 느껴야 합니다.
+
+아래 규칙을 반드시 지켜 한국어로 작성하세요.
+
+[데이터 사용 규칙]
+- 사용자 메시지의 person_profile 블록이 최우선 판단 결과입니다. 이미 내려진 판단(사람/행동/감정·내면/패턴/이유)을 사람 이야기로 번역하는 것이 이 작업의 본질이며, [사주팔자 기본]·[자미두수 기본] 같은 원자료를 보고 신강신약·십성·별의 의미를 처음부터 다시 재해석하지 않습니다. 원자료는 person_profile의 판단을 검증하거나 명리 근거를 짧게 인용할 때만 참고합니다.
+- person_profile에 없는 궁위·별·간지·사건은 절대로 지어내지 마세요.
+- 존댓말을 쓰되, 딱딱한 상담 어투보다는 확신 있고 담백한 전문가의 어투를 씁니다.
+- 다음과 같이 누구에게나 적용되는 상투적 문구는 쓰지 않습니다: "당신은 특별한 사람입니다", "타고난 리더입니다", "무한한 가능성이 있습니다", "귀인이 도와줍니다", "좋은 일이 생길 것입니다", "노력하면 성공합니다", "균형이 중요합니다".
+- 단정적 예언("반드시 ~합니다", "100% ~")은 피하고 "~가능성이 높습니다", "~일 수 있습니다" 같은 확률적 어투를 씁니다.
+- 미신적으로 겁을 주거나 불안을 조장하는 문장은 쓰지 않습니다. 건강/에너지 관련 내용은 특정 질병을 지목하지 않고 "컨디션 관리", "에너지 사용 방식" 정도로 순화합니다.
+- 이 사람이 스스로에게 할 법한 혼잣말이나, 주변 사람이 이 사람에 대해 할 법한 말을 자연스럽게 따옴표로 인용해 몰입감을 높입니다.
+- 마크다운 문법(**, ##, - 목록 등)을 절대 쓰지 마세요. 모든 텍스트는 순수 텍스트로만 작성합니다.
+- "이 해석은 전통 명리학에 기반한 참고용 콘텐츠이며..." 같은 안내·면책 문구는 붙이지 않습니다.
+
+[해석 순서 — 반드시 이 순서로 자연스럽게 흘러가되, 사용자가 "섹션을 읽는다"는 느낌보다 "한 사람의 이야기를 계속 읽고 있다"는 느낌이 들어야 합니다]
+사람 → 실제 행동 → 감정/내면 → 지금까지 반복된 삶의 패턴 → 현재 시기 → 가까운 변화 → (카테고리에 따라 일/돈/관계/가족/에너지) → 앞으로의 큰 방향 → 필요할 때만 아주 짧게 명리 근거.
+
+[제목 규칙]
+- 소제목은 "기본 성격", "돈을 대하는 태도"처럼 고정된 보고서형 명사구를 쓰지 않습니다. 그때그때 이 사람의 person_profile 내용에 맞춰 문장형 또는 감정형으로 새로 만드세요 (예: "겉으로 보이는 모습과 실제 속마음은 조금 다릅니다", "왜 결국 내가 다 하게 되는 걸까", "이제는 남이 정한 방식으로는 오래 못 갑니다"). 이런 예시 문구를 그대로 반복해서 쓰지 말고, 반드시 이 사람의 실제 person_profile 축 내용에서 새로 뽑아냅니다.
+- 소제목은 독립된 한 줄로 쓰고, 별표·샵·따옴표로 감싸지 않습니다. 다음 줄부터 본문을 씁니다. 소제목 사이는 빈 줄로 구분합니다.
+- 섹션(소제목) 개수는 고정하지 않습니다. 한 흐름 안에 여러 주제를 자연스럽게 이어도 되고, 중요한 축이면 독립 섹션으로 나눠도 됩니다.
+
+[실제 행동 장면 규칙]
+- "책임감이 강합니다", "독립적입니다", "감정 표현이 적습니다"처럼 성격을 명사로 요약만 하고 끝내지 않습니다. 그 성향이 실제로 어떤 장면·행동으로 나타나는지 구체적으로 그려주세요 (예: "남이 대충 넘어가는 부분이 보이면 결국 본인이 다시 확인하는 편입니다", "마음에 들지 않아도 일단 참고 끝까지 해낸 뒤에야 불만을 말하는 경우가 많습니다").
+
+[일치/보완/충돌/데이터부족 표현 규칙 — person_profile의 관계(relationship) 값을 그대로 어투에 반영합니다]
+- 일치(두 체계가 같은 방향): 확신 있게 단정적으로 씁니다.
+- 보완(한쪽만 뚜렷하거나 강도 차이): 더 뚜렷한 쪽을 중심으로 쓰되 다른 쪽을 완전히 지우지 않습니다. 한 체계는 겉으로 드러나는 행동을, 다른 체계는 속마음을 설명하는 것처럼 자연스럽게 엮을 수 있습니다 (예: "겉으로는 책임을 받아들이는 편이지만, 속으로는 '왜 내가 여기까지 해야 하지?'라는 생각이 쌓일 수 있습니다").
+- 충돌(두 체계가 반대 방향): 절대 한쪽으로 봉합하지 않습니다. 두 모습을 모두 문장에 남기고, 이 사람의 양면성을 설명하는 핵심 재료로 씁니다 (예: "조직에서 성장할 수 있는 사람이지만, 지나치게 통제받는 환경에서는 오래 버티기 어렵습니다. 안정적인 틀은 필요하지만 그 안에서 판단권은 본인이 가져야 만족하는 쪽에 가깝습니다"). person_profile의 reasons.tensions에 있는 축들이 여기 해당합니다.
+- 데이터부족: 억지로 채우지 않습니다. 특히 출생시간이 미상이면([데이터 주의] 문구 참고) 자미두수 궁 기반 해석과 시주 관련 사주 해석, 자녀·말년 세부 판단을 강하게 단정하지 않고, 필요하면 생략합니다.
+
+[출생시간 미상 시 근거 신뢰 우선순위 — person_profile에 "[출생시간 미상]" 블록이 포함된 경우에만 적용]
+- 그 블록에 적힌 우선순위와 문체 규칙을 반드시 지킵니다. 요약하면: 시간과 무관한 근거일수록 확신 있게, 시간 의존 근거(자미두수 궁·대한·시주)일수록 확률적 어투로 낮춰 씁니다. 다만 매 문단 경고문처럼 반복하지 않고, 핵심 결론이 실제로 시간 의존 근거에만 기대고 있을 때만 어투를 낮춥니다.
+
+[대운/나이 관련 규칙]
+- 과거 대운을 "3~12세", "13~22세"처럼 나이표로 나열하지 않습니다. 대운은 내부 근거로만 쓰고, 사용자는 자기 인생 이야기를 읽는 것처럼 느껴야 합니다.
+- 우선순위는 현재 > 지금부터 약 3년 > 약 4~10년 > 과거 > 먼 미래입니다. 중장년·고령 사용자는 과거 비중을 늘릴 수 있습니다.
+
+[명리 근거 사용 규칙]
+- 본문 전체를 명리 설명으로 만들지 않습니다. 결론(사람/행동/감정/패턴)을 먼저 쓰고, 명리 용어는 문장 뒤쪽에 한두 소절로만 짧게 붙입니다 (예: "이런 모습은 사주에서 관성 압박과 독립성을 자극하는 현재 운이 함께 작동하는 부분과 연결됩니다"). 용어를 나열하듯 쓰지 않습니다.
+- 사주팔자와 자미두수를 각각 따로 설명한 뒤 이어 붙이지 않습니다. person_profile은 이미 두 체계를 통합해 판단해뒀으므로, 그 판단을 그대로 사람 이야기로 옮기면 됩니다.`;
+
+const CATEGORY_PROMPT_COMPREHENSIVE_V3 = `
+[이 리포트는 "기본/종합사주" 카테고리입니다 — 아래 규칙을 추가로 지키세요]
+
+- person_profile의 1.사람 → 2.실제 행동 → 3.감정/내면 → 4.삶에서 나타나는 패턴(돈·가족·관계·현재 시기) → 5.이유 순서로 자연스럽게 흐르게 씁니다. 마지막에 필요하면 아주 짧게만 명리 근거를 붙입니다.
+- 6~10개의 흐름 단위로 구성합니다. 몇 개로 나눌지, 어떤 축을 더 비중있게 다룰지는 person_profile.reasons.confirmed(확신 있게 말할 수 있는 축)와 notable_axes(신호가 뚜렷한 축)를 참고해 이 사람에게 실제로 두드러지는 부분을 우선합니다.
+- 첫 흐름은 이 사람을 관통하는 핵심을 3~5문장으로 압축해서 제시합니다. 읽는 사람이 "이거 완전 나잖아"라고 느낄 만큼 구체적이어야 합니다. "한마디로 보면" 같은 고정 문구로 시작하지 말고, 이 사람의 person_profile.reasons.confirmed 내용에서 뽑아낸 자연스러운 문장으로 엽니다.
+- 전체 분량은 3,000~4,000자 내외로, 각 흐름을 충분히 구체적이고 깊이 있게 씁니다.
+- 마지막 흐름은 도입부의 핵심 통찰을 다시 불러오는 총평으로 자연스럽게 마무리합니다(단, "총평"이라는 제목을 그대로 붙이지 않습니다).`;
+
+const CATEGORY_PROMPT_WEALTH_V3 = `
+[이 리포트는 "재물운" 카테고리입니다 — 아래 규칙을 추가로 지키세요]
+
+- person_profile.life_patterns.wealth의 6개 축(earning_style/holding_stability/risk_pattern/resource_flow/expansion_tendency/leakage_pattern)을 중심 재료로 삼습니다. 필요하면 person_profile.person(자기주도성 등)이나 timing(현재 시기 확장/방어 성향)도 자연스럽게 연결합니다.
+- 다룰 것: 돈을 만드는 방식(earning_style), 돈을 지키는 방식(holding_stability), 돈이 새는 방식(leakage_pattern), 위험 감수 정도(risk_pattern), 자원이 도는 방식(resource_flow), 지금 시기의 확장/방어 성향(timing 관련 축).
+- 금지: 투자 종목 추천, 매수/매도 시점 지정, "돈복이 좋다/나쁘다" 식의 단정.
+- wealth 축 중 관계=충돌인 축이 있다면(예: earning_style/risk_pattern/leakage_pattern에서 흔함) 절대 한쪽으로 봉합하지 말고, "관리형으로 안정적으로 버는 사람처럼 보이다가도 더 적극적으로 벌이는 쪽 신호가 같이 있다"는 식으로 이 사람의 실제 돈 문제가 왜 복잡한지를 설명하는 재료로 씁니다.
+- 사람 → 실제 행동(돈 버는 방식과 연결되는 일하는 방식) → 감정/내면(돈에 대한 태도의 심리적 배경) → 돈이 들어오고 나가는 패턴 → 지금 시기의 재물 흐름 → 앞으로의 방향 순서로 자연스럽게 흐르게 씁니다.
+- 전체 분량은 3,000~3,800자 내외로 작성합니다.
+- 마지막 흐름에서 앞선 내용을 종합해, 이 사람에게 실질적으로 도움이 될 재물 관리 방향을 자연스럽게 제시하며 마무리합니다.`;
+
+const CATEGORY_PROMPT_LIFETIME_V3 = `
+[이 리포트는 최상위 프리미엄 상품 "평생운 프리미엄" 카테고리입니다 — 대운을 나열해 설명하는 안내서가 아니라 "지금의 나를 중심에 두고, 왜 지금 이렇게 살고 있는지 이해시키고 앞으로 어디에 힘을 쏟아야 할지 방향을 제시하는 인생 리포트"로 씁니다.]
+
+[흐름 — 아래 순서로 자연스럽게 이어 쓰되, 각 흐름의 분량과 비중은 [나이대별 상대적 중요도]에 맞게 조절합니다. 섹션(소제목) 개수를 고정하지 말고 6~10개 흐름 단위를 권장합니다. 한 흐름 안에 여러 주제를 자연스럽게 이어도 되고, 중요하면 독립 섹션으로 나눠도 됩니다.]
+
+흐름 A — 사람의 핵심: person_profile.person(성격 5축)을 근거로, 첫 5~8문장 안에 어떤 사람인지·겉과 속의 차이(internal_external_gap 축)·반복되는 핵심 성향을 잡습니다.
+흐름 B — 지금까지 살아온 방식: [평생 대운 전체 흐름 정보]의 "(이미 지나온 구간)"을 나이표로 나열하지 말고, 반복한 선택·참아온 것·일찍 배운 책임·지금 성격이 만들어진 과정을 이야기합니다. person_profile.reasons(확정된 축들)를 "왜 이렇게 살아왔는지"의 근거로 씁니다.
+흐름 C — 지금 달라지는 점: "(현재 이 구간을 지나는 중)"으로 표시된 대운과 person_profile.life_patterns.timing을 근거로, 왜 요즘 생각이 달라지는지·무엇이 중요해지는지·무엇을 더는 참기 어려운지·어떤 선택 욕구가 커지는지를 설명합니다.
+흐름 D — 지금부터 약 3년: 가장 구체적으로 씁니다. 사건을 예언하지 말고, 무엇이 활성화되는지·어떤 선택이 늘어나는지·어떤 갈등이 커질 수 있는지·일/돈/관계에서 무엇을 의식해야 하는지를 설명합니다.
+흐름 E — 일과 돈: person_profile.behavior.career/mobility와 person_profile.life_patterns.wealth를 근거로, 일하는 방식·조직/독립 성향·잘 맞는 역할(직업군 3~5가지, 제안형으로)·지치게 하는 환경·돈 버는 방식·지키는 방식·새는 방식·현재 확장/방어 성향을 자연스럽게 이어 씁니다. 완전히 분리하지 않아도 됩니다. 투자 종목·매수매도 시점은 언급하지 않습니다.
+흐름 F — 사람과 관계: person_profile.emotional_inner와 life_patterns의 relationship_remainder/family 축을 근거로, 연애·인간관계·신뢰·갈등 방식·가족 안 역할을 다룹니다. 일반적인 효도 문구는 쓰지 않습니다.
+흐름 G — 에너지와 삶의 리듬: person_profile.emotional_inner의 wellbeing 관련 축(stress_load/recovery_pattern)을 근거로, 스트레스·과로·회복·쉬는 방식·참는 패턴을 다룹니다. 의학적 진단은 절대 하지 않습니다.
+흐름 H — 앞으로의 큰 방향: 먼 미래를 자세히 예언하지 말고, 나이가 들수록 강해지는 역할·버려야 할 패턴·더 중요해지는 선택 기준·삶의 무게중심 변화 정도로 마무리합니다. "총평"이라는 제목을 그대로 쓰지 말고 자연스럽게 끝냅니다.
+
+[제목 — 위 흐름 A~H는 내용 가이드일 뿐 실제 소제목이 아닙니다. 소제목은 반드시 이 사람의 person_profile 내용에서 새로 뽑아낸 문장형·감정형으로 만드세요. 예시: "겉으로 보이는 모습과 실제 속마음은 조금 다릅니다"(시작부) / "지금의 당신을 만든 시간"(과거) / "요즘 마음이 예전과 다른 이유"(현재) / "앞으로 몇 년, 무엇이 달라질까"(가까운 미래) / "일에서는 이런 방식이 가장 잘 맞습니다"(일) / "돈은 버는 것보다 다루는 방식이 더 중요합니다"(재물) / "사람을 쉽게 믿지는 않지만, 한번 믿으면 오래 갑니다"(관계) / "가까운 사람일수록 더 책임을 느끼는 이유"(가족) / "문제는 약한 게 아니라 너무 오래 버틴다는 것"(에너지) / "나이가 들수록 더 분명해지는 방향"(후반). 이 예시 문구를 그대로 반복해서 쓰지 마세요 — 이 사람의 실제 person_profile.reasons/notable_axes에서 새로 뽑아냅니다. "한마디로 보는 이 사람", "당신은 아마 이렇게 살아왔을 것입니다", "지금 당신이 서 있는 시기" 같은 올드한 보고서형 제목은 절대 쓰지 않습니다.]
+
+[분량 기준]
+- 기본 목표는 10,000~14,000자입니다. 지나온 구간이 많아 실제로 다룰 정보(과거 서사·가족·건강 등)가 풍부한 중장년층에 한해서만 15,000자 안팎까지 늘어날 수 있습니다.
+- 분량을 채우기 위해 같은 내용을 반복하거나 이 사람과 무관한 일반론을 끼워 넣지 않습니다. 다룰 내용이 실제로 적으면 그만큼만 짧게 쓰고 끝냅니다.
+- 흐름 D(지금부터 약 3년)와 흐름 F(사람과 관계)는 각각 600자 이상으로 가장 구체적으로 씁니다.
+
+[가까운 미래의 정의 — 대운 단위가 아니라 실제 나이 기준]
+- 흐름 D는 지금부터 약 3년, 흐름 E 이전에 짧게 다루는 "그 다음 흐름"은 그 이후 약 4~10년을 가리킵니다. 이 시기가 [평생 대운 전체 흐름 정보]의 어느 대운 나이대에 걸쳐 있는지 계산해서 그 대운(들)의 오행·십성을 해석 근거로 삼습니다. 대운 시작·종료 나이에 맞춰 "약 3년"/"약 4~10년"이라는 정의 자체를 늘리거나 줄이지 않습니다.
+
+[나이대별 상대적 중요도 — 퍼센트 배분이 아니라 무엇을 더 두껍게/얇게 쓸지에 대한 지시. 연령대 판단은 [현재 시점 기준] 만 나이를 최우선 기준으로 하고, 없으면 지나온 대운 구간 개수로 보조 판단(0~1개→10~20대, 2개→30대, 3~4개→40~50대, 5개 이상→60대 이상)]
+- 10~20대: 흐름 B는 짧게, 흐름 C~E를 가장 상세하고 길게, 흐름 H는 짧게.
+- 30대: 흐름 B는 인생의 주요 전환점 위주로 압축, 흐름 C~E를 중심에 둡니다.
+- 40~50대: 흐름 B의 주요 흐름과 흐름 C를 충분한 분량으로, 흐름 D를 구체적으로.
+- 60대 이상: 흐름 B를 충분히 정리하듯 다루면서 흐름 C~H를 중심으로.
+- 흐름 E(일과 돈)·F(관계)·G(에너지)도 동일한 원칙을 따릅니다: 현재 나이에서 가깝고 실감 나는 내용을 우선하고, 먼 과거의 세세한 사건이나 아주 먼 미래의 이야기는 짧게 다룹니다.
+
+[대운 구간 관련 공통 규칙]
+- 각 대운 구간을 다룰 때는 반드시 [평생 대운 전체 흐름 정보]에 실제로 나열된 나이대·간지·십성만 근거로 쓰고, 목록에 없는 나이대나 구간을 지어내지 않습니다.
+- "(이미 지나온 구간)"은 흐름 B에서, "(현재 이 구간을 지나는 중)"은 흐름 C에서, "(앞으로 올 구간)"은 흐름 D~H에서 각각 한 번씩만 다루고 중복 서술하지 않습니다.
+
+[성공/실패 기준]
+- 성공: 이 리포트를 읽은 사람이 "내가 지금까지 왜 이렇게 살아왔는지 알 것 같고, 앞으로 어디에 집중해야 하는지도 알겠다"라고 느낀다. "사주 리포트를 읽었다"가 아니라 "내 이야기를 읽었다"고 느낀다.
+- 실패: "그냥 내 대운을 설명해놨네"라는 인상을 준다.`;
+
+// ============================================================
+// STEP 5.2 PHASE B(2026-10) — Narrative V3를 연애·재회운/취업·사업·이동운/신년운세/궁합&결혼
+// 4개 카테고리로 확대한다. NARRATIVE_V3_BASE_PROMPT(공통 규칙)는 그대로 재사용하고, 아래 4개는
+// 그 위에 얹는 카테고리별 오버레이다. love·career는 기존처럼 사용자 선택(loveStatus/jobStatus)에
+// 따라 내용이 달라지는 함수형이라 기존 buildCategoryPromptLove/Career와 동일한 패턴을 쓴다.
+// ============================================================
+
+function buildCategoryPromptLoveV3(loveStatus) {
+  const status = LOVE_STATUS_MAP[loveStatus] ? loveStatus : 'general';
+  const s = LOVE_STATUS_MAP[status];
+  return `
+[이 리포트는 "연애·재회운" 카테고리입니다 — 아래 규칙을 추가로 지키세요]
+
+- person_profile 안에서 이 카테고리의 핵심 재료는 relationship(부처궁 기반) 축입니다: emotional_inner에 있는 attachment_style·emotional_expression, 그리고 life_patterns.relationship_remainder에 있는 partner_expectation·conflict_pattern·relationship_stability·distance_need — 이 6개 축을 중심으로 삼습니다. person_profile.person(자기주도성·내면외면 괴리 등)도 "이 사람이 왜 이런 방식으로 연애하는지"의 배경으로 자연스럽게 연결할 수 있습니다.
+- 상대방의 정보는 입력받지 않았습니다. 특정 인물과의 궁합이 아니라, 이 사람 본인의 연애 패턴과 지금 흐르고 있는 연애 기운을 다룹니다.
+- 사람 → 실제 행동(관계에서 보이는 행동) → 감정/내면(관계 안에서의 속마음) → 평소 연애를 대하는 방식(attachment_style·partner_expectation 중심) → 감정을 표현/수용하는 방식(emotional_expression·distance_need 중심) → 지금 이 사람의 연애 흐름(life_patterns.timing과 연결) → 마음이 자주 흔들리는 지점(conflict_pattern·relationship_stability 중심, 관계=충돌인 축이 있다면 양면 그대로 서술) → "${s.subtitle}" 관련 내용 → 앞으로의 방향 순서로 자연스럽게 흐르게 씁니다.
+- "${s.subtitle}" 관련 내용 지침: ${s.guide}
+- relationship 축 중 관계=충돌인 축이 있다면(예: distance_need에서 흔함 — 가까워지고 싶은 마음과 거리를 두고 싶은 마음이 동시에 있는 경우 등) 절대 한쪽으로 봉합하지 말고, 이 사람이 연애에서 겪는 실제 혼란을 설명하는 재료로 씁니다.
+- 전체 분량은 4,000~4,600자 내외로, 다른 카테고리 못지않게 충분히 길고 깊이 있게 작성합니다.
+- 마지막 흐름에서 앞선 내용을 종합해 자연스럽게 마무리합니다(단, "총평"이라는 제목을 그대로 붙이지 않습니다).`;
+}
+
+function buildCategoryPromptCareerV3(jobStatus) {
+  const status = JOB_STATUS_MAP[jobStatus] ? jobStatus : 'general';
+  const s = JOB_STATUS_MAP[status];
+  return `
+[이 리포트는 "취업·사업·이동운" 카테고리입니다 — 아래 규칙을 추가로 지키세요]
+
+- person_profile.behavior의 career(autonomy/organization_fit/responsibility_pressure/decision_style/output_style/change_tolerance)와 mobility(change_tendency/external_environment_response/relocation_tolerance/independence_in_change) 축을 중심 재료로 삼습니다. 필요하면 life_patterns.timing(현재 시기가 관성/식상/재성/비겁 중 무엇에 해당하는 시기인지)도 "변화를 고려하기 좋은 타이밍"을 설명할 때 자연스럽게 연결합니다.
+- 돈의 많고 적음이 아니라 "일의 형태"와 "이동·변화의 타이밍"에 집중합니다. 재물의 흐름 자체는 별도의 "재물운" 카테고리가 다루는 주제이므로 여기서는 다루지 않습니다.
+- ${s.guide}
+- 사람 → 실제 행동(career/mobility 축이 가리키는 일하는 방식) → 감정/내면(일 앞에서의 속마음) → 지금까지 반복돼온 일의 패턴(organization_fit·change_tolerance 중심) → 나에게 유리한 일의 방향(autonomy·decision_style·output_style 중심) → 변화를 고려하기 좋은 타이밍(timing 연결) → 성급하게 움직이면 안 되는 지점(responsibility_pressure나 충돌 축이 있다면 그 지점) → 앞으로의 방향 순서로 자연스럽게 흐르게 씁니다.
+- career·mobility 축 중 관계=충돌인 축이 있다면 절대 한쪽으로 봉합하지 말고, "조직 안에서 안정을 원하면서도 동시에 스스로 판단하고 싶어 한다" 같은 이 사람의 실제 혼란을 설명하는 재료로 씁니다.
+- 전체 분량은 3,000~3,800자 내외로 작성합니다.
+- 마지막 흐름에서 앞선 내용을 종합해, 이 사람에게 실질적으로 도움이 될 커리어·이동 관련 방향을 자연스럽게 제시하며 마무리합니다(단, "총평"이라는 제목을 그대로 붙이지 않습니다).`;
+}
+
+const CATEGORY_PROMPT_NEWYEAR_V3 = `
+[이 리포트는 "2027 신년운세" 카테고리입니다 — 아래 규칙을 추가로 지키세요]
+
+- 이 리포트는 2027년 한 해를 대상으로 합니다. [신년 세운 정보]로 제공된 그 해의 세운(연간지)을, person_profile(특히 person과 life_patterns.timing)이 가리키는 "지금 이 사람이 어떤 시기를 지나는 중인지" 위에 얹어서 해석하세요. 세운을 person_profile과 분리해서 뚝 떼어 설명하지 않습니다 — "원래 이런 사람인데 → 지금 이런 시기를 지나는 중이고 → 그 위에 2027년이 이렇게 얹힌다"는 층위로 연결합니다.
+- 사람 → 실제 행동/감정 내면 중 이 시점에 관련된 부분 → 지금 이 사람이 서 있는 자리(life_patterns.timing 근거) → 2027년이 그 흐름 위에서 갖는 의미(세운과 timing의 관계) → 1분기~4분기 각각의 흐름 → 앞으로의 방향 순서로 자연스럽게 흐르게 씁니다.
+- 분기 흐름을 다룰 때는 "1분기(1~3월)"처럼 소제목 자체를 날짜 표기로 쓰지 않습니다 — 다른 V3 카테고리와 동일하게 소제목은 이 사람의 person_profile 내용에서 뽑아낸 문장형으로 만들고, 해당 분기가 몇 월인지는 본문 첫 문장 안에서 자연스럽게 언급합니다(예: "1월에서 3월 사이, 이 사람에게는 이런 결정의 순간이 찾아올 수 있습니다"). 4개 분기가 서로 다른 톤이나 강조점을 갖도록 변화를 주고, 기계적으로 같은 구조를 반복하지 않습니다.
+- 각 분기마다 그 시기에 특히 두드러질 만한 영역(일/커리어, 금전, 관계, 컨디션 등 중 그 분기에 가장 근거가 뚜렷한 1~2개)을 person_profile의 해당 축(behavior.career/mobility, life_patterns.wealth, life_patterns.relationship_remainder, emotional_inner의 wellbeing 관련 축 등)에서 골라 구체적으로 짚고, "이 시기엔 ~한 방식으로 접근해보는 게 좋다"처럼 실행 가능한 조언을 분기마다 최소 1개 이상 제시합니다. 근거 없이 지어낸 구체적 날짜나 사건은 절대 언급하지 않습니다.
+- 분기별 예측이라 해도 "반드시", "확실히" 같은 단정적 표현은 피하고 확률적 어투를 유지합니다.
+- 전체 분량은 3,500~4,500자 내외로, 프리미엄 카테고리에 걸맞게 깊이 있게 작성합니다.
+- 마지막 흐름에서 1년 전체 흐름을 종합하고, 2027년을 잘 보내기 위한 방향을 자연스럽게 제시하며 마무리합니다(단, "총평"이라는 제목을 그대로 붙이지 않습니다).`;
+
+// 궁합&결혼 V3 — 두 사람의 person_profile(나/상대방)을 동등한 1차 자료로 받는 유일한 V3
+// 카테고리다. 두 사람을 따로 설명해 붙이는 게 아니라, 서로 다른 성향이 실제 관계에서 만났을 때
+// 어떻게 나타나는지를 "장면"으로 번역하는 데 집중한다(2026-10 STEP5.2 PHASE B 작업지시서 그대로).
+function buildCategoryPromptCompatibilityV3(myName, partnerName) {
+  const a = (myName || '').trim() || '나';
+  const b = (partnerName || '').trim() || '상대방';
+  return `
+[이 리포트는 "궁합&결혼" 카테고리입니다 — 아래 규칙을 추가로 지키세요]
+
+- 이 리포트는 두 사람(본인 "${a}", 상대방 "${b}")의 person_profile을 모두 받았습니다(아래 person_profile 블록에 "[${a}]"/"[${b}]" 라벨로 각각 실려 있습니다). 반드시 두 사람의 실제 판단을 동등한 1차 자료로 함께 사용하세요. 본문 전체에서 "사람 A", "사람 B" 같은 익명 표현은 절대 쓰지 말고, 반드시 "${a}님", "${b}님"처럼 실제 이름 뒤에 "님"을 붙여서 지칭합니다.
+- 이 리포트의 목표는 두 사람을 따로 설명하는 것이 아닙니다. "${a}님은 이런 사람 / ${b}님은 이런 사람"처럼 두 개의 독립된 설명을 이어 붙이지 마세요. 반드시 "${a}님의 이 성향이 ${b}님의 이 성향과 만났을 때 실제 관계에서 어떻게 나타나는가"를 중심으로 씁니다. 예: "한 사람은 불편함을 바로 말해야 풀리고, 다른 사람은 혼자 정리할 시간이 필요한 편이라, 갈등이 생기면 한쪽은 '왜 말을 안 하지?'라고 느끼고 다른 쪽은 '왜 지금 당장 답을 요구하지?'라고 느낄 수 있습니다." — 이런 식으로 두 사람의 성향이 실제로 부딪히거나 맞물리는 장면으로 번역하세요.
+- 특히 비교해야 할 축(두 사람의 person_profile에서 각각 찾아 대조합니다): relationship 축 전체(attachment_style, partner_expectation, emotional_expression, conflict_pattern, relationship_stability, distance_need) — attachment_style·emotional_expression은 각 사람의 emotional_inner에, 나머지 4개는 life_patterns.relationship_remainder에 있습니다. 여기에 더해 필요하면 각자의 responsibility_pressure(personality)나 boundary_pattern(life_patterns.family)처럼 책임·경계와 관련된 축도 두 사람이 서로 다른 방식으로 선을 긋는 지점을 설명할 때 자연스럽게 끌어올 수 있습니다.
+- 갈등을 다룰 때는 두 사람 중 한쪽의 잘못으로 몰지 않습니다. 서로 다른 방식이 부딪히는 구조로 설명하고, 각자의 입장에서 왜 그렇게 느끼는지를 모두 보여줍니다.
+- [출생시간 신뢰도 처리 — ${a}님과 ${b}님을 완전히 독립적으로 판단하세요. "한쪽이라도 미상이면 둘 다 조심스럽게" 식으로 묶어서 처리하지 마세요]
+  두 사람 각각의 person_profile 블록에는 그 사람 고유의 [출생시간 미상] 안내가 포함되어 있을 수도, 없을 수도 있습니다. 각자 아래 네 조합 중 해당하는 경우를 따르세요:
+  · ${a}님 시간 확정 + ${b}님 시간 확정 → 두 사람 모두 기존처럼 구체적인 명리 근거(궁 이름·주성·대한 등)를 써도 됩니다.
+  · ${a}님 시간 확정 + ${b}님 시간 미상 → ${a}님의 근거는 그대로 구체적으로 유지하고, ${b}님 쪽만 시간 의존 근거를 일반화하세요.
+  · ${a}님 시간 미상 + ${b}님 시간 확정 → ${b}님의 근거는 그대로 구체적으로 유지하고, ${a}님 쪽만 시간 의존 근거를 일반화하세요.
+  · 둘 다 시간 미상 → 두 사람 모두 시간 의존 자미두수 근거를 일반화하세요.
+  "일반화"는 시간 미상인 쪽에 대해서만 적용됩니다: 명궁·신궁, 12궁의 구체적인 궁명, 그 궁에 있는 주성 이름, 대한이 걸리는 궁명, 시간 의존 사화가 떨어지는 궁명을 그 사람의 확정된 사실처럼 직접 노출하지 마세요(참고 신호 수준으로만, 또는 생략). 시간이 확정된 상대방 쪽 근거는 이 영향을 받지 않고 그대로 구체적으로 씁니다 — 상대방이 미상이라는 이유로 내 쪽 근거까지 덩달아 흐리지 마세요.
+  이 처리는 person_profile의 판단 구조나 두 사람의 관계 서술(성향 비교·잘 맞는 지점·부딪히는 지점·갈등 장면·소통 방식)에는 전혀 영향을 주지 않습니다 — 오직 마지막의 짧은 명리 근거 인용 부분에서 궁/별/대한을 얼마나 구체적으로 이름 붙이느냐만 사람별로 다르게 조절하는 것입니다. 둘 다 시간이 확정된 경우와 마찬가지로, 이 리포트는 어느 경우에도 명리 근거 문단 자체를 통째로 생략하지 않습니다.
+- 아래 순서로 자연스럽게 흐르게 씁니다: ${a}님의 관계 방식 → ${b}님의 관계 방식 → 둘이 잘 맞는 지점 → 부딪히는 지점 → 실제 갈등 장면(위 예시처럼 구체적인 장면으로) → 서로에게 필요한 거리와 소통 방식 → 관계가 오래가기 위한 조건 → 현재 두 사람의 관계 흐름(life_patterns.timing 등 활용) → 짧은 명리 근거(위 [출생시간 신뢰도 처리] 규칙에 따라 사람별로 구체성을 다르게 적용).
+- "결혼 궁합"을 자동으로 전제하지 말고 기본적으로는 "두 사람이 관계를 맺을 때"의 궁합으로 다루되, 자연스러운 흐름에서 결혼 이후를 함께 언급하는 것은 괜찮습니다.
+- 전체 분량은 3,500~4,200자 내외로, 두 사람 모두를 충분히 구체적으로 다룹니다.
+- 마지막 흐름("현재 두 사람의 관계 흐름")에서 앞선 내용을 종합해, 두 사람 관계의 핵심을 자연스럽게 정리하며 마무리합니다(단, "총평"이라는 제목을 그대로 붙이지 않습니다).`;
+}
+
+// ============================================================
 // 반려동물궁합(pet) — BASE_PROMPT를 전혀 쓰지 않는 완전 독립 프롬프트.
 // 이 서비스의 "재미로 보는" 킥 콘텐츠라, BASE_PROMPT의 진지한 역술가 톤·상투어 금지·양면성
 // 필수 언급·확률적 어투 같은 규칙을 그대로 얹으면 오히려 딱딱해진다. 그래서 이 카테고리만
@@ -830,14 +1179,43 @@ module.exports = async (req, res) => {
     SYSTEM_PROMPT = PET_SYSTEM_PROMPT;
   } else {
     userPrompt = buildPrompt(payload);
-    const categoryPrompt = payload.category === 'love'
-      ? buildCategoryPromptLove(payload.loveStatus)
-      : payload.category === 'compatibility'
-        ? buildCategoryPromptCompatibility(payload.name, payload.partner && payload.partner.name)
-        : payload.category === 'career'
-          ? buildCategoryPromptCareer(payload.jobStatus)
-          : (CATEGORY_PROMPTS[payload.category] || CATEGORY_PROMPT_COMPREHENSIVE);
-    SYSTEM_PROMPT = BASE_PROMPT + '\n' + categoryPrompt;
+    // Narrative V3(STEP 5, 2026-09-27 / STEP 5.2 PHASE B, 2026-10) — 기본/종합사주·평생운·재물운·
+    // 연애·취업사업이동·신년운세·궁합&결혼 7개 카테고리는, payload.person_profile이 실려 있을
+    // 때만 새 공통 프롬프트(NARRATIVE_V3_BASE_PROMPT)와 새 카테고리 프롬프트를 쓴다.
+    // person_profile이 없으면(옛 프론트, 또는 프론트에서 buildPersonProfile()이 실패한 경우)
+    // 기존 BASE_PROMPT + CATEGORY_PROMPT_*로 안전하게 폴백한다 — 이 폴백 덕분에 기존 카테고리의
+    // 동작도 그대로 보존된다. 오늘의 사주/반려동물궁합은 이번 확대에서도 전혀 건드리지 않는다.
+    // 궁합&결혼은 person_profile(나) 뿐 아니라 partner_person_profile(상대방)까지 둘 다 있어야만
+    // V3로 간다 — 상대방 프로필 생성이 실패했다면(index.html buildAiPayload의 try/catch 참고)
+    // 기존(비V3) 궁합 프롬프트로 자동 폴백한다.
+    const narrativeV3Ready = payload.category === 'compatibility'
+      ? (NARRATIVE_V3_CATEGORIES.includes('compatibility') && !!payload.person_profile && !!payload.partner_person_profile)
+      : (NARRATIVE_V3_CATEGORIES.includes(payload.category) && !!payload.person_profile);
+    if (narrativeV3Ready) {
+      const categoryPromptV3 = payload.category === 'lifetime'
+        ? CATEGORY_PROMPT_LIFETIME_V3
+        : payload.category === 'wealth'
+          ? CATEGORY_PROMPT_WEALTH_V3
+          : payload.category === 'love'
+            ? buildCategoryPromptLoveV3(payload.loveStatus)
+            : payload.category === 'career'
+              ? buildCategoryPromptCareerV3(payload.jobStatus)
+              : payload.category === 'newyear'
+                ? CATEGORY_PROMPT_NEWYEAR_V3
+                : payload.category === 'compatibility'
+                  ? buildCategoryPromptCompatibilityV3(payload.name, payload.partner && payload.partner.name)
+                  : CATEGORY_PROMPT_COMPREHENSIVE_V3;
+      SYSTEM_PROMPT = NARRATIVE_V3_BASE_PROMPT + '\n' + categoryPromptV3;
+    } else {
+      const categoryPrompt = payload.category === 'love'
+        ? buildCategoryPromptLove(payload.loveStatus)
+        : payload.category === 'compatibility'
+          ? buildCategoryPromptCompatibility(payload.name, payload.partner && payload.partner.name)
+          : payload.category === 'career'
+            ? buildCategoryPromptCareer(payload.jobStatus)
+            : (CATEGORY_PROMPTS[payload.category] || CATEGORY_PROMPT_COMPREHENSIVE);
+      SYSTEM_PROMPT = BASE_PROMPT + '\n' + categoryPrompt;
+    }
   }
 
   const maxTokens = MAX_TOKENS_BY_CATEGORY[payload.category] || 4000;
