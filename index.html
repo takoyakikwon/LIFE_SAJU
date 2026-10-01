@@ -778,6 +778,12 @@ window.SajuAnalytics = (function(){
   }
   .ai-report-sec .sec-h h3{ font-family:"Noto Serif KR"; font-weight:900; font-size:14.5px; margin:0; color:var(--ink); }
   .ai-report-sec p{ font-size:13.5px; line-height:1.85; color:var(--ink); margin:0; white-space:pre-wrap; }
+  /* 2026-10 "제목 구조 강제" — Narrative V3 큰 제목([[V3_SECTION]] 마커로 서버가 강제 삽입)
+     전용 스타일. 번호 배지 없이, 본문보다 확실히 크고 굵게, 사주결 붉은 포인트 컬러(--seal)로
+     표시하고 위아래 여백을 넉넉히 둔다. 기존(비V3) .sec-h/.sec-h .n/.sec-h h3 스타일은 전혀
+     건드리지 않는다. */
+  .ai-report-sec .sec-h.v3{ margin:18px 0 10px; }
+  .ai-report-sec .sec-h h3.v3-title{ font-family:"Noto Serif KR"; font-weight:900; font-size:17px; margin:0; color:var(--seal); letter-spacing:-.1px; }
   /* 십성 table */
   .sipsung-table{width:100%; border-collapse:collapse; margin-top:4px;}
   .sipsung-table th{
@@ -6735,8 +6741,29 @@ $('#mockPayBtn').addEventListener('click', async ()=>{
 // 분해한다. 소제목 줄은 마크다운 기호 없이 순수 텍스트이고 em dash(—)를 포함하며 짧다는 특징으로
 // 구분 — 이 형식을 못 찾으면(예: 오래된 저장 결과, 반려동물궁합처럼 다른 포맷) 기존처럼 통짜
 // 텍스트로 폴백해서 절대 깨지지 않게 한다.
+// 2026-10 "제목 구조 강제" 보정 — Narrative V3는 더 이상 em dash 소제목 형식에 기대지 않고,
+// api/interpret.js가 서버에서 [[V3_SECTION]]<제목> 마커로 큰 제목을 강제 삽입한 뒤 내려준다.
+// 이 마커가 텍스트에 하나라도 있으면 그걸 최우선으로 신뢰해 분해하고(각 section에 v3:true
+// 표시), 마커가 전혀 없으면(구버전 저장 결과, 반려동물궁합처럼 애초에 이 구조를 쓰지 않는
+// 카테고리) 기존 em dash 휴리스틱을 한 글자도 바꾸지 않고 그대로 쓴다 — 비V3 경로는 전혀
+// 영향받지 않는다.
 function parseAiSections(text){
-  const blocks = String(text||'').split(/\n\s*\n+/).map(b=>b.trim()).filter(Boolean);
+  const raw = String(text||'');
+  if(raw.includes('[[V3_SECTION]]')){
+    const parts = raw.split('[[V3_SECTION]]');
+    const sections = [];
+    const lead = parts[0].trim();
+    if(lead){ sections.push({title:null, body:lead, v3:true}); }
+    for(let i=1;i<parts.length;i++){
+      const chunk = parts[i];
+      const nlIdx = chunk.indexOf('\n');
+      const title = (nlIdx === -1 ? chunk : chunk.slice(0, nlIdx)).trim();
+      const body = (nlIdx === -1 ? '' : chunk.slice(nlIdx+1)).trim();
+      if(title){ sections.push({title, body, v3:true}); }
+    }
+    return sections;
+  }
+  const blocks = raw.split(/\n\s*\n+/).map(b=>b.trim()).filter(Boolean);
   const sections = [];
   blocks.forEach(b=>{
     const isTitle = b.length <= 100 && !b.includes('\n') && b.includes('—');
@@ -6757,8 +6784,14 @@ function renderAiResult(container, text){
   // 항상 두므로, 맨 앞 무제목 블록은 소주제로 세지 않고 목차 위 리드인 문단으로 따로 보여준다.
   const leadIn = (parsed[0] && !parsed[0].title) ? parsed[0].body : '';
   const sections = parsed.filter(s=>s.title);
-  if(sections.length < 3){
-    const paras = raw.split(/\n\s*\n+/).map(p=>p.trim()).filter(Boolean);
+  // V3 마커 기반 큰 제목은 카테고리별 최소 2~3개가 보장되므로(서버의 repair 단계 참고)
+  // 기존 em dash 휴리스틱(최소 3개)보다 기준을 낮춰도 안전하다.
+  const isV3 = parsed.some(s=>s.v3);
+  if(sections.length < (isV3 ? 2 : 3)){
+    // 혹시 마커가 1개 이하로만 나와 이 폴백 경로로 떨어지더라도, 사용자 화면에 내부 마커
+    // 문자열(`[[V3_SECTION]]`)이 그대로 노출되는 일은 없도록 안전망으로 한 번 더 제거한다.
+    const rawForFlat = raw.replace(/\[\[V3_SECTION\]\]/g, '');
+    const paras = rawForFlat.split(/\n\s*\n+/).map(p=>p.trim()).filter(Boolean);
     const flatHtml = paras.map(p=>{
       const dashIdx = p.indexOf('—');
       const isLeadTitle = dashIdx > 0 && dashIdx <= 50 && !p.slice(0, dashIdx).includes('\n');
@@ -6779,11 +6812,18 @@ function renderAiResult(container, text){
   const tocItems = sections.map((s,i)=>
     `<div class="ai-toc-item" data-i="${i}"><span class="ai-toc-num">${String(i+1).padStart(2,'0')}</span><span>${escapeHtml(s.title)}</span></div>`
   ).join('');
+  // V3 큰 제목은 번호 배지 없이 굵게·크게·붉은 포인트 컬러로 표시한다(작업지시서 9번 항목).
+  // 기존(비V3) 소제목은 번호 원형 배지가 있는 기존 스타일을 한 글자도 바꾸지 않는다.
   const secHtml = sections.map((s,i)=>
-    `<div class="ai-report-sec" data-i="${i}" id="aiSec${i}">
-       <div class="sec-h"><span class="n">${String(i+1).padStart(2,'0')}</span><h3>${escapeHtml(s.title)}</h3></div>
-       <p>${escapeHtml(s.body)}</p>
-     </div>`
+    s.v3
+      ? `<div class="ai-report-sec" data-i="${i}" id="aiSec${i}">
+           <div class="sec-h v3"><h3 class="v3-title">${escapeHtml(s.title)}</h3></div>
+           <p>${escapeHtml(s.body)}</p>
+         </div>`
+      : `<div class="ai-report-sec" data-i="${i}" id="aiSec${i}">
+           <div class="sec-h"><span class="n">${String(i+1).padStart(2,'0')}</span><h3>${escapeHtml(s.title)}</h3></div>
+           <p>${escapeHtml(s.body)}</p>
+         </div>`
   ).join('');
   container.innerHTML = `
     ${leadInHtml}
@@ -7310,7 +7350,10 @@ function buildPdfBlocks(row){
   const parsed = parseAiSections(row.result_text || '');
   const leadIn = (parsed[0] && !parsed[0].title) ? parsed[0].body : '';
   const sections = parsed.filter(s=>s.title);
-  const useStructured = sections.length >= 3;
+  // V3 마커 기반 큰 제목은 카테고리별 최소 2~3개가 서버에서 보장되므로(repair 단계 참고)
+  // 기존 em dash 휴리스틱(최소 3개)보다 기준을 낮춰도 안전하다.
+  const isV3 = parsed.some(s=>s.v3);
+  const useStructured = sections.length >= (isV3 ? 2 : 3);
   const catLabel = CATEGORY_LABEL[row.category] || row.category;
   const nameLabel0 = (row.name || '').trim();
 
@@ -7339,8 +7382,14 @@ function buildPdfBlocks(row){
   }
 
   if(useStructured){
+    // V3 큰 제목은 번호 배지 없이 본문보다 확실히 크고 굵게, 사주결 붉은 포인트 컬러(#b23b2e)로
+    // 표시한다(2026-10 "제목 구조 강제" 작업지시서 8번 항목). 기존(비V3) 소제목의 번호 원형
+    // 배지 스타일은 한 글자도 바꾸지 않는다.
     sections.forEach((s,i)=>{
-      blocks.push({ keepWithNext:true, html: `
+      blocks.push({ keepWithNext:true, html: s.v3 ? `
+        <div style="margin:20pt 0 10pt;">
+          <h3 style="font-family:'Noto Serif KR',serif; font-weight:900; font-size:15.5pt; color:#b23b2e; margin:0;">${escapeHtml(s.title)}</h3>
+        </div>` : `
         <div style="display:flex; align-items:center; gap:8pt; margin:18pt 0 9pt;">
           <div style="width:18pt; height:18pt; border-radius:50%; background:rgba(178,59,46,.14); color:#b23b2e; font-family:'JetBrains Mono',monospace; font-size:9pt; display:flex; align-items:center; justify-content:center; flex-shrink:0;">${String(i+1).padStart(2,'0')}</div>
           <h3 style="font-family:'Noto Serif KR',serif; font-weight:700; font-size:13.5pt; color:#241d13; margin:0;">${escapeHtml(s.title)}</h3>
@@ -7351,7 +7400,9 @@ function buildPdfBlocks(row){
       });
     });
   } else {
-    const paras = String(row.result_text || '저장된 해석 내용이 없어요.').split(/\n\s*\n+/).map(p=>p.trim()).filter(Boolean);
+    // 마커가 1개 이하로만 나와 이 폴백 경로로 떨어지더라도, PDF에 내부 마커 문자열이
+    // 그대로 찍히는 일은 없도록 안전망으로 한 번 더 제거한다.
+    const paras = String(row.result_text || '저장된 해석 내용이 없어요.').replace(/\[\[V3_SECTION\]\]/g, '').split(/\n\s*\n+/).map(p=>p.trim()).filter(Boolean);
     paras.forEach(p=>{
       const dashIdx = p.indexOf('—');
       const isLeadTitle = dashIdx > 0 && dashIdx <= 50 && !p.slice(0, dashIdx).includes('\n');
