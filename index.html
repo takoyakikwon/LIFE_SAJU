@@ -747,14 +747,6 @@ window.SajuAnalytics = (function(){
   /* 심층풀이 목차 + 진행상태 — 순서대로 나열(아코디언 아님), 옆에 스텝 표시로 지금 읽는 위치를
      보여준다. AI 응답은 이미 "[소제목] — [문장]" 줄바꿈 형식을 지키므로(BASE_PROMPT) 새 파싱
      없이 그 형식을 그대로 분해해서 쓴다(parseAiSections 참고). */
-  .ai-toc-wrap{ display:flex; gap:12px; align-items:flex-start; margin:0 0 8px; }
-  .ai-toc-list{ flex:1; display:flex; flex-direction:column; gap:2px; }
-  .ai-toc-item{
-    display:flex; align-items:center; gap:9px; padding:8px 4px; border-radius:10px; font-size:12.5px;
-    color:var(--ink-faint);
-  }
-  .ai-toc-item.done{ color:var(--ink-soft); }
-  .ai-toc-item.current{ color:var(--ink); background:rgba(244,196,99,.08); }
   .ai-step-track{ display:flex; flex-direction:column; align-items:center; flex-shrink:0; padding-top:8px; }
   .ai-step-dot{
     width:15px; height:15px; border-radius:50%; border:2px solid var(--ink-faint);
@@ -765,10 +757,6 @@ window.SajuAnalytics = (function(){
   .ai-step-dot.current{ border-color:var(--gold); box-shadow:0 0 0 3px rgba(244,196,99,.25); }
   .ai-step-line{ width:2px; flex:1; min-height:16px; background:var(--ink-faint); opacity:.35; }
   .ai-step-line.done{ background:var(--gold); opacity:.7; }
-  .ai-toc-num{ font-family:"JetBrains Mono", monospace; font-size:10px; color:var(--ink-faint); width:14px; }
-  .ai-toc-item.current .ai-toc-num{ color:var(--gold); }
-  .ai-toc-progress-hint{ text-align:center; font-size:11px; color:var(--ink-faint); margin:0 0 18px; }
-  .ai-toc-progress-hint b{ color:var(--gold); }
   .ai-report-sec{ margin:22px 0; scroll-margin-top:16px; }
   .ai-report-sec .sec-h{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
   .ai-report-sec .sec-h .n{
@@ -778,6 +766,13 @@ window.SajuAnalytics = (function(){
   }
   .ai-report-sec .sec-h h3{ font-family:"Noto Serif KR"; font-weight:900; font-size:14.5px; margin:0; color:var(--ink); }
   .ai-report-sec p{ font-size:13.5px; line-height:1.85; color:var(--ink); margin:0; white-space:pre-wrap; }
+  /* 2026-10 "제목 구조 강제" — Narrative V3 큰 제목([[V3_SECTION]] 마커로 서버가 강제 삽입)
+     전용 스타일. 번호 배지 없이, 본문보다 확실히 크고 굵게 표시하고 위아래 여백을 넉넉히 둔다.
+     2026-10 "최종 UI 보정" — 어두운 배경에서 더 잘 읽히도록 붉은 포인트(--seal) 대신 밝은
+     골드 포인트(--gold)로 변경. 기존(비V3) .sec-h/.sec-h .n/.sec-h h3 스타일은 전혀
+     건드리지 않는다. */
+  .ai-report-sec .sec-h.v3{ margin:18px 0 10px; }
+  .ai-report-sec .sec-h h3.v3-title{ font-family:"Noto Serif KR"; font-weight:900; font-size:17px; margin:0; color:var(--gold); letter-spacing:-.1px; }
   /* 십성 table */
   .sipsung-table{width:100%; border-collapse:collapse; margin-top:4px;}
   .sipsung-table th{
@@ -1523,9 +1518,6 @@ window.SajuAnalytics = (function(){
           <a href="/refund.html">환불정책</a>
         </div>
         <div class="app-biz-info">
-          <b>상호</b> 편한세상만들기 &nbsp;·&nbsp; <b>대표자</b> 김순늠<br>
-          <b>사업자등록번호</b> 246-28-01614 (간이과세자)<br>
-          <b>사업장 소재지</b> 대구광역시 달서구 성서동로350<br>
           <b>고객센터</b> 서비스 내 "문의하기" &nbsp;·&nbsp; 010-4827-7521
         </div>
         <div class="app-footer-copy">© 2026 사주결</div>
@@ -1780,7 +1772,7 @@ window.SajuAnalytics = (function(){
                 <div class="cat-option-desc">성격·기질부터 지금의 흐름까지, 사주 전체를 폭넓게 풀어드려요.</div>
                 <div class="cat-option-price">9,900원</div>
               </button>
-              <button type="button" class="cat-option cat-option-premium"  style="display:none;" data-cat="lifetime">
+              <button type="button" class="cat-option cat-option-premium" data-cat="lifetime">
                 <div class="cat-option-badge">PREMIUM</div>
                 <div class="cat-option-name">평생운 프리미엄 👑</div>
                 <div class="cat-option-desc">과거부터 지금, 그리고 앞으로의 대운까지 — 이 사람의 인생 전체를 하나의 이야기로 풀어드려요. 귀인이 오는 시기, 투자와 건강까지 챙기는 가장 깊은 리포트예요.</div>
@@ -2430,6 +2422,13 @@ function seunList(fromYear, count){
   }
   return arr;
 }
+// 2026-10-02 STEP B — buildSajuCore()의 timing.seun(opts.seunInfo)을 실제로 채워 보내기 위한 헬퍼.
+// 하드코딩된 연도(예: 기존 신년운세 전용 buildSeunText(s, 2027)) 없이, 호출 시점의 "올해"를 그대로 쓴다.
+function currentSeunInfo(){
+  const y = new Date().getFullYear();
+  const p = yearPillarIdx(y);
+  return { year: y, g: p.g, z: p.z };
+}
 function tenGodOf(dmG, targetElement, targetYY){
   const dmElement = GAN_ELEMENT[dmG];
   const dmYY = dmG % 2; // 0 양 1 음
@@ -2775,6 +2774,36 @@ const TIANFU_GROUP = [
   {name:'파군', hanja:'破軍', off:10},
 ];
 
+// ---- 14주성 강도(廟/旺/得/利/平/不/陷) — 2026-10-02 STEP E 신설 ----
+// 전통적으로 이 등급표는 "고정된 암기표"(간지 관계로 산술 도출되는 12운성과 다름)라서,
+// 혼천의가 실제로 어떤 값을 쓰는지 직접 확인된 셀만 채운다. 권영민 샘플(1986-10-25)의
+// 紫微斗數 命盤에 명시된 13개 (주성,지지) 조합만 근거로 삼았고, 그 외 조합은 사용자 지시
+// ("혼천의가 실제 사용하는 등급만 구현한다", "전통적으로 맞다는 이유로 차이를 허용하지 않는다")에
+// 따라 추측으로 채우지 않고 비워둔다(null — UI/evidence에서는 "혼천의 미확인"으로 표시).
+// 키: `${주성명}_${표준지지idx(0=子)}`. 확장하려면 추가 혼천의 원자료 샘플의 紫微斗數 命盤
+// 12궁 강도 표기를 더 받아 이 표에 추가한다(권영민 전용 하드코딩이 아니라, 모든 사용자에게
+// 공통 적용되는 범용 참조표이므로 추가해도 과적합 위험이 없음).
+const ZIWEI_STAR_STRENGTH = {
+  '자미_7': '廟',  // 兄弟 未
+  '파군_7': '廟',  // 兄弟 未
+  '천기_6': '陷',  // 夫妻 午
+  '태양_4': '旺',  // 財帛 辰
+  '무곡_3': '陷',  // 疾厄 卯
+  '칠살_3': '旺',  // 疾厄 卯
+  '천동_2': '得',  // 遷移 寅
+  '천량_2': '廟',  // 遷移 寅
+  '천상_1': '廟',  // 交友 丑
+  '거문_0': '旺',  // 官祿 子
+  '염정_11': '陷', // 田宅 亥
+  '탐랑_11': '陷', // 田宅 亥
+  '태음_10': '廟', // 福德 戌
+  '천부_9': '廟',  // 父母 酉
+};
+function ziweiStarGrade(starName, stdZhi){
+  const v = ZIWEI_STAR_STRENGTH[`${starName}_${stdZhi}`];
+  return v || null; // 미확인은 null — 추측해서 채우지 않음
+}
+
 // ---- 십간사화표 (검증됨: iztro heavenlyStems.ts) ----
 // [화록, 화권, 화과, 화기] 별 이름(한글, 위 목록과 동일 표기 사용)
 const SIHWA_TABLE = {
@@ -3071,13 +3100,20 @@ function calcZiwei({ year, month, day, hour, minute, unknownTime, gender, trueHo
   const lunar = solarToLunar(wallJD, year);
   if(!lunar) return null;
 
-  // 2) 시지 (사주 엔진의 진태양시 기준 시각을 그대로 사용해 두 체계의 '시'를 일치시킴)
+  // 2) 시지 — 2026-10-02 STEP A 수정: 자미두수 명궁/신궁/문창문곡/화성영성 등 시(時) 의존 요소는
+  //    사주 시주(時柱)와 달리 '진태양시(true solar time)'가 아니라 '출생시각 그대로(민간 시진, KST 벽시계)'를
+  //    기준으로 한다. 과거 코드는 "두 체계의 시를 일치시킨다"는 의도로 사주 엔진의 trueHourFloat를
+  //    그대로 재사용했으나, 혼천의 원자료 3건(1986-10-25 03:00 대구 남 / 1992-03-08 13:00 대구 여 /
+  //    1990-08-03 17:00 대구 여) 교차검증 결과 혼천의는 세 건 모두 자미두수 시지를 진태양시가 아닌
+  //    벽시계 시각으로 산출했고, 그 결과 12궁·보조성(좌보/우필/천괴/천월/경양/타라/녹존/문창/문곡/화성/영성)·
+  //    사화·신궁이 전부 정확히 일치했다(사주 시주는 원래부터 진태양시 기준으로 이미 일치하므로 변경하지 않음).
+  //    buildLunarCalendar()/solarToLunar()/soulBodyIndex() 자체는 정상이며, 이 시지 기준 하나만 원인이었다.
   let hourZhiStd;
-  if(unknownTime || trueHourFloat===null || trueHourFloat===undefined){
+  if(unknownTime || hour===null || hour===undefined){
     hourZhiStd = null;
   } else {
-    const h = mod(trueHourFloat,24);
-    hourZhiStd = (h>=23 || h<1) ? 0 : Math.floor((h+1)/2);
+    const wallHourFloat = mod(hour + (minute||0)/60, 24);
+    hourZhiStd = (wallHourFloat>=23 || wallHourFloat<1) ? 0 : Math.floor((wallHourFloat+1)/2);
   }
   const hourForCalc = hourZhiStd===null ? 0 : hourZhiStd; // 시간 미상이면 子시로 임시 계산(참고용, 명궁 정확도 낮음)
 
@@ -3095,10 +3131,11 @@ function calcZiwei({ year, month, day, hour, minute, unknownTime, gender, trueHo
 
   // 6) 紫微/天府 및 14주성
   const { ziweiIndex, tianfuIndex } = ziweiTianfuIndex(bureau.num, lunar.lunarDay);
-  const starMap = {}; // reduced index(0~11) -> [{name,hanja}]
+  const starMap = {}; // reduced index(0~11) -> [{name,hanja,grade}]
   for(let i=0;i<12;i++) starMap[i]=[];
-  ZIWEI_GROUP.forEach(s=>{ starMap[mod(ziweiIndex+s.off,12)].push({name:s.name, hanja:s.hanja}); });
-  TIANFU_GROUP.forEach(s=>{ starMap[mod(tianfuIndex+s.off,12)].push({name:s.name, hanja:s.hanja}); });
+  // grade(廟/旺/得/利/平/不/陷)는 표준 지지(std, 0=子) 기준 — reduced 좌표를 변환해서 조회한다.
+  ZIWEI_GROUP.forEach(s=>{ const ridx=mod(ziweiIndex+s.off,12); starMap[ridx].push({name:s.name, hanja:s.hanja, grade: ziweiStarGrade(s.name, reducedToStd(ridx))}); });
+  TIANFU_GROUP.forEach(s=>{ const ridx=mod(tianfuIndex+s.off,12); starMap[ridx].push({name:s.name, hanja:s.hanja, grade: ziweiStarGrade(s.name, reducedToStd(ridx))}); });
 
   // 7) 12궁 배치 (命宮에서 역행/감소)
   const palaces = [];
@@ -3156,6 +3193,14 @@ function calcZiwei({ year, month, day, hour, minute, unknownTime, gender, trueHo
   }
   auxStars.push({name:'화성', hanja:'火星', stdZhi: huo});
   auxStars.push({name:'영성', hanja:'鈴星', stdZhi: ling});
+  // 2026-10-02 STEP C 신설 — 天馬/地劫/地空. 혼천의 원자료 3건(권영민/1992-03-08/1990-08-03)
+  // 전부와 대조해 검증: 天馬는 년지 삼합국 기준(바자의 驛馬와 동일한 지지), 地空/地劫은
+  // "亥에서 子시 기준으로 역행(地空)·순행(地劫)" 공식으로 6/6(地空·地劫)+3/3(天馬) 전부 일치.
+  const ZIWEI_CHEONMA_GROUP = { 2:8, 6:8, 10:8, 8:2, 0:2, 4:2, 5:11, 9:11, 1:11, 11:5, 3:5, 7:5 }; // 寅午戌→申 申子辰→寅 巳酉丑→亥 亥卯未→巳
+  const cheonma = ZIWEI_CHEONMA_GROUP[yp.z];
+  if(cheonma!=null) auxStars.push({name:'천마', hanja:'天馬', stdZhi: cheonma});
+  auxStars.push({name:'지공', hanja:'地空', stdZhi: mod(11 - hourForCalc, 12)});
+  auxStars.push({name:'지겁', hanja:'地劫', stdZhi: mod(11 + hourForCalc, 12)});
   // 궁에 보조성 반영
   auxStars.forEach(s=>{
     const reducedIdx = mod(s.stdZhi-2,12);
@@ -3191,6 +3236,1616 @@ function calcZiwei({ year, month, day, hour, minute, unknownTime, gender, trueHo
     hourZhiStd,
   };
 }
+
+/* =========================================================
+   1c. STEP 1.1 / STEP 2 — saju_core / ziwei_core 구조화 판단 레이어
+   (사주결_V3_STEP1.1_수정설계서.md, STEP2+STEP3 통합 작업지시서 그대로 구현)
+   순수 함수만 추가 — calcSaju()/calcZiwei() 등 기존 계산 로직은 한 줄도 수정하지 않음.
+   ========================================================= */
+"use strict";
+/* =========================================================
+   STEP 1.1 — buildSajuCore(sajuResult, opts)
+   설계서: 사주결_V3_STEP1.1_수정설계서.md 그대로 구현.
+   순수 함수 — calcSaju()의 반환값(및 옵션으로 daeHan 목록)만 입력으로 받는다.
+   기존 계산 엔진(calcSaju/calcZiwei 등)은 단 한 줄도 건드리지 않는다.
+   ========================================================= */
+// ---------- 0. 공통 유틸 ----------
+const GAN_STR = g => `${GAN[g]}(${GAN_HANJA[g]})`;
+const ZHI_STR = z => `${ZHI[z]}(${ZHI_HANJA[z]})`;
+const generates = e => mod(e + 1, 5); // e가 생하는 대상
+const controls  = e => mod(e + 2, 5); // e가 극하는 대상
+
+// ---------- 신설 관계 테이블 (기존 엔진엔 육합/충만 있음 — 삼합/방합/반합/형/파/해 신설) ----------
+const SANHE = [ // 완전삼합 [지지idx 3개], element(생성국)
+  { zhis:[11,3,7], element:0, label:'해묘미(목국)' },
+  { zhis:[2,6,10], element:1, label:'인오술(화국)' },
+  { zhis:[5,9,1],  element:3, label:'사유축(금국)' },
+  { zhis:[8,0,4],  element:4, label:'신자진(수국)' },
+];
+const BANGHAP = [ // 방합(방위국) [지지idx 3개]
+  { zhis:[2,3,4], element:0, label:'인묘진(동방목)' },
+  { zhis:[5,6,7], element:1, label:'사오미(남방화)' },
+  { zhis:[8,9,10], element:3, label:'신유술(서방금)' },
+  { zhis:[11,0,1], element:4, label:'해자축(북방수)' },
+];
+const XING_GROUPS = [ // 형(刑)
+  { zhis:[2,5,8], label:'인사신 삼형(지세지형)', kind:'triangle' },
+  { zhis:[1,10,7], label:'축술미 삼형(무은지형)', kind:'triangle' },
+  { zhis:[3,0], label:'자묘형(무례지형)', kind:'pair' },
+  { self:[4], label:'진 자형' }, { self:[6], label:'오 자형' },
+  { self:[9], label:'유 자형' }, { self:[11], label:'해 자형' },
+];
+const ZHI_PA = { 0:9,9:0, 3:6,6:3, 4:1,1:4, 7:10,10:7, 2:11,11:2, 5:8,8:5 }; // 파(破)
+const ZHI_HAE = { 0:7,7:0, 1:6,6:1, 2:5,5:2, 3:4,4:3, 8:11,11:8, 9:10,10:9 }; // 해(害)
+
+// ---------- 1-1. 월령: 왕상휴수사 ----------
+// 계절(표기용)과, 그 계절의 "왕(旺)" 오행(D) 판정 — 진술축미는 사계토왕으로 독립 취급.
+const MONTH_SEASON = { 2:'봄',3:'봄',4:'봄', 5:'여름',6:'여름',7:'여름', 8:'가을',9:'가을',10:'가을', 11:'겨울',0:'겨울',1:'겨울' };
+const MONTH_DOMINANT_EL = { 2:0,3:0,4:2, 5:1,6:1,7:2, 8:3,9:3,10:2, 11:4,0:4,1:2 }; // 진술축미=토(2)
+function wangSangState(dayEl, monthZ){
+  const D = MONTH_DOMINANT_EL[monthZ];
+  if(dayEl === D) return '왕';
+  if(dayEl === generates(D)) return '상';
+  if(dayEl === mod(D + 4, 5)) return '휴'; // dayEl generates D
+  if(dayEl === mod(D + 3, 5)) return '수'; // dayEl controls D
+  return '사'; // D controls dayEl
+}
+function buildMonthCommand(dayG, monthZ){
+  const dayEl = GAN_ELEMENT[dayG];
+  const state = wangSangState(dayEl, monthZ);
+  return {
+    month_branch: ZHI_STR(monthZ),
+    season: MONTH_SEASON[monthZ] + (([4,7,10,1].includes(monthZ)) ? ' (환절기·사계토왕)' : ''),
+    day_master_wangsang: state,
+    seasonal_note: `${MONTH_SEASON[monthZ]}, ${ELEMENT_NAME[MONTH_DOMINANT_EL[monthZ]]}왕지절 — 일간 ${ELEMENT_NAME[dayEl]}은(는) 이 계절에 '${state}'에 해당한다.`,
+  };
+}
+
+// ---------- 1-2. 조후 ----------
+const ZHI_MOISTURE = { 0:'습',1:'습',2:'중',3:'중',4:'습',5:'조',6:'조',7:'조',8:'중',9:'중',10:'조',11:'습' };
+const MONTH_TEMPERATURE = { 2:'중',3:'중',4:'중', 5:'열',6:'열',7:'열', 8:'중',9:'중',10:'중', 11:'한',0:'한',1:'한' };
+function buildClimateBalance(monthZ, allZhis){
+  const temperature = MONTH_TEMPERATURE[monthZ];
+  const moistCounts = { 조:0, 중:0, 습:0 };
+  allZhis.forEach(z => { moistCounts[ZHI_MOISTURE[z]]++; });
+  const moisture = moistCounts.조 > moistCounts.습 ? '조' : (moistCounts.습 > moistCounts.조 ? '습' : '중');
+  const needs = [];
+  if(temperature === '열' && moisture === '조') needs.push('수기(水氣)로 식혀줄 필요');
+  if(temperature === '한' && moisture === '습') needs.push('화기(火氣)로 데워줄 필요');
+  if(temperature === '열' && moisture !== '조') needs.push('과열을 눌러줄 수기 보완');
+  if(temperature === '한' && moisture !== '습') needs.push('한기를 완화할 화기 보완');
+  if(!needs.length) needs.push('온도·습도가 극단적이지 않아 조후상 뚜렷한 결핍은 없음');
+  return {
+    climate_balance: {
+      temperature, moisture, needs,
+      notes: [`월지 기준 온도=${temperature}, 지지 조습 분포 기준 습도=${moisture}(신강신약 판정과는 무관하게 계절적으로 필요한 기운만 판정)`],
+    },
+  };
+}
+
+// ---------- 1-5. 지장간 · 통근 · 투간 ----------
+function janggan본기(z){ const arr = ZHI_JANGGAN[z]; return arr[arr.length - 1]; }
+function janggan중기(z){ const arr = ZHI_JANGGAN[z]; return arr.length === 3 ? arr[1] : null; }
+function janggan여기(z){ const arr = ZHI_JANGGAN[z]; return arr.length === 3 ? arr[0] : arr[0]; }
+// pillars: [{label, g, z}] (있는 것만)
+function buildRootsAndStems(dayG, pillars){
+  const dayEl = GAN_ELEMENT[dayG];
+  const byLabel = {}; pillars.forEach(p => byLabel[p.label] = p);
+  const matches = []; // {label, position, gan}
+  pillars.forEach(p => {
+    const arr = ZHI_JANGGAN[p.z];
+    arr.forEach((g, i) => {
+      if(GAN_ELEMENT[g] !== dayEl) return;
+      const position = (i === arr.length - 1) ? '본기' : (arr.length === 3 && i === 1 ? '중기' : '여기');
+      matches.push({ label: p.label, position, gan: g });
+    });
+  });
+  let grade = '무근', detail = '어느 지장간에도 일간과 같은 오행이 없음';
+  const hasMonth본기 = matches.some(m => m.label === '월지' && m.position === '본기');
+  const has일지본기or월중기 = matches.some(m => (m.label === '일지' && m.position === '본기') || (m.label === '월지' && m.position === '중기'));
+  const has약한 = matches.some(m => ['년지', '시지'].includes(m.label) || m.position === '여기');
+  if(hasMonth본기){ grade = '강함'; }
+  else if(has일지본기or월중기){ grade = '보통'; }
+  else if(has약한){ grade = '약함'; }
+  if(matches.length){
+    const best = matches.find(m => m.label === '월지' && m.position === '본기')
+      || matches.find(m => (m.label === '일지' && m.position === '본기') || (m.label === '월지' && m.position === '중기'))
+      || matches[0];
+    detail = `${best.label} ${ZHI_STR(byLabel[best.label].z)}의 ${best.position} ${GAN_STR(best.gan)}가 일간과 같은 오행(${ELEMENT_NAME[dayEl]}) — ${best.label} ${best.position} 통근`;
+  }
+  // 투간/암장: 같은 기둥(지지→천간) 비교
+  const revealed = [], hidden = [];
+  pillars.forEach(p => {
+    const arr = ZHI_JANGGAN[p.z];
+    arr.forEach((g, i) => {
+      const position = (i === arr.length - 1) ? '본기' : (arr.length === 3 && i === 1 ? '중기' : '여기');
+      const label = `${p.label} ${ZHI_STR(p.z)}의 ${position} ${GAN_STR(g)}`;
+      if(p.g !== undefined && p.g !== null && g === p.g){ revealed.push(`${label} — 같은 기둥 천간(${GAN_STR(p.g)})에 투출`); }
+      else { hidden.push(`${label} — 암장(미투출)`); }
+    });
+  });
+  return { roots_and_stems: { tongkeun_grade: grade, tongkeun_detail: detail, revealed, hidden } };
+}
+
+// ---------- 1-3. 신강/신약 ----------
+function buildStrength(sajuResult){
+  const { pillars, input } = sajuResult;
+  const dayG = pillars.day.g, dayZ = pillars.day.z;
+  const dayEl = GAN_ELEMENT[dayG];
+  const monthZ = pillars.month.z;
+
+  // 득령
+  const state = wangSangState(dayEl, monthZ);
+  const deukryeong = (state === '왕' || state === '상');
+
+  // 득지 (일지 십성이 비겁/인성이면 지지 원조)
+  const dayGodZ = tenGodOf(dayG, ZHI_ELEMENT[dayZ], dayZ % 2);
+  const dayGroup = TEN_GOD_GROUP[dayGodZ];
+  const deukji = (dayGroup === '비겁' || dayGroup === '인성');
+
+  // 득세 (년간·년지·시간·시지 — 월간/월지/일지는 득령/득지에서 이미 사용했으므로 제외)
+  const seseChars = [];
+  seseChars.push({ label: '년간', gz: 'g', v: pillars.year.g, isGan: true });
+  seseChars.push({ label: '년지', gz: 'z', v: pillars.year.z, isGan: false });
+  if(pillars.hour){
+    seseChars.push({ label: '시간', gz: 'g', v: pillars.hour.g, isGan: true });
+    seseChars.push({ label: '시지', gz: 'z', v: pillars.hour.z, isGan: false });
+  }
+  let supportCnt = 0, drainCnt = 0;
+  const seseDetail = [];
+  seseChars.forEach(c => {
+    const el = c.isGan ? GAN_ELEMENT[c.v] : ZHI_ELEMENT[c.v];
+    const yy = c.isGan ? (c.v % 2) : (c.v % 2);
+    const god = tenGodOf(dayG, el, yy);
+    const grp = TEN_GOD_GROUP[god];
+    const supportive = (grp === '비겁' || grp === '인성');
+    if(supportive) supportCnt++; else drainCnt++;
+    seseDetail.push(`${c.label}=${god}(${supportive ? '비겁·인성' : '식재관'})`);
+  });
+  const deukse = supportCnt === drainCnt ? '동률' : (supportCnt > drainCnt ? '우세' : '열세');
+
+  const timeKnown = !input.unknownTime;
+  const rootsInfo = buildRootsAndStems(dayG, [
+    { label: '년지', g: pillars.year.g, z: pillars.year.z },
+    { label: '월지', g: pillars.month.g, z: pillars.month.z },
+    { label: '일지', g: null, z: dayZ },
+    ...(pillars.hour ? [{ label: '시지', g: pillars.hour.g, z: pillars.hour.z }] : []),
+  ]);
+  const tongkeunGrade = rootsInfo.roots_and_stems.tongkeun_grade;
+  const tongkeunSupport = tongkeunGrade === '강함' || tongkeunGrade === '보통';
+
+  let supportSignals = [deukryeong, deukji, deukse === '우세', tongkeunSupport].filter(Boolean).length;
+  let level;
+  if(deukse === '동률'){
+    // 나머지 3체크(득령/득지/통근)로 판단, 애매하면 중화
+    const strongCnt = [deukryeong, deukji, tongkeunSupport].filter(Boolean).length;
+    level = strongCnt >= 2 ? '중화' : (strongCnt <= 1 ? '중화' : '중화');
+  } else if(supportSignals >= 3){
+    level = (deukryeong && tongkeunSupport) ? '신강' : '신강';
+  } else if(supportSignals <= 1){
+    level = '신약';
+  } else {
+    level = '중화';
+  }
+  // 태강/태약(극단) — 4체크 전부 일치 시
+  if(supportSignals === 4) level = '태강' === level ? level : '신강';
+  if(supportSignals === 0) level = '신약';
+
+  let confidence = '중간';
+  const allAgree = (deukryeong === deukji) && (deukji === tongkeunSupport) && (deukse !== '동률');
+  if(!timeKnown){
+    confidence = '중간'; // 시주 없으면 절대 '높음' 부여 안 함
+  } else if(allAgree && deukse !== '동률'){
+    confidence = '높음';
+  } else if(deukse === '동률'){
+    confidence = '중간';
+  } else {
+    confidence = '중간';
+  }
+
+  return {
+    strength: {
+      level, confidence,
+      checks: {
+        deukryeong: { result: deukryeong, detail: `월지 ${ZHI_STR(monthZ)}, 일간 상태='${state}'` },
+        deukji: { result: deukji, detail: `일지 ${ZHI_STR(dayZ)}=${dayGodZ}(${dayGroup})` },
+        deukse: { result: deukse, detail: seseDetail.join(', ') },
+        tongkeun: { result: tongkeunGrade, detail: rootsInfo.roots_and_stems.tongkeun_detail },
+      },
+      reasons: [
+        `득령 ${deukryeong ? '성공' : '실패'}`, `득지 ${deukji ? '성공' : '실패'}`,
+        `득세 ${deukse}`, `통근 ${tongkeunGrade}`,
+      ],
+      data_status: {
+        time: timeKnown ? '확정' : '미상',
+        confidence_capped_reason: timeKnown ? null : '시주 데이터가 없어 득세 체크가 2자리(년간·년지)만으로 산출됨 — confidence 상한 중간',
+      },
+    },
+    _rootsInfo: rootsInfo,
+  };
+}
+
+// ---------- 1-4. 오행 균형과 유통 ----------
+function buildFiveElements(allGans, allZhis){
+  const counts = [0, 0, 0, 0, 0];
+  allGans.forEach(g => counts[GAN_ELEMENT[g]]++);
+  allZhis.forEach(z => counts[ZHI_ELEMENT[z]]++);
+  const revealedElements = new Set(counts.map((c, i) => c > 0 ? i : null).filter(v => v !== null));
+  // 잠재: 원국에 드러나진 않았으나(count=0) 지지 장간에는 있는 오행
+  const jangganElements = new Set();
+  allZhis.forEach(z => ZHI_JANGGAN[z].forEach(g => jangganElements.add(GAN_ELEMENT[g])));
+  const dominant = [], weak = [], latent = [];
+  for(let i = 0; i < 5; i++){
+    if(counts[i] >= 3) dominant.push(`${ELEMENT_NAME[i]}(${counts[i]}개)`);
+    else if(counts[i] === 0){
+      if(jangganElements.has(i)) latent.push(`${ELEMENT_NAME[i]}(지장간에만 존재 — 정합성 검증상 완전 부재로 단정하지 않음)`);
+      else weak.push(`${ELEMENT_NAME[i]}(0개, 지장간에도 없음)`);
+    } else if(counts[i] === 1){ weak.push(`${ELEMENT_NAME[i]}(1개)`); }
+  }
+  const maxEl = counts.indexOf(Math.max(...counts));
+  const flow = `가장 두드러진 오행은 ${ELEMENT_NAME[maxEl]}(${counts[maxEl]}개) — 생극 흐름은 인접 오행 개수 분포에 따라 판단 필요`;
+  return { five_elements: { dominant, weak, latent, flow, counts_by_element: ELEMENT_NAME.map((n, i) => `${n} ${counts[i]}`).join(', ') } };
+}
+
+// ---------- 1-6/1-7. 십성 구조 + 격국 ----------
+function buildTenGodsAndStructure(dayG, pillars, rootsInfo){
+  const dayEl = GAN_ELEMENT[dayG];
+  const dayZ = pillars.day.z;
+  const items = []; // {label, char, isGan, god, group}
+  const pushGan = (label, g) => { if(g===undefined||g===null) return; const god = tenGodOf(dayG, GAN_ELEMENT[g], g % 2); items.push({ label, isGan: true, char: g, god, group: TEN_GOD_GROUP[god] }); };
+  const pushZhi = (label, z) => { const god = tenGodOf(dayG, ZHI_ELEMENT[z], z % 2); items.push({ label, isGan: false, char: z, god, group: TEN_GOD_GROUP[god] }); };
+  pushGan('년간', pillars.year.g); pushZhi('년지', pillars.year.z);
+  pushGan('월간', pillars.month.g); pushZhi('월지', pillars.month.z);
+  pushZhi('일지', dayZ); // 일간은 일원(日元) 자체라 제외
+  if(pillars.hour){ pushGan('시간', pillars.hour.g); pushZhi('시지', pillars.hour.z); }
+
+  const revealedGodSet = new Set(items.map(it => it.god));
+  const hiddenOnly = []; // 지장간에만 존재하는 십성(잠재)
+  const allBranches = items.filter(it=>!it.isGan).map(it=>it.char);
+  allBranches.forEach(z => {
+    ZHI_JANGGAN[z].forEach(g => {
+      const god = tenGodOf(dayG, GAN_ELEMENT[g], g % 2);
+      if(!revealedGodSet.has(god)) hiddenOnly.push(god);
+    });
+  });
+
+  const godCount = {};
+  items.forEach(it => { godCount[it.god] = (godCount[it.god] || 0) + 1; });
+  const dominant_patterns = Object.keys(godCount).map(god => {
+    const cnt = godCount[god];
+    const grounded = rootsInfo.roots_and_stems.tongkeun_grade !== '무근' && rootsInfo.roots_and_stems.tongkeun_detail.includes(god);
+    let grade = cnt >= 2 ? '핵심' : '보조';
+    return { god, grade, count: cnt, direction_note: `${TEN_GOD_GROUP[god]} 계열` };
+  });
+  [...new Set(hiddenOnly)].forEach(god => {
+    if(!godCount[god]) dominant_patterns.push({ god, grade: '잠재', count: 0, direction_note: `${TEN_GOD_GROUP[god]} 계열(지장간에만 존재)` });
+  });
+
+  const supportive = [...new Set(items.filter(it => it.group === '비겁' || it.group === '인성').map(it => it.god))];
+  const draining = [...new Set(items.filter(it => it.group === '재성' || it.group === '관성' || it.group === '식상').map(it => it.god))];
+
+  // 격국/전체 구조
+  const groupCount = { 비겁: 0, 식상: 0, 재성: 0, 관성: 0, 인성: 0 };
+  items.forEach(it => { groupCount[it.group]++; });
+  const groups = Object.keys(groupCount);
+  const maxCnt = Math.max(...groups.map(g => groupCount[g]));
+  const topGroups = groups.filter(g => groupCount[g] === maxCnt && maxCnt > 0);
+  const minCnt = Math.min(...groups.map(g => groupCount[g]));
+  const weakGroups = groups.filter(g => groupCount[g] === minCnt);
+  let type;
+  if(topGroups.length === 1) type = `${topGroups[0]} 중심 구조`;
+  else if(topGroups.length === 2) type = `${topGroups[0]}-${topGroups[1]} 병존형`;
+  else type = '혼합 구조';
+
+  return {
+    ten_gods: {
+      dominant_patterns, supportive_to_day_master: supportive, draining_or_controlling_day_master: draining,
+      field_note: '위 두 필드는 일간 강약 관점의 작용만을 뜻하며, 용신/기신 판정이나 길흉 판단이 아니다.',
+    },
+    structural_pattern: {
+      type, basis: items.map(it => `${it.label}=${it.god}`),
+      tension_note: `${weakGroups.join(', ')}이(가) 상대적으로 가장 취약한 고리`,
+    },
+  };
+}
+
+// ---------- 1-8. 합충형파해 ----------
+// ⚠️ 내부 임시 설정(SAJU_RELATION_CONFIG) — 전통적으로 확정된 보편 규칙이 아니다.
+// STEP1.1 설계서 3-A~3-C 3개 검증 샘플 중 3-A("신자진 삼합... 불성립, 성립하는 관계 없음")를 코드
+// 결과와 맞추기 위해 도입한 판단이며, "년주-시주는 직접 합하지 않는다"는 관점을 취하는 학파도 있지만
+// 이걸 부정하는 학파도 있다(학파차 있음, 등급표 B/C와 마찬가지로 논쟁적). 새 검증 샘플이 이 설정과
+// 어긋나는 결과를 요구하면, 이 값을 false로 바꾸거나 규칙 자체를 다시 검토해야 한다 — 하드코딩된
+// 명리학 정설처럼 취급하지 말 것.
+const SAJU_RELATION_CONFIG = {
+  EXCLUDE_YEAR_HOUR_PAIR_FROM_COMBINATIONS: true, // 육합/완전삼합/방합/반합에만 적용, 충/형/파/해는 미적용
+};
+const FAR_PAIR = (l1, l2) => SAJU_RELATION_CONFIG.EXCLUDE_YEAR_HOUR_PAIR_FROM_COMBINATIONS
+  && ((l1 === '년지' && l2 === '시지') || (l1 === '시지' && l2 === '년지'));
+function buildRelations(branchList){ // [{label,z}]
+  const combinations = [], clashes = [], punishments = [], harms = [], breaks = [], special = [];
+  // 2026-10-02 STEP E — 혼천의 호환 출력/AI evidence에는 포함하지 않는 내부 연구용 후보.
+  // 혼천의 원자료(권영민)의 "八字關係" 섹션은 B급 반합을 전혀 표시하지 않았다(丑戌刑만 표시,
+  // 寅戌 반합은 없음). 혼천의가 이 RAW 섹션에서 반합(2글자 삼합) 자체를 노출하지 않는 것으로
+  // 보고, 반합 전체를 여기로 분리한다 — relations.combinations(혼천의 호환)에는 넣지 않는다.
+  const experimentalCombinations = [];
+  const zs = branchList.map(b => b.z);
+  const lbl = z => { const b = branchList.find(x => x.z === z); return b ? b.label : ZHI_STR(z); };
+  // 육합 (A)
+  for(let i = 0; i < branchList.length; i++){
+    for(let j = i + 1; j < branchList.length; j++){
+      const a = branchList[i], b = branchList[j];
+      const isFar = FAR_PAIR(a.label, b.label);
+      if(!isFar && ZHI_YUKHAP[a.z] === b.z){ combinations.push({ type: '육합', pair: `${lbl(a.z)}${ZHI[a.z]}-${lbl(b.z)}${ZHI[b.z]}`, grade: 'A' }); }
+      if(ZHI_CHUNG[a.z] === b.z){ clashes.push({ type: '충', pair: `${lbl(a.z)}${ZHI[a.z]}-${lbl(b.z)}${ZHI[b.z]}`, grade: 'A' }); }
+      if(ZHI_PA[a.z] === b.z){ breaks.push({ type: '파', pair: `${lbl(a.z)}${ZHI[a.z]}-${lbl(b.z)}${ZHI[b.z]}`, grade: 'C' }); }
+      if(ZHI_HAE[a.z] === b.z){ harms.push({ type: '해', pair: `${lbl(a.z)}${ZHI[a.z]}-${lbl(b.z)}${ZHI[b.z]}`, grade: 'C' }); }
+    }
+  }
+  // 완전삼합/방합 (A) · 반합 (B) — group.zhis(패턴의 3개 지지) 각각이 원국에 "존재하는가"만 본다
+  // (같은 지지가 두 기둥에 중복 출현해도 서로 다른 지지 3개가 실제로 모였는지가 핵심이므로,
+  // 존재 여부는 유니크한 지지값 기준으로 판정하고, 2개만 존재할 때만 그 2개가 년지+시지 조합인지
+  // 확인해 반합에서 제외한다).
+  [...SANHE, ...BANGHAP].forEach(group => {
+    const present = group.zhis.filter(z => zs.includes(z));
+    if(present.length === 3){
+      combinations.push({ type: SANHE.includes(group) ? '완전삼합' : '방합', pair: group.label, grade: 'A' });
+    } else if(present.length === 2 && SANHE.includes(group)){
+      // present 지지 각각이 어느 기둥(label)에서 왔는지 — 여러 기둥에서 올 수 있으므로 첫 매치만 사용
+      const labelsForPresent = present.map(z => { const b = branchList.find(x => x.z === z); return b ? b.label : null; });
+      if(labelsForPresent.length === 2 && FAR_PAIR(labelsForPresent[0], labelsForPresent[1])) return;
+      const missing = group.zhis.find(z => !present.includes(z));
+      experimentalCombinations.push({ type: '반합', pair: `${group.label.replace(/\(.+\)/, '')} 중 ${present.map(z=>ZHI[z]).join('·')} (${ZHI[missing]} 없음)`, grade: 'B', note: '학파에 따라 인정 여부·강도가 갈림 — 혼천의 RAW(八字關係)엔 표시되지 않아 혼천의 호환 출력/AI evidence에서 제외, 내부 연구용으로만 보존' });
+    }
+  });
+  // 형
+  XING_GROUPS.forEach(g => {
+    if(g.self){ if(zs.filter(z => z === g.self[0]).length >= 2) punishments.push({ type: '자형', pair: g.label, grade: 'B' }); return; }
+    if(g.kind === 'pair'){
+      if(g.zhis.every(z => zs.includes(z))) punishments.push({ type: '형', pair: g.label, grade: 'B' });
+      return;
+    }
+    const present = g.zhis.filter(z => zs.includes(z));
+    if(present.length >= 2){
+      let type = present.length === 3 ? '삼형(완전)' : '형(부분)';
+      let label = g.label;
+      // 2026-10-02 STEP E — 혼천의 권영민 샘플: 丑戌만 걸린 경우를 "丑戌刑(無禮)"로 표기했다
+      // (분류상 축술미 삼형=무은지형이 맞지만, 혼천의는 丑+戌 2개만 걸린 이 특정 조합에
+      // "無禮"라는 라벨을 쓴다). 丑戌 쌍만 정확히 이 라벨로 교체하고, 아직 혼천의 원자료로
+      // 확인되지 않은 戌未/丑未 부분조합이나 丑戌未 완전삼형은 추측해서 바꾸지 않는다.
+      if(g.label.startsWith('축술미') && present.length === 2 && present.includes(1) && present.includes(10)){
+        type = '형'; label = '축술형(無禮)';
+      }
+      punishments.push({ type, pair: `${label}: ${present.map(z=>ZHI[z]).join('·')}`, grade: 'B' });
+    }
+  });
+  return { relations: { combinations, clashes, punishments, harms, breaks, special }, experimental_relations: { combinations: experimentalCombinations } };
+}
+
+// ---------- 1-7b. 좌法(坐法) — 2026-10-02 STEP B ----------
+// 기존 twelveStage()/GAN_JANGSAENG_ZHI(일간 12운성, 이미 배포된 일지 배우자 해설 기능 등에 쓰임)는
+// 전혀 건드리지 않고 그대로 재사용한다 — 새 테이블·보정 상수는 전혀 필요 없었다.
+//
+// 처음에는 "음간은 장생 시작점을 1칸 당긴다"는 보정을 시도했으나(권영민 시지 丑/
+// 1992-03-08 시지 午의 음간들은 맞았지만, 1992-03-08 시지 午 위의 양간 丙(혼천의: 衰坐)이
+// 기존 공식의 제왕과 맞지 않아 "양간은 전부 일치" 가정이 깨졌다), 끝까지 맞지 않는 사례를
+// 역추적한 결과 실제 규칙은 음양 보정이 전혀 아니었다:
+//
+//   좌法 = 각 기둥의 지장간을, "자기 기둥의 지지"가 아니라 "일지(日支)" 위에서
+//          기존 twelveStage(간, 일지)로 그대로 계산한 값이다.
+//
+// 즉 년/월/시주의 지장간도 전부 "일지" 기준으로 포태법을 돌린다(일주의 지장간은
+// 자기 지지=일지라서 기존 결과와 같아 보였을 뿐). 이 규칙으로 혼천의 원자료 3건
+// (권영민/1992-03-08/1990-08-03) 전부, 4기둥×지장간 전체 33개 항목이 예외 없이
+// 정확히 일치했다(년·월·일·시주 전부, 양간·음간 구분 없이). 기존 twelveStage()를
+// 그대로 호출만 하므로 새 상수표나 수정이 없고, 기존 일지 배우자 해설 기능에도
+// 영향이 없다.
+function buildJwabeop(pillars, dayG, dayZ){
+  const PILLAR_KEYS = [['년주','year'],['월주','month'],['일주','day'],['시주','hour']];
+  const result = [];
+  PILLAR_KEYS.forEach(([label,key])=>{
+    const p = pillars[key];
+    if(!p){ result.push({ pillar: label, branch: null, hidden_stems: [], note: '시간미상' }); return; }
+    const hidden = ZHI_JANGGAN[p.z].map(g => ({
+      stem: GAN_STR(g),
+      ten_god: tenGodOf(dayG, GAN_ELEMENT[g], g % 2),
+      seat_stage: twelveStage(g, dayZ), // 일지 기준(자기 기둥 지지가 아님) — 위 주석 참고
+    }));
+    result.push({ pillar: label, branch: ZHI_STR(p.z), hidden_stems: hidden });
+  });
+  return { jwabeop: result };
+}
+
+// ---------- 1-7c. 引從法(인종法) — 2026-10-02 STEP B, 규칙 미확정 ----------
+// 포태법 산출 메커니즘 자체는 좌法과 동일하게 검증됨(양간 대표를 "일지 기준
+// twelveStage()"로 평가 — 혼천의 원자료 3건에서 8/8 전부 일치).
+//
+// 그런데 "어느 십성을 누락(인종 대상)으로 볼지" 선택 규칙은 샘플 간 서로 모순된다:
+//  - 1992-03-08 샘플: 壬(비겁)이 년간에 실제로 존재하는데도 인종法이 壬을 인종 대상으로 지목.
+//  - 1990-08-03 샘플: 庚(비겁)도 년간에 실제로 존재하는데 동일하게 인종 대상으로 지목.
+//  - 권영민 샘플: 식상(甲/乙)이 원국에 완전히 없는데도 인종法 목록에는 나오지 않음.
+// "완전 부재"도 "실제 존재"도 선택 기준을 설명하지 못해, 샘플 3건만으로는 일반 규칙을
+// 재구성할 수 없다. 이 상태에서 선택 규칙을 추정해 구현하면 샘플 전용 하드코딩이 될
+// 위험이 커서, 사용자 지시(2026-10-02 STEP B)에 따라 "규칙 미확정"으로만 표시하고
+// 구체적인 인종 대상·결과는 출력하지 않는다. 추가 혼천의 샘플이 더 확보되면 재조사한다.
+function buildInjongbeop(){
+  return {
+    injongbeop: {
+      status: '규칙 미확정',
+      note: '포태법 계산 방식(양간 대표를 일지 기준 twelveStage()로 평가)은 혼천의 원자료로 검증됐으나, 어떤 십성을 "누락"으로 판정해 인종하는지의 선택 규칙이 샘플 간 모순되어(실제 존재하는 십성도 인종되는 사례, 완전히 없는 십성이 인종되지 않는 사례 공존) 확정하지 못했다. 구체적인 인종 대상·결과는 이 버전에서 출력하지 않는다.',
+    },
+  };
+}
+
+// ---------- 1-8b. 천간 합·충 (2026-10-02 STEP B 신설) ----------
+// 혼천의 원자료 3건(1986-10-25 권영민 남 / 1992-03-08 여 / 1990-08-03 여)의 "八字關係" 섹션과
+// 대조해 검증: 甲庚沖(時-年)·辛丙合水(時-年)·壬丙沖(日-年) 등 표기와 아래 표가 전부 일치함을 확인했다.
+const GAN_HAP = { 0:5,5:0, 1:6,6:1, 2:7,7:2, 3:8,8:3, 4:9,9:4 }; // 갑기합토·을경합금·병신합수·정임합목·무계합화
+const GAN_HAP_ELEMENT = { 0:2, 1:3, 2:4, 3:0, 4:1 }; // min(갑0,기5)→토2 / min(을1,경6)→금3 / min(병2,신7)→수4 / min(정3,임8)→목0 / min(무4,계9)→화1
+const GAN_CHUNG = { 0:6,6:0, 1:7,7:1, 2:8,8:2, 3:9,9:3 }; // 갑경충·을신충·병임충·정계충 — 무기는 중앙토라 충이 없다(전통 4충 체계)
+function buildGanRelations(pillarList){ // [{label,g}] — natal 4주만 대상(년/월/일/시 순서, label은 '년간'·'월간'·'일간'·'시간')
+  const clashedIdx = new Set();
+  const clashes = [];
+  for(let i=0;i<pillarList.length;i++){
+    for(let j=i+1;j<pillarList.length;j++){
+      const a = pillarList[i], b = pillarList[j];
+      if(a.g==null || b.g==null) continue;
+      if(GAN_CHUNG[a.g]===b.g){
+        clashes.push({ type:'천간충', pair:`${a.label}${GAN_HANJA[a.g]}-${b.label}${GAN_HANJA[b.g]}`, grade:'A' });
+        clashedIdx.add(i); clashedIdx.add(j);
+      }
+    }
+  }
+  const combinations = [];
+  for(let i=0;i<pillarList.length;i++){
+    for(let j=i+1;j<pillarList.length;j++){
+      const a = pillarList[i], b = pillarList[j];
+      if(a.g==null || b.g==null) continue;
+      if(GAN_HAP[a.g]===b.g){
+        const adjacent = (j-i)===1; // 전통적으로 천간합은 바로 인접한 기둥 사이에서만 묶인다고 보는 경우가 많다
+        const brokenByChung = clashedIdx.has(i) || clashedIdx.has(j);
+        const transformation_status = (adjacent && !brokenByChung) ? '미판정' : '성립가능성낮음';
+        combinations.push({
+          type:'천간합',
+          pair:`${a.label}${GAN_HANJA[a.g]}-${b.label}${GAN_HANJA[b.g]}`,
+          result_element: ELEMENT_NAME[GAN_HAP_ELEMENT[Math.min(a.g,b.g)]],
+          detected: true,
+          adjacent,
+          grade: (adjacent && !brokenByChung) ? 'B' : 'C',
+          transformation_status, // "미판정" | "가능" | "성립가능성낮음" — 化 성립 여부는 단정하지 않음
+          field_note: '천간합(묶임) 자체는 확정 판단이지만, 실제 化(오행 전환) 성립 여부는 월령 통근·주변 충 여부 등 학파마다 기준이 크게 갈리는 영역이라 사주결은 "성립"으로 단정하지 않고 보조 참고 신호로만 제공한다.',
+        });
+      }
+    }
+  }
+  return { gan_relations: { combinations, clashes } };
+}
+
+// ---------- 1-11. 신살/귀인 (2026-10-02 STEP B 신설) ----------
+// 혼천의 원자료 3건의 "神殺" 섹션과 대조해 검증(전부 일치):
+//  - 권영민(남, 1986-10-25): 천덕귀인(年柱)·월덕귀인(年柱)·문창귀인(日柱,年柱)·금여록(時柱)
+//  - 1992-03-08(여): 천을귀인(月柱)·천덕귀인(年柱)·문창귀인(月柱)
+//  - 1990-08-03(여): 천을귀인(月柱)·천덕귀인(時柱)·월덕귀인(時柱)
+// 세 샘플 모두 "있음"과 "없음"(해당 신살이 전혀 뜨지 않는 경우)이 아래 표와 정확히 일치했다.
+// 도화/역마/장성/화개, 양인/백호/괴강은 세 샘플의 혼천의 원자료 자체에 표시되지 않아
+// (혼천의가 이 신살류를 神殺 섹션에 노출하지 않는 것으로 보임) 교차검증을 하지 못했다 —
+// 표준 공식으로 구현해 두되 "혼천의 미검증" 태그를 명시한다.
+const CHEONEUL_GUIIN = { 0:[1,7],4:[1,7],6:[1,7], 1:[0,8],5:[0,8], 2:[11,9],3:[11,9], 8:[3,5],9:[3,5], 7:[6,2] }; // 甲戊庚→丑未 乙己→子申 丙丁→亥酉 壬癸→卯巳 辛→午寅
+const MUNCHANG_GUIIN = { 0:5,1:6,2:8,3:9,4:8,5:9,6:11,7:0,8:2,9:3 }; // 甲巳乙午丙申丁酉戊申己酉庚亥辛子壬寅癸卯
+const GEUMYEO_ROK = { 0:4,1:5,2:7,3:8,4:7,5:8,6:10,7:11,8:1,9:2 }; // 甲辰乙巳丙未丁申壬丑癸寅 (戊未·己申은 건록 寅/巳 두 설이 있어 confidence를 낮춰 사용)
+const WOLDEOK_BY_SAMHAP = { 2:2,6:2,10:2, 8:8,0:8,4:8, 5:6,9:6,1:6, 11:0,3:0,7:0 }; // 월지 삼합국: 寅午戌→丙 申子辰→壬 巳酉丑→庚 亥卯未→甲
+const CHEONDEOK_BY_MONTHZHI = { // 월지 → {type:'gan'|'zhi', value} (寅→丁 卯→申 辰→壬 巳→辛 午→亥 未→甲 申→癸 酉→寅 戌→丙 亥→乙 子→巳 丑→庚)
+  2:{type:'gan',value:3}, 3:{type:'zhi',value:8}, 4:{type:'gan',value:8}, 5:{type:'gan',value:7},
+  6:{type:'zhi',value:11}, 7:{type:'gan',value:0}, 8:{type:'gan',value:9}, 9:{type:'zhi',value:2},
+  10:{type:'gan',value:2}, 11:{type:'gan',value:1}, 0:{type:'zhi',value:5}, 1:{type:'gan',value:6},
+};
+// 도화/역마/장성/화개 — 삼합국(년지 기준) 공식. 혼천의 원자료로 교차검증하지 못했다(위 설명 참고).
+const SAMHAP_GROUP_OF = { 2:'인오술',6:'인오술',10:'인오술', 8:'신자진',0:'신자진',4:'신자진', 5:'사유축',9:'사유축',1:'사유축', 11:'해묘미',3:'해묘미',7:'해묘미' };
+const DOHWA_BY_GROUP = { '인오술':3, '신자진':9, '사유축':6, '해묘미':0 };
+const YEOKMA_BY_GROUP = { '인오술':8, '신자진':2, '사유축':11, '해묘미':5 };
+const JANGSEONG_BY_GROUP = { '인오술':6, '신자진':0, '사유축':9, '해묘미':3 };
+const HWAGAE_BY_GROUP = { '인오술':10, '신자진':4, '사유축':1, '해묘미':7 };
+
+function buildGuiinShinsal(dayG, yearZ, monthZ, pillars){ // pillars: {year:{g,z},month:{g,z},day:{g,z},hour:{g,z}|null}
+  const allPillars = [
+    { label:'년주', g: pillars.year.g, z: pillars.year.z },
+    { label:'월주', g: pillars.month.g, z: pillars.month.z },
+    { label:'일주', g: pillars.day.g, z: pillars.day.z },
+  ];
+  if(pillars.hour) allPillars.push({ label:'시주', g: pillars.hour.g, z: pillars.hour.z });
+
+  const found = [];
+  function scan(name, type, targetValues, basis, confidence, usage){
+    const vals = Array.isArray(targetValues) ? targetValues : [targetValues];
+    allPillars.forEach(p=>{
+      const hit = type==='gan' ? vals.includes(p.g) : vals.includes(p.z);
+      if(hit) found.push({ name, scope:'natal', pillar:p.label, basis, confidence, usage: usage || 'supporting_evidence' });
+    });
+  }
+
+  // ---- 귀인 (혼천의 3건 교차검증 완료) ----
+  if(CHEONEUL_GUIIN[dayG]) scan('천을귀인', 'zhi', CHEONEUL_GUIIN[dayG], `일간 ${GAN_HANJA[dayG]} 기준`, 'B');
+  const cd = CHEONDEOK_BY_MONTHZHI[monthZ];
+  if(cd) scan('천덕귀인', cd.type, cd.value, `월지 ${ZHI_HANJA[monthZ]} 기준`, 'B');
+  const wd = WOLDEOK_BY_SAMHAP[monthZ];
+  if(wd!=null) scan('월덕귀인', 'gan', wd, `월지 ${ZHI_HANJA[monthZ]}(삼합국) 기준`, 'B');
+  if(MUNCHANG_GUIIN[dayG]!=null) scan('문창귀인', 'zhi', MUNCHANG_GUIIN[dayG], `일간 ${GAN_HANJA[dayG]} 기준`, 'B');
+  if(GEUMYEO_ROK[dayG]!=null) scan('금여록', 'zhi', GEUMYEO_ROK[dayG], `일간 ${GAN_HANJA[dayG]} 기준`, (dayG===4||dayG===5) ? 'C' : 'B');
+
+  // ---- 도화/역마/장성/화개(년지 기준) — 혼천의 원자료로 교차검증하지 못함, "강한 해석주의 대상"은 아니지만 참고용 ----
+  const group = SAMHAP_GROUP_OF[yearZ];
+  if(group){
+    scan('도화', 'zhi', DOHWA_BY_GROUP[group], `년지 ${ZHI_HANJA[yearZ]}(삼합국) 기준 — 혼천의 미검증`, 'C');
+    scan('역마', 'zhi', YEOKMA_BY_GROUP[group], `년지 ${ZHI_HANJA[yearZ]}(삼합국) 기준 — 혼천의 미검증`, 'C');
+    scan('장성', 'zhi', JANGSEONG_BY_GROUP[group], `년지 ${ZHI_HANJA[yearZ]}(삼합국) 기준 — 혼천의 미검증`, 'C');
+    scan('화개', 'zhi', HWAGAE_BY_GROUP[group], `년지 ${ZHI_HANJA[yearZ]}(삼합국) 기준 — 혼천의 미검증`, 'C');
+  }
+
+  // ---- 양인/백호/괴강 — "강한 해석 주의 대상"으로 별도 태그. 혼천의 원자료로 교차검증하지 못함 ----
+  const YANGIN_BY_GAN = { 0:3,2:6,4:8,6:9,8:0 }; // 甲→卯 丙→午 戊→申(일부 설은 다름) 庚→酉 壬→子 (양간에만 존재한다고 보는 설 채택)
+  if(YANGIN_BY_GAN[dayG]!=null) scan('양인', 'zhi', YANGIN_BY_GAN[dayG], `일간 ${GAN_HANJA[dayG]} 기준 — 혼천의 미검증, 해석 시 과단/극단성 주의`, 'C', 'caution_signal');
+  const GWEGANG_PILLARS = new Set(['경진','경술','임진','임술','기미','무진']); // 일주 간지 기준(여러 설 중 비교적 넓게 쓰이는 조합)
+  const dayGanZhiStr = GAN[dayG]+ZHI[pillars.day.z];
+  if(GWEGANG_PILLARS.has(dayGanZhiStr)) found.push({ name:'괴강', scope:'natal', pillar:'일주', basis:`일주 ${dayGanZhiStr} — 혼천의 미검증, 해석 시 극단성 주의`, confidence:'C', usage:'caution_signal' });
+  const BAEKHO_PILLARS = new Set(['갑진','을미','병술','정축','무진','임진','계축']); // 백호대살 — 학파 간 조합 목록 차이가 큼
+  ['year','month','day','hour'].forEach(key=>{
+    const p = pillars[key]; if(!p) return;
+    const s = GAN[p.g]+ZHI[p.z];
+    if(BAEKHO_PILLARS.has(s)) found.push({ name:'백호', scope:'natal', pillar:({year:'년주',month:'월주',day:'일주',hour:'시주'})[key], basis:`${s} — 혼천의 미검증, 학파 간 조합 차이가 큰 신살, 해석 시 과단/사고 주의`, confidence:'C', usage:'caution_signal' });
+  });
+
+  return { guiin_shinsal: found };
+}
+
+// ---------- 1-9. 12운성 ----------
+const STAGE_GROUP = {
+  장생: '생조성장군', 관대: '생조성장군', 건록: '생조성장군', 제왕: '생조성장군',
+  쇠: '쇠퇴수렴군', 병: '쇠퇴수렴군', 사: '쇠퇴수렴군', 묘: '쇠퇴수렴군',
+  절: '전환잠재군', 태: '전환잠재군', 양: '전환잠재군', 목욕: '전환잠재군',
+};
+function buildTwelveStages(dayG, pillars){
+  const list = [];
+  const push = (label, z) => { const stage = twelveStage(dayG, z); list.push({ pillar: label, stage, internal_interpretive_group: STAGE_GROUP[stage], field_note: '이 그룹 분류는 전통 명리의 고정 공식이 아니라 사주결 내부 해석 휴리스틱이다.' }); };
+  push('년주', pillars.year.z); push('월주', pillars.month.z); push('일주', pillars.day.z);
+  if(pillars.hour) push('시주', pillars.hour.z); else list.push({ pillar: '시주', stage: null, internal_interpretive_group: null, field_note: '시주 데이터부족(시간미상)' });
+  return { twelve_stages: list };
+}
+
+// ---------- 1-10. 공망 ----------
+function buildVoids(pillars, daeunList, seunInfo){
+  let dayCombined = 0;
+  for(let c = 0; c < 60; c++){ if(mod(c, 10) === pillars.day.g && mod(c, 12) === pillars.day.z){ dayCombined = c; break; } }
+  const gm = gongmangZhi(dayCombined); // [void1, void2]
+  const natalBranches = [pillars.year.z, pillars.month.z, pillars.day.z, ...(pillars.hour ? [pillars.hour.z] : [])];
+  const hitPillar = natalBranches.find(z => gm.includes(z));
+  const natal_void = { status: hitPillar !== undefined ? '작동' : '미작동', pillar_hit: hitPillar !== undefined ? ZHI_STR(hitPillar) : null, void_branches: gm.map(ZHI_STR) };
+  const daeun_void_activation = (daeunList || []).filter(d => gm.includes(d.z)).map(d => ({ daeun: `${GAN_STR(d.g)}${ZHI_STR(d.z)}(${d.startAge}-${d.endAge}세)`, hit_branch: ZHI_STR(d.z) }));
+  const seun_void_activation = [];
+  if(seunInfo && gm.includes(seunInfo.z)){ seun_void_activation.push({ year: seunInfo.year, hit_branch: ZHI_STR(seunInfo.z) }); }
+  return { voids: { natal_void, daeun_void_activation, seun_void_activation } };
+}
+
+// ---------- 1-11. 대운 변조 ----------
+function godNote(god, group){
+  if(group === '비겁') return '일간과 같은 편 — 신강 원국엔 경쟁·분산, 신약 원국엔 힘을 보태는 방향';
+  if(group === '인성') return '일간을 돕는 인성 — 심리적/자원적 지원 방향';
+  if(group === '식상') return '일간의 기운을 설기하는 방향 — 표현·활동력이나 신약 원국엔 부담';
+  if(group === '재성') return '일간이 다루는 재성 — 재물·활동 확장이나 신약 원국엔 부담';
+  return '일간을 극하는 관성 — 신강 원국엔 긴장을 통한 자극, 신약 원국엔 부담으로 작동 가능';
+}
+function buildDaeunModulation(dayG, pillars, daeun, label){
+  const stemGod = tenGodOf(dayG, GAN_ELEMENT[daeun.g], daeun.g % 2);
+  const branchGod = tenGodOf(dayG, ZHI_ELEMENT[daeun.z], daeun.z % 2);
+  const stemGroup = TEN_GOD_GROUP[stemGod], branchGroup = TEN_GOD_GROUP[branchGod];
+  const hiddenEffects = ZHI_JANGGAN[daeun.z].map(g => {
+    const god = tenGodOf(dayG, GAN_ELEMENT[g], g % 2);
+    return { god, note: `지장간 ${GAN_STR(g)} — ${TEN_GOD_GROUP[god]} 계열` };
+  });
+  const natalBranches = [
+    { label: '년지', z: pillars.year.z }, { label: '월지', z: pillars.month.z },
+    { label: '일지', z: pillars.day.z }, ...(pillars.hour ? [{ label: '시지', z: pillars.hour.z }] : []),
+  ];
+  const relationsWithNatal = buildRelations([...natalBranches, { label: `${label} 지지`, z: daeun.z }]).relations;
+  const flat = [...relationsWithNatal.combinations, ...relationsWithNatal.clashes, ...relationsWithNatal.punishments, ...relationsWithNatal.harms, ...relationsWithNatal.breaks]
+    .filter(r => r.pair.includes(`${label} 지지`));
+  const bokeum = natalBranches.some(nb => nb.z === daeun.z);
+  if(bokeum) flat.push({ type: '복음(伏吟) 후보', note: `대운 지지가 원국 지지와 동일 글자(${ZHI_STR(daeun.z)})로 재등장`, grade: 'B' });
+
+  const stemSupportive = stemGroup === '비겁' || stemGroup === '인성';
+  const branchSupportive = branchGroup === '비겁' || branchGroup === '인성';
+  const overall = stemSupportive === branchSupportive
+    ? [`천간·지지가 같은 방향(${stemSupportive ? '지원' : '부담'})으로 작동하는 시기`]
+    : [`천간(${stemGroup})과 지지(${branchGroup})가 서로 다른 방향으로 동시에 작동하는 시기`];
+
+  return {
+    ganzhi: `${GAN_STR(daeun.g)}${ZHI_STR(daeun.z)}`,
+    age_range: `${daeun.startAge}-${daeun.endAge}세`,
+    stem_effect: [{ god: stemGod, note: godNote(stemGod, stemGroup) }],
+    branch_effect: [{ god: branchGod, note: godNote(branchGod, branchGroup) }],
+    hidden_stem_effects: hiddenEffects,
+    relations_with_natal: flat,
+    overall_modulation: overall,
+  };
+}
+
+// ---------- 1-12. 세운 촉발 ----------
+function buildSeunTrigger(dayG, structuralType, currentDaeunGods, seunInfo){
+  if(!seunInfo) return { seun: { year: null, trigger: [] } };
+  const god = tenGodOf(dayG, GAN_ELEMENT[seunInfo.g], seunInfo.g % 2);
+  const branchGod = tenGodOf(dayG, ZHI_ELEMENT[seunInfo.z], seunInfo.z % 2);
+  const trigger = [];
+  if(structuralType && structuralType.includes(TEN_GOD_GROUP[god])) trigger.push(`세운 천간(${god})이 원국 핵심 구조(${structuralType})와 같은 계열 — 촉발 가능`);
+  if(currentDaeunGods && currentDaeunGods.includes(god)) trigger.push(`세운 천간(${god})이 현재 대운의 활성 십성과 동일 — 촉발 가능`);
+  if(!trigger.length) trigger.push('원국 핵심 구조·현재 대운 활성 요소와 뚜렷하게 겹치는 지점 없음');
+  return { seun: { year: seunInfo.year, ganzhi: `${GAN_STR(seunInfo.g)}${ZHI_STR(seunInfo.z)}`, stem_god: god, branch_god: branchGod, trigger } };
+}
+
+// ---------- 0. 원자료 정합성 검증 ----------
+function buildConsistencyCheck(pillars, fiveElements){
+  const notes = [];
+  let status = '통과';
+  // 천간에 드러난 오행이 잠재(latent)로 잘못 분류되지 않았는지 자체 점검
+  const revealedGanEls = new Set([pillars.year.g, pillars.month.g, pillars.day.g, ...(pillars.hour ? [pillars.hour.g] : [])].map(g => GAN_ELEMENT[g]));
+  fiveElements.latent.forEach(item => {
+    const elName = item.split('(')[0];
+    const idx = ELEMENT_NAME.indexOf(elName);
+    if(revealedGanEls.has(idx)){ status = '검증필요'; notes.push(`${elName}이 천간에 드러났는데 잠재로 분류됨 — 모순`); }
+  });
+  if(!notes.length) notes.push('오행분포·십성구조 간 모순 없음 — 검증 통과');
+  return { consistency_check: { status, notes } };
+}
+
+function buildSajuCore(sajuResult, opts){
+  opts = opts || {};
+  const { pillars, input } = sajuResult;
+  const dayG = pillars.day.g, dayZ = pillars.day.z;
+  const allGans = [pillars.year.g, pillars.month.g, dayG, ...(pillars.hour ? [pillars.hour.g] : [])];
+  const allZhis = [pillars.year.z, pillars.month.z, dayZ, ...(pillars.hour ? [pillars.hour.z] : [])];
+
+  const monthCommand = buildMonthCommand(dayG, pillars.month.z);
+  const climate = buildClimateBalance(pillars.month.z, allZhis);
+  const strengthResult = buildStrength(sajuResult);
+  const fiveElements = buildFiveElements(allGans, allZhis);
+  const consistency = buildConsistencyCheck(pillars, fiveElements.five_elements);
+  const tenGodsAndStructure = buildTenGodsAndStructure(dayG, pillars, strengthResult._rootsInfo);
+  const branchList = [
+    { label: '년지', z: pillars.year.z }, { label: '월지', z: pillars.month.z }, { label: '일지', z: dayZ },
+    ...(pillars.hour ? [{ label: '시지', z: pillars.hour.z }] : []),
+  ];
+  const relations = buildRelations(branchList);
+  const ganPillarList = [
+    { label: '년간', g: pillars.year.g }, { label: '월간', g: pillars.month.g }, { label: '일간', g: dayG },
+    ...(pillars.hour ? [{ label: '시간', g: pillars.hour.g }] : []),
+  ];
+  const ganRelations = buildGanRelations(ganPillarList); // STEP B 신설 — 천간 합·충
+  const guiinShinsal = buildGuiinShinsal(dayG, pillars.year.z, pillars.month.z, pillars); // STEP B 신설 — 신살/귀인
+  const jwabeop = buildJwabeop(pillars, dayG, dayZ); // STEP B 신설 — 좌法(坐法, 지장간을 일지 기준 포태법으로 평가)
+  const injongbeop = buildInjongbeop(); // STEP B 신설 — 引從法(인종法), 규칙 미확정으로 표시만(구현 보류)
+  const twelveStages = buildTwelveStages(dayG, pillars);
+  const voids = buildVoids(pillars, sajuResult.daeun.list, opts.seunInfo);
+
+  // 현재 대운
+  const asOfDate = opts.asOfDate || new Date();
+  const birthLocal = new Date(input.year, input.month - 1, input.day);
+  let curAge = asOfDate.getFullYear() - birthLocal.getFullYear();
+  const hadBirthday = (asOfDate.getMonth() > birthLocal.getMonth()) || (asOfDate.getMonth() === birthLocal.getMonth() && asOfDate.getDate() >= birthLocal.getDate());
+  if(!hadBirthday) curAge -= 1;
+  const curDaeun = sajuResult.daeun.list.find(d => curAge >= d.startAge && curAge <= d.endAge);
+  const currentDaeunOut = curDaeun ? buildDaeunModulation(dayG, pillars, curDaeun, '현재 대운') : null;
+  const idx = curDaeun ? sajuResult.daeun.list.indexOf(curDaeun) : -1;
+  const nearFuture = idx >= 0 ? sajuResult.daeun.list.slice(idx + 1, idx + 3).map(d => buildDaeunModulation(dayG, pillars, d, '대운')) : [];
+
+  let seunOut = { seun: { year: null, trigger: [] } };
+  if(opts.seunInfo){
+    const currentDaeunGods = currentDaeunOut ? [currentDaeunOut.stem_effect[0].god, currentDaeunOut.branch_effect[0].god] : [];
+    seunOut = buildSeunTrigger(dayG, tenGodsAndStructure.structural_pattern.type, currentDaeunGods, opts.seunInfo);
+  }
+
+  return {
+    saju_core: {
+      data_status: { time: input.unknownTime ? '미상' : '확정', note: input.unknownTime ? '시주 기반 판단(자녀궁/말년, 시주 12운성)은 데이터부족 처리' : null },
+      consistency_check: consistency.consistency_check,
+      day_master: { gan: GAN_STR(dayG), element: ELEMENT_NAME[GAN_ELEMENT[dayG]] },
+      month_command: monthCommand,
+      climate_balance: climate.climate_balance,
+      strength: strengthResult.strength,
+      five_elements: fiveElements.five_elements,
+      roots_and_stems: strengthResult._rootsInfo.roots_and_stems,
+      ten_gods: tenGodsAndStructure.ten_gods,
+      structural_pattern: tenGodsAndStructure.structural_pattern,
+      relations: relations.relations,
+      experimental_relations: relations.experimental_relations, // 혼천의 RAW에 없는 B급 후보(반합 등) — 혼천의 호환 출력/AI evidence에서 제외, 내부 연구용
+      gan_relations: ganRelations.gan_relations,
+      guiin_shinsal: guiinShinsal.guiin_shinsal,
+      jwabeop: jwabeop.jwabeop,
+      injongbeop: injongbeop.injongbeop,
+      twelve_stages: twelveStages.twelve_stages,
+      voids: voids.voids,
+    },
+    timing: {
+      current_daeun: currentDaeunOut,
+      near_future_daeun: nearFuture,
+      ...seunOut,
+    },
+  };
+}
+
+
+"use strict";
+/* =========================================================
+   STEP 2 — buildZiweiCore(ziweiResult, sajuContext, opts)
+   작업지시서(STEP2+STEP3 통합 작업지시서) 그대로 구현.
+   순수 함수 — calcZiwei()의 반환값만 입력으로 받는다. calcZiwei() 자체는 건드리지 않는다.
+   ========================================================= */
+const AUSPICIOUS_STARS = ['녹존', '천괴', '천월', '좌보', '우필', '문창', '문곡'];
+
+function idxOfName(name){ return PALACE_NAMES.indexOf(name); }
+function oppositeIdx(k){ return (k + 6) % 12; }
+function trineIdx(k){ return [(k + 4) % 12, (k + 8) % 12]; }
+
+// 주성이 없는 궁(무주성)이면 대궁에서 차용 — "차용"과 "직접 배치"를 반드시 구분해서 표기한다.
+function resolveMainStars(palaces, k){
+  const self = palaces[k];
+  const direct = self.stars.filter(s => !s.aux);
+  if(direct.length){ return { stars: direct, source: '직접배치', borrowed_from_opposite: [] }; }
+  const opp = palaces[oppositeIdx(k)];
+  const oppDirect = opp.stars.filter(s => !s.aux);
+  return {
+    stars: [],
+    source: '무주성',
+    borrowed_from_opposite: oppDirect.map(s => ({ ...s, from: `대궁(${opp.name})` })),
+  };
+}
+
+function starText(starName, palaceName){
+  return (ZIWEI_STAR_IN_PALACE[starName] && ZIWEI_STAR_IN_PALACE[starName][palaceName]) || null;
+}
+
+function buildSanFangSiZheng(palaces, k){
+  const self = palaces[k];
+  const [t1, t2] = trineIdx(k).map(i => palaces[i]);
+  const opp = palaces[oppositeIdx(k)];
+  const network = [];
+  [{ p: self, rel: '본궁' }, { p: t1, rel: '삼합궁' }, { p: t2, rel: '삼합궁' }, { p: opp, rel: '대궁' }].forEach(({ p, rel }) => {
+    p.stars.filter(s => !s.aux).forEach(s => network.push({ star: s.name, palace: p.name, relation: rel }));
+  });
+  const supporting_signals = network.filter(n => AUSPICIOUS_STARS.includes(n.star) || (ZIWEI_STAR_IN_PALACE[n.star] && !ZIWEI_MALEFIC_STARS.includes(n.star) && n.relation !== '본궁'))
+    .filter(n => n.relation !== '본궁' && !ZIWEI_MALEFIC_STARS.includes(n.star))
+    .map(n => `${n.palace}(${n.relation})의 ${n.star}`);
+  const conflicting_signals = network.filter(n => ZIWEI_MALEFIC_STARS.includes(n.star))
+    .map(n => `${n.palace}(${n.relation})의 ${n.star}(살성)`);
+  return {
+    san_fang_si_zheng: {
+      self_palace: self.name,
+      trine_palaces: [t1.name, t2.name],
+      opposite_palace: opp.name,
+      main_star_network: network,
+      supporting_signals,
+      conflicting_signals,
+    },
+  };
+}
+
+// 사화 확장 — 어느 별/궁인지에 더해, 그 궁의 기능과 현재 대한에서 재활성되는지까지 본다.
+function buildSihwaExpanded(z, palaces, currentDaeunPalaceIdx){
+  return (z.sihwaInfo || []).map(si => {
+    if(!si.palace) return { label: si.label, star: si.starName, palace: null, effect_scope: null, interpretive_note: `${si.starName}(${si.label} 대상)이 현재 명반의 12궁 어디에도 배치되어 있지 않음`, reactivated_in_current_daeun: false, reasons: [] };
+    const k = idxOfName(si.palace);
+    const intro = ZIWEI_PALACE_INTRO[si.palace] || '';
+    let reactivated = false, reactivateNote = '';
+    if(currentDaeunPalaceIdx !== null && currentDaeunPalaceIdx !== undefined){
+      const daeunTrine = [currentDaeunPalaceIdx, ...trineIdx(currentDaeunPalaceIdx), oppositeIdx(currentDaeunPalaceIdx)];
+      if(daeunTrine.includes(k)){ reactivated = true; reactivateNote = `현재 대한의 활성 궁(${PALACE_NAMES[currentDaeunPalaceIdx]}) 삼방사정 안에 포함 — 이 시기에 재활성될 가능성`; }
+    }
+    return {
+      label: si.label, star: si.starName, palace: si.palace,
+      effect_scope: intro,
+      interpretive_note: `${si.starName}이(가) ${si.label}(으)로 ${si.palace}에 배치 — ${intro}`,
+      reactivated_in_current_daeun: reactivated,
+      reasons: reactivated ? [reactivateNote] : [],
+    };
+  });
+}
+
+function buildLifeAndBodyPalace(palaces, timeKnown){
+  const mingIdx = 0; // PALACE_NAMES[0] === '명궁'
+  const ming = resolveMainStars(palaces, mingIdx);
+  const mingSanFang = buildSanFangSiZheng(palaces, mingIdx);
+  const mingTexts = ming.stars.map(s => starText(s.name, '명궁')).filter(Boolean);
+  const life_palace = {
+    branch: palaces[mingIdx].stdZhi,
+    main_stars: ming.stars.map(s => s.name),
+    // 2026-10-02 STEP E 신설 — 주성 강도(廟/旺/得/利/平/不/陷). main_stars(문자열 배열, 기존
+    // api/interpret.js가 .join()으로 그대로 소비)는 손대지 않고, 같은 정보를 {name,grade} 형태로
+    // 추가 노출만 한다. grade는 혼천의로 직접 확인된 조합만 값이 있고, 그 외엔 null(미확인).
+    main_star_grades: ming.stars.map(s => ({ name: s.name, grade: s.grade || null })),
+    support_stars: palaces[mingIdx].stars.filter(s => s.aux).map(s => s.name),
+    borrowed_from_opposite: ming.borrowed_from_opposite.map(s => s.name),
+    sihwa: [],
+    opposite_palace: mingSanFang.san_fang_si_zheng.opposite_palace,
+    san_fang_si_zheng: mingSanFang.san_fang_si_zheng,
+    core_tendencies: mingTexts.length ? mingTexts : (ming.borrowed_from_opposite.length
+      ? ming.borrowed_from_opposite.map(s => starText(s.name, '명궁')).filter(Boolean)
+      : [ZIWEI_EMPTY_PALACE_TEXT['명궁']]),
+    behavioral_expression: mingTexts,
+    confidence: timeKnown ? (ming.source === '직접배치' ? '높음' : '중간') : '중간',
+    main_star_source: ming.source,
+    reasons: [`명궁 지지=${palaces[mingIdx].stdZhi}`, `주성=${ming.source}${ming.borrowed_from_opposite.length ? '(대궁 차용: ' + ming.borrowed_from_opposite.map(s=>s.name).join(',') + ')' : ''}`],
+  };
+
+  // 신궁 — calcZiwei의 bodyIndex가 가리키는 궁을 palaces에서 찾는다(별도 궁 slot이 아니라 12궁 중 하나).
+  return { life_palace };
+}
+
+function buildBodyPalace(z, palaces, timeKnown){
+  const bodyReducedIdx = z.bodyIndex % 12;
+  const bodyPalace = palaces.find(p => p.reducedIdx === (((z.bodyIndex % 12) + 12) % 12));
+  if(!bodyPalace){
+    return { body_palace: { location: null, main_stars: [], support_stars: [], behavioral_tendencies: [], confidence: '낮음', reasons: ['신궁 궁 매칭 실패'] } };
+  }
+  const k = PALACE_NAMES.indexOf(bodyPalace.name);
+  const resolved = resolveMainStars(palaces, k);
+  const texts = resolved.stars.map(s => starText(s.name, bodyPalace.name)).filter(Boolean);
+  return {
+    body_palace: {
+      location: bodyPalace.name,
+      main_stars: resolved.stars.map(s => s.name),
+      main_star_grades: resolved.stars.map(s => ({ name: s.name, grade: s.grade || null })), // STEP E 신설, main_stars 형식은 유지
+      support_stars: bodyPalace.stars.filter(s => s.aux).map(s => s.name),
+      borrowed_from_opposite: resolved.borrowed_from_opposite.map(s => s.name),
+      behavioral_tendencies: texts.length ? texts : [ZIWEI_EMPTY_PALACE_TEXT[bodyPalace.name] || ''],
+      confidence: timeKnown ? (resolved.source === '직접배치' ? '높음' : '중간') : '낮음', // 신궁은 시지 의존도가 명궁보다도 높음
+      reasons: [`신궁=${bodyPalace.name}(${bodyPalace.stdZhi})`, timeKnown ? '시간 확정' : '시간미상 — 신궁은 시지 기반이라 명궁보다 더 낮은 신뢰도로 제한'],
+    },
+  };
+}
+
+// 명궁-신궁 방향 비교(강화/차이)
+function compareMingShen(lifePalace, bodyPalace){
+  if(!bodyPalace.location) return [];
+  const sameDirectionHint = lifePalace.main_stars.some(s => bodyPalace.main_stars.includes(s));
+  return [sameDirectionHint
+    ? '명궁과 신궁의 주성이 겹쳐 같은 방향으로 강화되는 구조'
+    : '명궁(기본 기질)과 신궁(후천적 행동 표현)이 서로 다른 별자리로 구성 — 타고난 기질과 실제 행동 방식에 차이가 있을 수 있음'];
+}
+
+const TOPIC_MAP = {
+  career:       { primary: '관록궁', support: ['명궁', '신궁', '천이궁'] },
+  wealth:       { primary: '재백궁', support: ['관록궁', '전택궁', '복덕궁'] },
+  relationship: { primary: '부처궁', support: ['명궁', '복덕궁'] },
+  family:       { primary: '부모궁', support: ['형제궁', '자녀궁', '전택궁'] },
+  mobility:     { primary: '천이궁', support: ['명궁', '신궁'] },
+  wellbeing:    { primary: '질액궁', support: ['복덕궁', '명궁'] },
+};
+const TOPIC_FIELD_NAMES = {
+  career: { list1: 'work_style', enum: 'organization_fit', list2: 'decision_style', list3: 'role_tendencies', list4: 'friction_patterns', list5: 'career_environment' },
+  wealth: { list1: 'earning_style', list2: 'holding_style', list3: 'risk_pattern', list4: 'resource_flow', list5: 'wealth_friction' },
+  relationship: { list1: 'attachment_style', list2: 'partner_expectation', list3: 'conflict_style', list4: 'relationship_strengths', list5: 'relationship_friction' },
+  family: { list1: 'family_role', list2: 'parent_dynamic', list3: 'sibling_dynamic', list4: 'child_dynamic', list5: 'home_attachment' },
+  mobility: { list1: 'change_tendency', list2: 'external_environment_response', list3: 'relocation_or_movement_pattern' },
+  wellbeing: { list1: 'energy_pattern', list2: 'stress_pattern', list3: 'recovery_style', list4: 'overload_pattern' },
+};
+
+function buildTopic(topicKey, palaces, timeKnown, bodyPalaceName){
+  const cfg = TOPIC_MAP[topicKey];
+  const fields = TOPIC_FIELD_NAMES[topicKey];
+  // '신궁'은 PALACE_NAMES에 없는 특수 표식 — 실제로는 12궁 중 z.bodyIndex가 가리키는 궁이므로
+  // 여기서 실제 궁 이름으로 치환해서 찾는다(신궁 계산 자체를 새로 하지 않고 body_palace 결과를 그대로 재사용).
+  const resolveName = n => (n === '신궁' ? bodyPalaceName : n);
+  const primaryName = resolveName(cfg.primary);
+  const primaryIdx = idxOfName(primaryName);
+  const resolved = resolveMainStars(palaces, primaryIdx);
+  const sanFang = buildSanFangSiZheng(palaces, primaryIdx).san_fang_si_zheng;
+  const primaryTexts = resolved.stars.map(s => starText(s.name, primaryName)).filter(Boolean);
+  const borrowedTexts = resolved.borrowed_from_opposite.map(s => starText(s.name, primaryName)).filter(Boolean);
+  const supportTexts = [];
+  cfg.support.forEach(rawName => {
+    const pname = resolveName(rawName);
+    if(!pname) return; // 신궁 매칭 실패 시 스킵
+    const idx = idxOfName(pname);
+    if(idx < 0) return;
+    const r = resolveMainStars(palaces, idx);
+    r.stars.forEach(s => { const t = starText(s.name, pname); if(t) supportTexts.push(t); });
+  });
+  const allTexts = primaryTexts.length ? primaryTexts : (borrowedTexts.length ? borrowedTexts : [ZIWEI_EMPTY_PALACE_TEXT[primaryName] || '']);
+  const malefic = sanFang.conflicting_signals.length > 0;
+
+  const out = {
+    reasons: [
+      `주관궁=${cfg.primary}${cfg.primary==='신궁'?'('+primaryName+')':''}, 주성=${resolved.source}${resolved.borrowed_from_opposite.length ? '(대궁 차용)' : ''}`,
+      `삼방사정 보조신호=${sanFang.supporting_signals.length}건, 충돌신호=${sanFang.conflicting_signals.length}건`,
+    ],
+    // STEP 3(통합 판단 레이어)가 이 자연어 reasons 문자열을 파싱하지 않고도 구조화된 수치로
+    // 바로 비교할 수 있도록 명시적 필드로 노출한다 — 위 reasons 문자열과 같은 값을 가리킨다.
+    main_star_source: resolved.source, // '직접배치' | '무주성'
+    signal_counts: { supporting: sanFang.supporting_signals.length, conflicting: sanFang.conflicting_signals.length },
+    // STEP 3 보정(작업지시서 §7)이 본궁/삼합궁/대궁 관계별로 세분화된 신호를 직접 조회할 수 있도록
+    // life_palace와 동일하게 삼방사정 구조 전체를 노출한다(이전엔 life_palace에만 있었음 — buildTopic()
+    // 내부에서 이미 계산해 두던 sanFang을 반환값에 포함시키는 추가일 뿐, 계산 로직 변경 없음).
+    san_fang_si_zheng: sanFang,
+    confidence: (() => {
+      // ⚠️ STEP 3 보정(2026-09-27 작업지시서 §2) — calcZiwei() 코드 흐름을 직접 추적해 확인한 결과,
+      // 시간미상(unknownTime)일 땐 명궁/신궁뿐 아니라 오행국(bureau)·주성 배치(ziweiIndex/tianfuIndex)
+      // 자체가 soulIndex(=hourForCalc 파생)에 의존한다: bureau ← mingGan ← soulZhiStd ← soulIndex ←
+      // hourForCalc. 즉 12궁 전체(palaces[].reducedIdx = soulIndex - k)와 대한 배치(daeHan list),
+      // 사화 소재궁(sihwaInfo, palaces 배열을 순회해 찾음)까지 전부 이 값에서 파생되므로, 어떤 주제든
+      // "이 주제는 명궁/신궁과 무관하니 시간에 안전하다"고 볼 수 있는 예외는 실제 코드상 존재하지 않는다.
+      // 따라서 시간미상이면 주제 종류와 무관하게 confidence 상한을 '중간'으로 제한한다(무주성+차용
+      // 없음처럼 원래도 '낮음'이어야 하는 경우는 그대로 '낮음' 유지).
+      if(resolved.source === '무주성' && resolved.borrowed_from_opposite.length === 0) return '낮음';
+      if(!timeKnown) return '중간';
+      if(resolved.source === '무주성') return '중간';
+      return malefic ? '중간' : '높음';
+    })(),
+  };
+  if(fields.enum){
+    // career 전용: 조직형/독립형/복합형/불명확 — 별 해설 텍스트에 등장하는 키워드로 판정하는 휴리스틱
+    const orgHint = allTexts.join(' ');
+    const independentHit = /주도|이끌|독립|스스로/.test(orgHint);
+    const orgHit = /조직|규율|질서|신뢰받는/.test(orgHint);
+    out[fields.enum] = (independentHit && orgHit) ? '복합형' : independentHit ? '독립형' : orgHit ? '조직형' : (allTexts.length ? '복합형' : '불명확');
+  }
+  out[fields.list1] = allTexts.slice(0, 2);
+  if(fields.list2) out[fields.list2] = supportTexts.slice(0, 2);
+  if(fields.list3) out[fields.list3] = allTexts.slice(2, 4);
+  if(fields.list4) out[fields.list4] = sanFang.conflicting_signals;
+  if(fields.list5) out[fields.list5] = sanFang.supporting_signals;
+  return out;
+}
+
+// ---------- 대한 ----------
+function buildMajorPeriod(z, palaces, asOfDate, birthInput, sihwaExpanded, timeKnown){
+  const birthLocal = new Date(birthInput.year, birthInput.month - 1, birthInput.day);
+  let curAge = asOfDate.getFullYear() - birthLocal.getFullYear();
+  const hadBirthday = (asOfDate.getMonth() > birthLocal.getMonth()) || (asOfDate.getMonth() === birthLocal.getMonth() && asOfDate.getDate() >= birthLocal.getDate());
+  if(!hadBirthday) curAge -= 1;
+  const cur = z.daeHan.list.find(d => curAge >= d.startAge && curAge <= d.endAge);
+  if(!cur) return { major_period: null, _curDaeunPalaceIdx: null };
+  const k = idxOfName(cur.palaceName);
+  const resolved = resolveMainStars(palaces, k);
+  const sihwaHere = sihwaExpanded.filter(s => s.reactivated_in_current_daeun);
+  const activatedStarNames = resolved.stars.map(s => s.name);
+  const maleficCount = activatedStarNames.filter(n => ZIWEI_MALEFIC_STARS.includes(n)).length;
+  // ⚠️ STEP 3 보정 §2 — 대한 리스트(daeHan.list)의 palaceName 배정도 soulIndex(시지 파생)에서
+  // 나온다(calcZiwei() 내부: daeHanList의 reducedIdx = soulIndex ± i). 시간미상이면 대한이 가리키는
+  // 궁 자체가 부정확할 수 있으므로 confidence를 '높음'까지 주지 않고 '중간'으로 상한을 둔다.
+  const confidence = !timeKnown ? '중간' : (resolved.source === '직접배치' ? '높음' : '중간');
+  return {
+    major_period: {
+      age_range: `${cur.startAge}-${cur.endAge}세`,
+      activated_palace: cur.palaceName,
+      activated_stars: activatedStarNames.concat(resolved.borrowed_from_opposite.map(s => `${s.name}(대궁차용)`)),
+      sihwa_effects: sihwaHere.map(s => `${s.label} ${s.star}(${s.palace}) — 이 대한에서 재활성`),
+      modulation: [`이 시기엔 ${cur.palaceName}(${PALACE_NAMES[k]}) 삼방사정이 활성화되는 구간 — 본명 구조를 덮어쓰지 않고, 본명 위에 이 궁의 주제가 부각되는 것으로 해석`],
+      confidence,
+      // STEP 3 통합 레이어가 자연어 reasons/modulation 문자열을 파싱하지 않고도 바로 쓸 수 있도록
+      // 구조화된 수치 필드를 추가로 노출한다.
+      main_star_source: resolved.source, // '직접배치' | '무주성'
+      signal_counts: { malefic_stars: maleficCount, sihwa_reactivations: sihwaHere.length },
+      reasons: [`현재 만 ${curAge}세 → ${cur.startAge}-${cur.endAge}세 대한(${cur.palaceName})`],
+    },
+    _curDaeunPalaceIdx: k,
+  };
+}
+
+function buildZiweiCore(ziweiResult, opts){
+  opts = opts || {};
+  const z = ziweiResult;
+  const timeKnown = z.hourZhiStd !== null && z.hourZhiStd !== undefined;
+  const reliability = timeKnown ? '높음' : '제한';
+  // ⚠️ STEP 3 보정 §2 — calcZiwei() 코드 흐름 확인: 오행국(bureau)조차 mingGan←soulZhiStd←
+  // soulIndex(=시지 파생)에 의존하므로, 명궁/신궁뿐 아니라 12궁 전체 배치·주성 배치·사화 소재궁·
+  // 대한 배치까지 전부 시간에 의존한다. "이 궁은 시간과 무관하니 안전하다"는 예외가 코드상 없다.
+  const data_status = {
+    birth_time_known: timeKnown,
+    ziwei_reliability: reliability,
+    reason: timeKnown ? '출생시간이 확정되어 명궁/신궁/12궁 배치 전체가 정상 신뢰도로 계산됨'
+      : '출생시간 미상 — 명궁·신궁뿐 아니라 오행국(bureau)·주성 배치·12궁 전체·사화 소재궁·대한 배치가 모두 임시 子시로 계산된 soulIndex에서 파생되므로, 궁 기반 판단 전체(명궁/신궁 한정이 아님)가 시간 의존적이다. 12궁 자체는 생성되나 확정적으로 해석하지 않음.',
+  };
+
+  const { life_palace } = buildLifeAndBodyPalace(z.palaces, timeKnown);
+  const { body_palace } = buildBodyPalace(z, z.palaces, timeKnown);
+  const midShenNotes = compareMingShen(life_palace, body_palace);
+  life_palace.behavioral_expression = [...life_palace.behavioral_expression, ...midShenNotes];
+
+  // 사화 확장은 현재 대한 계산 이후에 재활성 여부를 알 수 있으므로, 먼저 대한 없이 1차 계산 후
+  // 현재 대한 궁 인덱스를 넣어 2차로 재계산한다(순서 문제로 인한 버그를 피하기 위해 2-pass로 처리).
+  const sihwaPass1 = buildSihwaExpanded(z, z.palaces, null);
+  const asOfDate = opts.asOfDate || new Date();
+  const majorPeriodPass1 = buildMajorPeriod(z, z.palaces, asOfDate, opts.birthInput, sihwaPass1, timeKnown);
+  const sihwaFinal = buildSihwaExpanded(z, z.palaces, majorPeriodPass1._curDaeunPalaceIdx);
+  const majorPeriodFinal = buildMajorPeriod(z, z.palaces, asOfDate, opts.birthInput, sihwaFinal, timeKnown);
+  life_palace.sihwa = sihwaFinal.filter(s => s.palace === '명궁');
+
+  const bodyPalaceName = body_palace.location;
+  const career = buildTopic('career', z.palaces, timeKnown, bodyPalaceName);
+  const wealth = buildTopic('wealth', z.palaces, timeKnown, bodyPalaceName);
+  const relationship = buildTopic('relationship', z.palaces, timeKnown, bodyPalaceName);
+  const family = buildTopic('family', z.palaces, timeKnown, bodyPalaceName);
+  const mobility = buildTopic('mobility', z.palaces, timeKnown, bodyPalaceName);
+  const wellbeing = buildTopic('wellbeing', z.palaces, timeKnown, bodyPalaceName);
+
+  const internal_conflicts = [];
+  if(midShenNotes[0] && midShenNotes[0].startsWith('명궁(기본')) internal_conflicts.push('명궁과 신궁의 방향이 달라 기질과 실제 행동 표현 사이에 괴리가 있을 수 있음');
+  [career, wealth, relationship, family, mobility, wellbeing].forEach((t, i) => {
+    const key = Object.keys(TOPIC_MAP)[i];
+    if(t.confidence === '낮음') internal_conflicts.push(`${key} 판단은 무주성/시간미상 등으로 신뢰도가 낮아 다른 항목과의 비중을 동일하게 두지 않아야 함`);
+  });
+
+  return {
+    ziwei_core: {
+      data_status,
+      life_palace,
+      body_palace,
+      career, wealth, relationship, family, mobility, wellbeing,
+      major_period: majorPeriodFinal.major_period,
+      // STEP 3 통합 레이어(§7)가 특정 주제 궁에 사화가 재활성되는지 직접 조회할 수 있도록
+      // 사화 확장 전체 목록을 노출한다(이전엔 life_palace.sihwa/major_period.sihwa_effects로만
+      // 일부만 필터링해 노출했음 — 이 필드 자체는 buildSihwaExpanded()가 이미 계산해 두던 값을
+      // 그대로 반환에 포함시키는 추가일 뿐, 계산 로직은 변경하지 않음).
+      sihwa: sihwaFinal,
+      internal_conflicts,
+      // 2026-10-02 STEP D — 이미 calcZiwei()가 계산해 두던 보조성(天馬/地劫/地空/火星/鈴星 등) 목록을
+      // 그대로 노출만 추가한다(계산 로직 변경 없음, 새 필드 추가뿐이라 회귀 위험 없음).
+      aux_stars: (z.auxStars || []).map(s => ({ name: s.name, hanja: s.hanja, zhi: ZHI_STR(s.stdZhi) })),
+    },
+  };
+}
+
+
+/* =========================================================
+   STEP 3 (보정판) — buildIntegratedProfile(sajuCoreOut, ziweiCoreOut, opts)
+   2026-09-27 후속 작업지시서("STEP3 보정 및 Payload 연결 전 최종 작업지시서") 그대로 구현.
+   순수 함수 — buildSajuCore()/buildZiweiCore()의 반환값만 입력으로 받는다.
+   calcSaju()/calcZiwei()/buildSajuCore()/buildZiweiCore() 자체는 이 파일에서 건드리지 않는다
+   (buildZiweiCore()의 confidence 상한 로직 자체는 이번 보정에서 별도로 수정됨 — 이 파일과는 분리).
+
+   ⚠️ 이 레이어는 saju_core/ziwei_core의 구조화된 판단값·confidence·reasons/evidence만 사용한다.
+   ziwei_core의 work_style/decision_style/core_tendencies 등 ZIWEI_STAR_IN_PALACE 자연어 해설문에서
+   파생된 필드는 판정 근거로 쓰지 않는다 — main_star_source, signal_counts, san_fang_si_zheng(
+   main_star_network의 star/palace/relation 태그, supporting/conflicting_signals), sihwa, confidence,
+   life_palace/body_palace의 구조화 필드(branch/main_stars/support_stars/borrowed_from_opposite)만 사용.
+
+   ⚠️ 신강/신약은 "일간 세력"일 뿐 건강/성격의 강약이 아니다 — 어떤 축도 strength.level을 직접
+   high/low로 치환하지 않는다. strength는 다른 십성의 작동 방향을 보정하는 context로만 등장한다.
+
+   ⚠️ 이 레이어는 아직 "최종 사용자용 사주풀이"가 아니다.
+   ========================================================= */
+
+// ---------- 0. 공통 유틸 ----------
+const IP_CONF_RANK = { '낮음': 0, '중간': 1, '높음': 2 };
+const IP_RANK_CONF = ['낮음', '중간', '높음'];
+
+function ipAnnotateGroups(tenGods){
+  tenGods.dominant_patterns.forEach(p => { if(!p.group) p.group = TEN_GOD_GROUP[p.god] || null; });
+  return tenGods;
+}
+// 십성군 카운트(핵심/전체) — 여러 축에서 재사용하는 기본 집계
+function ipGroupCounts(sc, groups){
+  ipAnnotateGroups(sc.ten_gods);
+  const relevant = sc.ten_gods.dominant_patterns.filter(p => groups.includes(p.group));
+  return {
+    core: relevant.filter(p => p.grade === '핵심').length,
+    any: relevant.length,
+    typeHit: groups.some(g => (sc.structural_pattern.type || '').includes(g)),
+  };
+}
+
+// ---------- 1. 사주 축 신호 — 재사용 가능한 프리미티브 ----------
+// 단일 십성군의 "출현 강도"만 보는 축 (예: career.responsibility_pressure ← 관성)
+function ipSajuSingleGroup(sc, group, axisLabel){
+  const c = ipGroupCounts(sc, [group]);
+  if(c.core === 0 && c.any === 0){
+    return { level: 'unclear', evidence: [`${axisLabel}: 관련 십성군(${group}) 원국에 출현 없음(지장간 포함)`] };
+  }
+  const level = (c.core >= 1 || c.typeHit) ? 'high' : (c.any >= 1 ? 'moderate' : 'low');
+  return { level, evidence: [`${axisLabel}: ${group} 핵심 ${c.core}건/전체 ${c.any}건${c.typeHit ? `, 격국유형='${sc.structural_pattern.type}'(일치)` : ''}`] };
+}
+// 두 십성군의 상대 비교로 방향을 잡는 축 (예: career.decision_style ← 재성 vs 인성)
+function ipSajuCompareGroups(sc, groupA, groupB, axisLabel, highMeansA){
+  const cA = ipGroupCounts(sc, [groupA]), cB = ipGroupCounts(sc, [groupB]);
+  if(cA.any === 0 && cB.any === 0){
+    return { level: 'unclear', evidence: [`${axisLabel}: ${groupA}/${groupB} 모두 원국에 출현 없음`] };
+  }
+  const scoreA = cA.core * 2 + cA.any, scoreB = cB.core * 2 + cB.any;
+  let level;
+  if(scoreA === scoreB) level = 'moderate';
+  else level = (scoreA > scoreB) === highMeansA ? 'high' : 'low';
+  return { level, evidence: [`${axisLabel}: ${groupA}(핵심${cA.core}/전체${cA.any}) vs ${groupB}(핵심${cB.core}/전체${cB.any})`] };
+}
+// 통근(뿌리) 강도 축 (예: holding_stability, home_attachment)
+function ipSajuRoots(sc, axisLabel){
+  const grade = sc.roots_and_stems.tongkeun_grade;
+  const level = (grade === '강함' || grade === '보통') ? 'high' : (grade === '약함' ? 'moderate' : 'low');
+  return { level, evidence: [`${axisLabel}: 통근 등급=${grade}`, sc.roots_and_stems.tongkeun_detail] };
+}
+// 합충형파해 비율 축 (예: risk_pattern, boundary_pattern, conflict_pattern)
+function ipSajuRelationsFriction(sc, axisLabel){
+  const rel = sc.relations;
+  const frictionCount = rel.clashes.length + rel.punishments.length + rel.harms.length + rel.breaks.length;
+  const stableCount = rel.combinations.length;
+  if(frictionCount === 0 && stableCount === 0){
+    return { level: 'unclear', evidence: [`${axisLabel}: 합충형파해 관계 자체가 원국에 없음`] };
+  }
+  const level = frictionCount > stableCount ? 'high' : (frictionCount < stableCount ? 'low' : 'moderate');
+  return { level, evidence: [`${axisLabel}: 충/형/파/해 ${frictionCount}건 vs 합/삼합/방합 ${stableCount}건`] };
+}
+// 조후(계절 균형) 축 (wellbeing 전용 — 건강 진단이 아니라 "환경적 소진/여유" 구조 신호로만 사용)
+function ipSajuClimate(sc, axisLabel){
+  const needsReal = sc.climate_balance.needs.filter(n => !n.includes('극단적이지 않아'));
+  const level = needsReal.length > 0 ? 'high' : 'low';
+  return { level, evidence: [`${axisLabel}: 조후 상태=온도${sc.climate_balance.temperature}/습도${sc.climate_balance.moisture}, 필요사항=${sc.climate_balance.needs.join('; ')}`] };
+}
+// 현재 대운(timing 전용) 축들
+function ipSajuDaeunGroupHit(timingOut, groups, axisLabel){
+  const cur = timingOut.current_daeun;
+  if(!cur) return { level: 'unclear', evidence: [`${axisLabel}: 현재 대운 데이터 없음`] };
+  const stemGod = cur.stem_effect[0].god, branchGod = cur.branch_effect[0].god;
+  const stemGroup = TEN_GOD_GROUP[stemGod], branchGroup = TEN_GOD_GROUP[branchGod];
+  const hit = groups.includes(stemGroup) || groups.includes(branchGroup);
+  return {
+    level: hit ? 'high' : 'low',
+    evidence: [`${axisLabel}: 현재 대운 천간=${stemGod}(${stemGroup}), 지지=${branchGod}(${branchGroup}) — 대상 십성군(${groups.join('/')}) ${hit ? '포함' : '미포함'}`],
+  };
+}
+function ipSajuVoidTrigger(sc, timingOut, axisLabel){
+  const evid = [];
+  let hit = false;
+  if(sc.voids.daeun_void_activation.length){ hit = true; evid.push(`대운 공망 발동 ${sc.voids.daeun_void_activation.length}건`); }
+  if(timingOut.seun && timingOut.seun.trigger && timingOut.seun.trigger.length && !timingOut.seun.trigger[0].includes('없음')){ hit = true; evid.push(`세운 촉발: ${timingOut.seun.trigger.join('; ')}`); }
+  if(!evid.length) evid.push('대운 공망/세운 촉발 신호 없음');
+  return { level: hit ? 'high' : 'low', evidence: [`${axisLabel}: ${evid.join(' / ')}`] };
+}
+function ipSajuNearFutureConsistency(timingOut, axisLabel){
+  const cur = timingOut.current_daeun, nexts = timingOut.near_future_daeun || [];
+  if(!cur || !nexts.length) return { level: 'unclear', evidence: [`${axisLabel}: 현재/차기 대운 비교 데이터 부족`] };
+  const curDir = cur.overall_modulation[0] || '';
+  const sameCount = nexts.filter(n => (n.overall_modulation[0] || '') === curDir).length;
+  const level = sameCount === nexts.length ? 'high' : (sameCount === 0 ? 'low' : 'moderate');
+  return { level, evidence: [`${axisLabel}: 현재 대운 흐름과 차기 대운 ${nexts.length}개 중 ${sameCount}개가 같은 방향`] };
+}
+
+// ---------- 2. 자미두수 축 신호 — 재사용 가능한 프리미티브 ----------
+function ipZiweiCountByRelation(t, relation){
+  return (t.san_fang_si_zheng.main_star_network || []).filter(n => n.relation === relation).length;
+}
+function ipZiweiAuspicious(t){
+  return (t.san_fang_si_zheng.main_star_network || []).filter(n => AUSPICIOUS_STARS.includes(n.star)).length;
+}
+function ipZiweiMalefic(t){ return t.signal_counts.conflicting; }
+function ipZiweiMainSource(t, axisLabel){
+  if(t.confidence === '낮음') return { level: 'undetermined', evidence: [`${axisLabel}: 신뢰도 낮음(무주성/시간미상 등)으로 판단 보류`], confidence: t.confidence };
+  const level = t.main_star_source === '직접배치' ? 'high' : 'low';
+  return { level, evidence: [`${axisLabel}: 주성=${t.main_star_source}`], confidence: t.confidence };
+}
+function ipZiweiRelationCompare(t, relA, relB, axisLabel, highMeansA, confidence){
+  if(t.confidence === '낮음') return { level: 'undetermined', evidence: [`${axisLabel}: 신뢰도 낮음으로 판단 보류`], confidence: t.confidence };
+  const a = ipZiweiCountByRelation(t, relA), b = ipZiweiCountByRelation(t, relB);
+  let level;
+  if(a === b) level = 'moderate';
+  else level = (a > b) === highMeansA ? 'high' : 'low';
+  return { level, evidence: [`${axisLabel}: ${relA} ${a}건 vs ${relB} ${b}건`], confidence: t.confidence };
+}
+function ipZiweiAuspiciousAxis(t, axisLabel){
+  if(t.confidence === '낮음') return { level: 'undetermined', evidence: [`${axisLabel}: 신뢰도 낮음으로 판단 보류`], confidence: t.confidence };
+  const n = ipZiweiAuspicious(t);
+  return { level: n >= 1 ? 'high' : 'low', evidence: [`${axisLabel}: 삼방사정 내 길성(${AUSPICIOUS_STARS.join('/')}) ${n}건`], confidence: t.confidence };
+}
+function ipZiweiMaleficAxis(t, axisLabel){
+  if(t.confidence === '낮음') return { level: 'undetermined', evidence: [`${axisLabel}: 신뢰도 낮음으로 판단 보류`], confidence: t.confidence };
+  const n = ipZiweiMalefic(t);
+  return { level: n >= 1 ? 'high' : 'low', evidence: [`${axisLabel}: 삼방사정 충돌신호(살성) ${n}건`], confidence: t.confidence };
+}
+function ipZiweiSupportingCountAxis(t, axisLabel, threshold){
+  if(t.confidence === '낮음') return { level: 'undetermined', evidence: [`${axisLabel}: 신뢰도 낮음으로 판단 보류`], confidence: t.confidence };
+  const n = t.signal_counts.supporting;
+  return { level: n >= threshold ? 'high' : 'low', evidence: [`${axisLabel}: 삼방사정 보조신호 ${n}건(기준 ${threshold}건)`], confidence: t.confidence };
+}
+function ipZiweiSihwaTouch(zc, palaceName, axisLabel){
+  const hits = (zc.sihwa || []).filter(s => s.palace === palaceName);
+  const reactivated = hits.some(s => s.reactivated_in_current_daeun);
+  return { level: reactivated ? 'high' : 'low', evidence: [`${axisLabel}: ${palaceName} 대상 사화 ${hits.length}건 중 현재 대한 재활성 ${reactivated ? '있음' : '없음'}`] };
+}
+
+// ---------- 3. 방향성 조합 → 일치/보완/충돌/데이터부족 (축 단위) ----------
+function ipCombineAxis(sLevel, zLevel){
+  const norm = l => (l === 'unclear' ? 'undetermined' : l);
+  const s = norm(sLevel), z = norm(zLevel);
+  if(s === 'undetermined' && z === 'undetermined') return '데이터부족';
+  if((s === 'low' && z === 'undetermined') || (z === 'low' && s === 'undetermined')) return '데이터부족';
+  if(s === 'undetermined' || z === 'undetermined') return '보완';
+  if(s === z) return '일치';
+  if((s === 'high' && z === 'low') || (s === 'low' && z === 'high')) return '충돌';
+  return '보완';
+}
+function ipCombineAxisConfidence(relationship, sajuConf, ziweiConf){
+  const a = IP_CONF_RANK[sajuConf] ?? 1, b = IP_CONF_RANK[ziweiConf] ?? 1;
+  if(relationship === '데이터부족') return '낮음';
+  if(relationship === '충돌'){
+    if(a >= 1 && b >= 1) return '중간'; // 두 쪽 근거가 모두 최소 중간 이상이면 "조건부 복합형"으로 중간 유지 — 무조건 낮음으로 떨어뜨리지 않음
+    return '낮음';
+  }
+  if(a === 0 && b === 0) return '낮음';
+  if(a === 2 && b === 2) return '높음';
+  return '중간'; // 높음+중간, 중간+중간, 낮음이 하나만 있는 경우 등은 중간으로 수렴(스펙상 "중간~높음" 범위의 안전한 대표값)
+}
+function ipAxisSynthesis(relationship, sLevel, zLevel, axisLabel){
+  const s = sLevel, z = zLevel;
+  if(relationship === '일치') return `${axisLabel}: 사주(${s})·자미두수(${z}) 신호가 일치 — 두 체계에서 독립적으로 도출된 일관된 구조 신호.`;
+  if(relationship === '보완'){
+    if(s === 'unclear' || s === 'undetermined') return `${axisLabel}: 사주 근거 약함 — 자미두수(${z}) 신호로 보완, 자미두수 단독 신호로만 조건부 해석.`;
+    if(z === 'undetermined') return `${axisLabel}: 자미두수 신호 제한(무주성/시간미상 등) — 사주(${s}) 신호로 보완, 사주 단독 신호로만 조건부 해석.`;
+    return `${axisLabel}: 사주(${s})·자미두수(${z}) 강도 차이는 있으나 정반대는 아님 — 더 뚜렷한 쪽에 비중을 두되 다른 쪽을 배제하지 않음.`;
+  }
+  if(relationship === '충돌') return `${axisLabel}: 사주(${s})와 자미두수(${z})가 반대 방향 — 어느 한쪽을 버리지 않고 "원국 구조상 신호는 있으나 실제 발현 조건은 다르게 나타날 수 있다"는 조건부 결론으로 통합.`;
+  return `${axisLabel}: 두 체계 모두 이 축에 대한 구조적 근거가 약함 — 현재 데이터로는 확정적 판단이 어려움.`;
+}
+
+// ---------- 4. 주제별 축 정의 ----------
+// ⚠️ 아래 십성군/궁 대응은 STEP 3용 내부 근사치다(전통 정설 아님) — TOPIC_GOD_GROUPS 계열과 동일한
+// 성격의 휴리스틱이며, 축마다 "어떤 구조화 신호를 볼 것인가"를 명시적으로 고정해 재현 가능하게 한다.
+function buildAxesForTopic(topicKey, sajuCoreOut, ziweiCoreOut){
+  const sc = sajuCoreOut.saju_core, timingOut = sajuCoreOut.timing;
+  const zc = ziweiCoreOut.ziwei_core;
+
+  if(topicKey === 'personality'){
+    const t = zc.life_palace;
+    const bureauLike = { san_fang_si_zheng: t.san_fang_si_zheng, signal_counts: { supporting: t.san_fang_si_zheng.supporting_signals.length, conflicting: t.san_fang_si_zheng.conflicting_signals.length }, main_star_source: t.main_star_source, confidence: t.confidence };
+    const gapHigh = !(t.main_stars.length && zc.body_palace.main_stars && t.main_stars.some(s => zc.body_palace.main_stars.includes(s)));
+    return {
+      self_direction: {
+        saju: ipSajuCompareGroups(sc, '비겁', '인성', '자기주도성', true),
+        ziwei: ipZiweiMainSource(bureauLike, '명궁 주성 직접배치 여부'),
+      },
+      adaptability: {
+        saju: ipSajuCompareGroups(sc, '식상', '관성', '적응력(유연↔규율)', true),
+        ziwei: (() => { const n = ipZiweiCountByRelation(bureauLike, '삼합궁'); return { level: n >= 1 ? 'high' : 'low', evidence: [`적응력: 명궁 삼합궁 신호 ${n}건`], confidence: bureauLike.confidence }; })(),
+      },
+      responsibility_pressure: {
+        saju: ipSajuSingleGroup(sc, '관성', '책임감/부담'),
+        ziwei: ipZiweiMaleficAxis(bureauLike, '명궁 충돌신호'),
+      },
+      emotional_expression: {
+        saju: ipSajuCompareGroups(sc, '식상', '인성', '감정표현(표현↔절제)', true),
+        ziwei: (() => { const n = t.main_stars.length + t.support_stars.length; return { level: n >= 2 ? 'high' : 'low', evidence: [`감정표현: 명궁 주성+보좌성 총 ${n}개`], confidence: t.confidence }; })(),
+      },
+      internal_external_gap: {
+        saju: (() => {
+          const self = ipGroupCounts(sc, ['비겁', '인성']), outward = ipGroupCounts(sc, ['식상', '재성', '관성']);
+          if(self.any === 0 && outward.any === 0) return { level: 'unclear', evidence: ['내면-외면 괴리: 판단 근거 부족'] };
+          const level = outward.core > self.core ? 'high' : (self.core > outward.core ? 'low' : 'moderate');
+          return { level, evidence: [`내면-외면 괴리: 외향형 십성(식상/재성/관성) 핵심 ${outward.core}건 vs 자기형(비겁/인성) 핵심 ${self.core}건`] };
+        })(),
+        ziwei: { level: gapHigh ? 'high' : 'low', evidence: [`내면-외면 괴리: 명궁 주성과 신궁(${zc.body_palace.location || '미상'}) 주성 겹침 ${gapHigh ? '없음' : '있음'}`], confidence: zc.body_palace.confidence },
+      },
+    };
+  }
+
+  if(topicKey === 'timing'){
+    const cur = timingOut.current_daeun;
+    const mp = zc.major_period;
+    const sajuConf = cur ? sc.strength.confidence : '낮음';
+    return {
+      current_activation: {
+        saju: (() => { if(!cur) return { level: 'unclear', evidence: ['현재 대운 데이터 없음'] }; const same = cur.overall_modulation[0] && cur.overall_modulation[0].includes('같은 방향'); return { level: same ? 'high' : 'moderate', evidence: [`현재 대운=${cur.ganzhi}(${cur.age_range})`, ...cur.overall_modulation] }; })(),
+        ziwei: mp ? ipZiweiMainSource({ ...mp, san_fang_si_zheng: { main_star_network: [] } }, '현재 대한 주성 직접배치 여부') : { level: 'undetermined', evidence: ['현재 대한 데이터 없음'], confidence: '낮음' },
+      },
+      pressure_pattern: {
+        saju: ipSajuDaeunGroupHit(timingOut, ['관성', '재성'], '대운 압박축(관성/재성)'),
+        ziwei: mp ? { level: mp.signal_counts.malefic_stars >= 1 ? 'high' : 'low', evidence: [`대한 살성 ${mp.signal_counts.malefic_stars}건`], confidence: mp.confidence } : { level: 'undetermined', evidence: ['대한 데이터 없음'], confidence: '낮음' },
+      },
+      expansion_pattern: {
+        saju: ipSajuDaeunGroupHit(timingOut, ['식상', '재성'], '대운 확장축(식상/재성)'),
+        ziwei: mp ? { level: mp.activated_stars.length >= 2 ? 'high' : 'low', evidence: [`대한 활성 별 ${mp.activated_stars.length}개`], confidence: mp.confidence } : { level: 'undetermined', evidence: ['대한 데이터 없음'], confidence: '낮음' },
+      },
+      stabilization_pattern: {
+        saju: ipSajuDaeunGroupHit(timingOut, ['비겁', '인성'], '대운 안정축(비겁/인성)'),
+        ziwei: mp ? { level: mp.signal_counts.sihwa_reactivations === 0 ? 'high' : 'low', evidence: [`대한 사화 재활성 ${mp.signal_counts.sihwa_reactivations}건(적을수록 안정적 해석)`], confidence: mp.confidence } : { level: 'undetermined', evidence: ['대한 데이터 없음'], confidence: '낮음' },
+      },
+      change_trigger: {
+        saju: ipSajuVoidTrigger(sc, timingOut, '공망/세운 촉발'),
+        ziwei: mp ? { level: mp.signal_counts.sihwa_reactivations >= 1 ? 'high' : 'low', evidence: [`대한 사화 재활성 ${mp.signal_counts.sihwa_reactivations}건`], confidence: mp.confidence } : { level: 'undetermined', evidence: ['대한 데이터 없음'], confidence: '낮음' },
+      },
+      near_future_direction: {
+        saju: ipSajuNearFutureConsistency(timingOut, '차기 대운 일관성'),
+        ziwei: { level: 'undetermined', evidence: ['ziwei_core에는 차기 대한 구조화 데이터가 없음(현재 대한만 제공) — 이 축은 사주 근거로만 판단'], confidence: '낮음' },
+      },
+    };
+  }
+
+  // career / wealth / relationship / family / mobility / wellbeing — 공통 궁 기반 주제
+  const TOPIC_PALACE_NAME = { career: '관록궁', wealth: '재백궁', relationship: '부처궁', family: '부모궁', mobility: '천이궁', wellbeing: '질액궁' };
+  const t = zc[topicKey];
+  const palaceName = TOPIC_PALACE_NAME[topicKey];
+
+  if(topicKey === 'career'){
+    return {
+      autonomy: { saju: ipSajuSingleGroup(sc, '비겁', '자율성'), ziwei: ipZiweiMainSource(t, '관록궁 주성 직접배치 여부') },
+      organization_fit: { saju: ipSajuCompareGroups(sc, '관성', '비겁', '조직적합도(조직↔독립)', true), ziwei: ipZiweiAuspiciousAxis(t, '관록궁 길성 신호') },
+      responsibility_pressure: { saju: ipSajuSingleGroup(sc, '관성', '책임부담'), ziwei: ipZiweiMaleficAxis(t, '관록궁 충돌신호') },
+      decision_style: { saju: ipSajuCompareGroups(sc, '재성', '인성', '의사결정(실리↔원칙)', true), ziwei: ipZiweiRelationCompare(t, '본궁', '삼합궁', '관록궁 본궁↔삼합궁 비중', true) },
+      output_style: { saju: ipSajuSingleGroup(sc, '식상', '산출/표현'), ziwei: ipZiweiSupportingCountAxis(t, '관록궁 보조신호량', 3) },
+      change_tolerance: { saju: ipSajuCompareGroups(sc, '식상', '관성', '변화수용(유연↔안정)', true), ziwei: ipZiweiSihwaTouch(zc, palaceName, '관록궁 사화 재활성') },
+    };
+  }
+  if(topicKey === 'wealth'){
+    return {
+      earning_style: { saju: ipSajuCompareGroups(sc, '재성', '식상', '수입방식(관리↔창출)', true), ziwei: ipZiweiMainSource(t, '재백궁 주성 직접배치 여부') },
+      holding_stability: { saju: ipSajuRoots(sc, '재물 보유 안정성(통근)'), ziwei: ipZiweiRelationCompare(t, '대궁', '본궁', '재백궁 대궁 충돌 여부', false) },
+      risk_pattern: { saju: ipSajuRelationsFriction(sc, '재물 리스크(충형파해 비율)'), ziwei: ipZiweiMaleficAxis(t, '재백궁 충돌신호') },
+      resource_flow: { saju: ipSajuSingleGroup(sc, '식상', '자원 유통(식상)'), ziwei: ipZiweiSupportingCountAxis(t, '재백궁 보조신호량', 3) },
+      expansion_tendency: { saju: ipSajuSingleGroup(sc, '재성', '재물 확장(재성)'), ziwei: (() => { if(t.confidence==='낮음') return {level:'undetermined', evidence:['재백궁 신뢰도 낮음'], confidence:t.confidence}; const n = ipZiweiCountByRelation(t, '삼합궁'); return { level: n >= 1 ? 'high' : 'low', evidence: [`재백궁 삼합궁 신호 ${n}건`], confidence: t.confidence }; })() },
+      leakage_pattern: { saju: ipSajuCompareGroups(sc, '식상', '재성', '재물 누출경향(식상 우세↔재성 뒷받침)', true), ziwei: ipZiweiMaleficAxis(t, '재백궁 충돌신호(누출)') },
+    };
+  }
+  if(topicKey === 'relationship'){
+    return {
+      attachment_style: { saju: ipSajuCompareGroups(sc, '인성', '식상', '애착유형(밀착↔자율거리)', true), ziwei: ipZiweiMainSource(t, '부처궁 주성 직접배치 여부') },
+      partner_expectation: { saju: (() => { const c = ipGroupCounts(sc, ['관성', '재성']); if(c.any===0) return {level:'unclear', evidence:['배우자 기대축: 관성/재성 원국에 출현 없음']}; return { level: c.core>=1 ? 'high':'moderate', evidence:[`배우자 기대축: 관성/재성 핵심 ${c.core}건/전체 ${c.any}건`] }; })(), ziwei: ipZiweiRelationCompare(t, '대궁', '본궁', '부처궁 대궁(명궁) 투영 신호', true) },
+      emotional_expression: { saju: ipSajuCompareGroups(sc, '식상', '인성', '관계 내 감정표현', true), ziwei: ipZiweiSupportingCountAxis(t, '부처궁 본궁 표현신호량', 2) },
+      conflict_pattern: { saju: ipSajuRelationsFriction(sc, '관계 갈등패턴(충형파해)'), ziwei: ipZiweiMaleficAxis(t, '부처궁 충돌신호') },
+      relationship_stability: { saju: ipSajuRoots(sc, '관계 안정성(통근)'), ziwei: ipZiweiAuspiciousAxis(t, '부처궁 길성 신호') },
+      distance_need: { saju: ipSajuCompareGroups(sc, '비겁', '인성', '관계 내 거리욕구(독립↔밀착)', true), ziwei: ipZiweiRelationCompare(t, '삼합궁', '본궁', '부처궁 삼합궁↔본궁 비중', true) },
+    };
+  }
+  if(topicKey === 'family'){
+    return {
+      family_role: { saju: ipSajuSingleGroup(sc, '인성', '가족 내 역할비중(인성)'), ziwei: ipZiweiMainSource(t, '부모궁 주성 직접배치 여부') },
+      responsibility_load: { saju: ipSajuSingleGroup(sc, '관성', '가족 책임부담(관성)'), ziwei: ipZiweiMaleficAxis(t, '부모궁 충돌신호') },
+      emotional_distance: { saju: ipSajuCompareGroups(sc, '비겁', '인성', '가족 내 정서적 거리(거리↔밀착)', true), ziwei: ipZiweiRelationCompare(t, '대궁', '본궁', '부모궁 대궁 신호 비중', true) },
+      caregiving_tendency: { saju: ipSajuCompareGroups(sc, '식상', '관성', '돌봄경향(표현적↔규율적)', true), ziwei: ipZiweiAuspiciousAxis(t, '부모궁 길성 신호') },
+      home_attachment: { saju: ipSajuRoots(sc, '가정 애착(통근)'), ziwei: ipZiweiMainSource(t, '부모궁 주성 직접배치 여부(재사용)') },
+      boundary_pattern: { saju: ipSajuRelationsFriction(sc, '가족 경계마찰(충형파해)'), ziwei: ipZiweiMaleficAxis(t, '부모궁 충돌신호(경계)') },
+    };
+  }
+  if(topicKey === 'mobility'){
+    return {
+      change_tendency: { saju: ipSajuSingleGroup(sc, '식상', '변화경향(식상)'), ziwei: ipZiweiSupportingCountAxis(t, '천이궁 보조신호량', 2) },
+      external_environment_response: { saju: ipSajuCompareGroups(sc, '식상', '관성', '외부환경 반응성(반응적↔안정추구)', true), ziwei: ipZiweiRelationCompare(t, '대궁', '본궁', '천이궁 대궁(명궁) 반응신호', true) },
+      relocation_tolerance: { saju: (() => { const grade = sc.roots_and_stems.tongkeun_grade; const level = (grade==='약함'||grade==='무근') ? 'high' : 'low'; return { level, evidence: [`이동 수용력: 통근 등급=${grade}(약할수록 이동에 유연한 것으로 근사)`] }; })(), ziwei: ipZiweiMainSource(t, '천이궁 주성 직접배치 여부') },
+      independence_in_change: { saju: ipSajuSingleGroup(sc, '비겁', '변화 속 독립성(비겁)'), ziwei: ipZiweiAuspiciousAxis(t, '천이궁 길성 신호') },
+    };
+  }
+  if(topicKey === 'wellbeing'){
+    // ⚠️ 건강 진단 절대 금지 — 아래 축은 전부 "에너지 사용/스트레스/회복/과부하/휴식" 구조 신호일 뿐,
+    // 신강/신약을 직접 사용하지 않으며 특정 질병·건강 상태를 지시하지 않는다.
+    return {
+      energy_use_pattern: { saju: ipSajuSingleGroup(sc, '식상', '에너지 사용(식상)'), ziwei: ipZiweiSupportingCountAxis(t, '질액궁 보조신호량', 2) },
+      stress_load: { saju: (() => { const c = ipGroupCounts(sc, ['관성', '재성']); if(c.any===0) return {level:'unclear', evidence:['스트레스축: 관성/재성 출현 없음']}; return { level: c.core>=1?'high':'moderate', evidence:[`스트레스축: 관성/재성 핵심 ${c.core}건/전체 ${c.any}건`] }; })(), ziwei: ipZiweiMaleficAxis(t, '질액궁 충돌신호') },
+      recovery_pattern: { saju: ipSajuSingleGroup(sc, '인성', '회복자원(인성)'), ziwei: ipZiweiAuspiciousAxis(t, '질액궁 길성 신호') },
+      overload_tendency: { saju: (() => { const drain = ipGroupCounts(sc, ['식상','재성','관성']), sup = ipGroupCounts(sc, ['비겁','인성']); if(drain.any===0 && sup.any===0) return {level:'unclear', evidence:['과부하축: 판단 근거 부족']}; const level = drain.core > sup.core ? 'high' : (sup.core > drain.core ? 'low' : 'moderate'); return { level, evidence:[`과부하축: 설기/부담형(식상재성관성) 핵심 ${drain.core}건 vs 지원형(비겁인성) 핵심 ${sup.core}건`] }; })(), ziwei: ipZiweiMaleficAxis(t, '질액궁 충돌신호(과부하 재사용)') },
+      rest_difficulty: { saju: ipSajuClimate(sc, '조후 불균형(환경적 소진 근사)'), ziwei: ipZiweiSihwaTouch(zc, palaceName, '질액궁 사화 재활성(변동성)') },
+    };
+  }
+  return {};
+}
+
+// ---------- 5. 주제 오케스트레이션 ----------
+function ipTopicOverall(axesOut){
+  const rels = Object.values(axesOut).map(a => a.relationship);
+  const counts = {};
+  rels.forEach(r => counts[r] = (counts[r] || 0) + 1);
+  const maxCount = Math.max(...Object.values(counts));
+  const tiedTypes = Object.keys(counts).filter(r => counts[r] === maxCount);
+  const priority = ['충돌', '보완', '일치', '데이터부족'];
+  const overall_relationship = priority.find(p => tiedTypes.includes(p)) || tiedTypes[0];
+
+  const confRanks = Object.values(axesOut).map(a => IP_CONF_RANK[a.confidence] ?? 1);
+  const avgRank = confRanks.reduce((a, b) => a + b, 0) / confRanks.length;
+  const integrated_confidence = IP_RANK_CONF[Math.round(avgRank)];
+
+  const highAxes = Object.entries(axesOut).filter(([, a]) => a.saju_signal.direction === 'high' || a.ziwei_signal.direction === 'high').map(([k]) => k);
+  const synthesis = `이 주제의 ${Object.keys(axesOut).length}개 축 중 ${counts['일치'] || 0}개 일치, ${counts['보완'] || 0}개 보완, ${counts['충돌'] || 0}개 충돌, ${counts['데이터부족'] || 0}개 데이터부족으로 판정됨. 전체적으로는 '${overall_relationship}'에 가까우며${highAxes.length ? `, 특히 ${highAxes.slice(0, 3).join(', ')} 축에서 뚜렷한 구조 신호가 관측됨` : ''}. (STEP 3 내부 통합 판정 — 최종 사용자용 문장은 아직 아님)`;
+
+  return { overall_relationship, integrated_confidence, synthesis };
+}
+
+const IP_TOPICS = ['personality', 'career', 'wealth', 'relationship', 'family', 'mobility', 'wellbeing', 'timing'];
+function buildIntegratedProfile(sajuCoreOut, ziweiCoreOut){
+  const integrated_profile = {};
+  IP_TOPICS.forEach(topicKey => {
+    const axesRaw = buildAxesForTopic(topicKey, sajuCoreOut, ziweiCoreOut);
+    const axes = {};
+    Object.keys(axesRaw).forEach(axisKey => {
+      const { saju, ziwei } = axesRaw[axisKey];
+      const relationship = ipCombineAxis(saju.level, ziwei.level);
+      const sajuConf = saju.confidence || sajuCoreOut.saju_core.strength.confidence; // saju 프리미티브는 대개 confidence를 직접 안 들고 있어 strength.confidence로 보정(동일 제한 규칙)
+      const ziweiConf = ziwei.confidence || '중간';
+      const confidence = ipCombineAxisConfidence(relationship, sajuConf, ziweiConf);
+      axes[axisKey] = {
+        saju_signal: { direction: saju.level, basis: saju.evidence, confidence: sajuConf },
+        ziwei_signal: { direction: ziwei.level, basis: ziwei.evidence, confidence: ziweiConf },
+        relationship,
+        synthesis: ipAxisSynthesis(relationship, saju.level, ziwei.level, axisKey),
+        confidence,
+      };
+    });
+    const overall = ipTopicOverall(axes);
+    integrated_profile[topicKey] = {
+      axes,
+      overall_relationship: overall.overall_relationship,
+      synthesis: overall.synthesis,
+      integrated_confidence: overall.integrated_confidence,
+    };
+  });
+  return { integrated_profile };
+}
+
+/* =========================================================
+   STEP 4 — buildPersonProfile(sajuCoreOut, ziweiCoreOut, integratedProfileOut)
+   2026-09-27 STEP 4 작업지시서 그대로 구현.
+   순수 함수 — 새로운 명리 판단을 추가하지 않는다. buildIntegratedProfile()의 44개 축 판정과
+   buildSajuCore()/buildZiweiCore()의 구조화 값을 "선택·재배열"만 해서 하나의 일관된 인물
+   프로필로 묶는다. integrated_profile을 최우선 판단 결과로 쓰고, saju_core/ziwei_core
+   원자료는 myeongri_evidence(검증/세부 근거) 섹션에서만 참조한다.
+
+   해석 순서(작업지시서 §고정): 사람 → 실제 행동 → 감정/내면 → 삶에서 나타나는 패턴 → 이유 → 명리 근거.
+   이 섹션 배치 자체가 산출물의 구조이며, 이후 Narrative V3 프롬프트가 이 순서를 그대로 따라간다.
+   ========================================================= */
+
+// ---------- 0. 공통 유틸 — integrated_profile에서 축/주제를 뽑아오는 선택자 ----------
+function ppAxis(ip, topicKey, axisKey){
+  const t = ip.integrated_profile[topicKey];
+  const a = t && t.axes[axisKey];
+  if(!a) return null;
+  return {
+    topic: topicKey, axis: axisKey,
+    relationship: a.relationship, confidence: a.confidence, synthesis: a.synthesis,
+    saju_direction: a.saju_signal.direction, ziwei_direction: a.ziwei_signal.direction,
+    evidence: { saju: a.saju_signal.basis, ziwei: a.ziwei_signal.basis },
+  };
+}
+function ppTopic(ip, topicKey){
+  const t = ip.integrated_profile[topicKey];
+  return {
+    topic: topicKey,
+    overall_relationship: t.overall_relationship,
+    integrated_confidence: t.integrated_confidence,
+    synthesis: t.synthesis,
+    axes: Object.keys(t.axes).map(k => ppAxis(ip, topicKey, k)),
+  };
+}
+// "이 축이 뚜렷한 신호를 냈는가" — high/high(일치)이거나 최소 한쪽이 high인 축을 우선순위로 뽑는 데 사용
+function ppIsNotable(a){
+  return a && (a.saju_direction === 'high' || a.ziwei_direction === 'high');
+}
+
+// ---------- 1. 사람 (person) — personality 주제 전체 ----------
+function ppBuildPerson(ip){
+  const personality = ppTopic(ip, 'personality');
+  return {
+    overall_relationship: personality.overall_relationship,
+    integrated_confidence: personality.integrated_confidence,
+    synthesis: personality.synthesis,
+    axes: personality.axes, // self_direction, adaptability, responsibility_pressure, emotional_expression, internal_external_gap
+    notable_axes: personality.axes.filter(ppIsNotable).map(a => a.axis),
+  };
+}
+
+// ---------- 2. 실제 행동 (behavior) — career + mobility 주제 전체 ----------
+function ppBuildBehavior(ip){
+  const career = ppTopic(ip, 'career');
+  const mobility = ppTopic(ip, 'mobility');
+  return {
+    career, mobility,
+    notable_axes: [...career.axes, ...mobility.axes].filter(ppIsNotable).map(a => `${a.topic}.${a.axis}`),
+  };
+}
+
+// ---------- 3. 감정/내면 (emotional_inner) — 여러 주제에 흩어진 정서 관련 축만 선택 ----------
+function ppBuildEmotionalInner(ip){
+  const picks = [
+    ppAxis(ip, 'personality', 'emotional_expression'),
+    ppAxis(ip, 'personality', 'internal_external_gap'),
+    ppAxis(ip, 'relationship', 'attachment_style'),
+    ppAxis(ip, 'relationship', 'emotional_expression'),
+    ppAxis(ip, 'wellbeing', 'stress_load'),
+    ppAxis(ip, 'wellbeing', 'recovery_pattern'),
+  ].filter(Boolean);
+  return { axes: picks, notable_axes: picks.filter(ppIsNotable).map(a => `${a.topic}.${a.axis}`) };
+}
+
+// ---------- 4. 삶에서 나타나는 패턴 (life_patterns) — wealth/family/relationship 잔여축/timing ----------
+function ppBuildLifePatterns(ip){
+  const wealth = ppTopic(ip, 'wealth');
+  const familyTopic = ppTopic(ip, 'family');
+  const usedRelationshipAxes = ['attachment_style', 'emotional_expression'];
+  const relationshipRemainder = ppTopic(ip, 'relationship').axes.filter(a => !usedRelationshipAxes.includes(a.axis));
+  const timing = ppTopic(ip, 'timing');
+  const all = [...wealth.axes, ...familyTopic.axes, ...relationshipRemainder, ...timing.axes];
+  return {
+    wealth, family: familyTopic, relationship_remainder: relationshipRemainder, timing,
+    notable_axes: all.filter(ppIsNotable).map(a => `${a.topic}.${a.axis}`),
+  };
+}
+
+// ---------- 5. 이유 (reasons) — 8개 주제 전체를 가로질러 일치/충돌/데이터부족 근거를 모은다 ----------
+function ppBuildReasons(ip){
+  const allTopics = ['personality', 'career', 'wealth', 'relationship', 'family', 'mobility', 'wellbeing', 'timing'];
+  const confirmed = [], tensions = [], gaps = [];
+  allTopics.forEach(topicKey => {
+    const t = ip.integrated_profile[topicKey];
+    Object.keys(t.axes).forEach(axisKey => {
+      const a = t.axes[axisKey];
+      const entry = { topic: topicKey, axis: axisKey, synthesis: a.synthesis, confidence: a.confidence };
+      if(a.relationship === '일치' && (a.saju_signal.direction === 'high' || a.ziwei_signal.direction === 'high')) confirmed.push(entry);
+      else if(a.relationship === '충돌') tensions.push(entry);
+      else if(a.relationship === '데이터부족') gaps.push(entry);
+    });
+  });
+  return { confirmed, tensions, gaps };
+}
+
+// ---------- 6. 명리 근거 (myeongri_evidence) — 검증/세부 근거용 원자료 요약(참고용, 1차 판단 아님) ----------
+// 2026-10-02 STEP D — 기존 필드는 전부 그대로 두고(순서·값 변경 없음), STEP B/C에서 새로 생긴
+// 엔진(천간합충/신살귀인/좌法/공망/통근투간/세운/자미 보조성) 결과를 "추가 필드"로만 덧붙인다.
+// 인종法(引從法)은 "어떤 십성이 누락 판정되는가"의 선택 규칙이 아직 혼천의 원자료만으로는
+// 특정 인물 전용 추정 없이 재현되지 않아(스테이지 산출 자체는 좌法과 같은 "일지 기준
+// twelveStage()"로 검증됐지만, 어떤 십성을 "누락"으로 볼지의 판정 기준이 표본 간 모순돼
+// 아직 결론 내지 못함) 여기 포함하지 않는다 — 이 부분은 별도로 사용자에게 보고한다.
+function ppBuildMyeongriEvidence(sajuCoreOut, ziweiCoreOut){
+  const sc = sajuCoreOut.saju_core, timingOut = sajuCoreOut.timing;
+  const zc = ziweiCoreOut.ziwei_core;
+  return {
+    saju: {
+      day_master: sc.day_master,
+      strength: { level: sc.strength.level, confidence: sc.strength.confidence },
+      month_command: { season: sc.month_command.season, note: sc.month_command.seasonal_note },
+      structural_pattern: sc.structural_pattern.type,
+      five_elements_summary: sc.five_elements.counts_by_element,
+      current_daeun: timingOut.current_daeun ? { ganzhi: timingOut.current_daeun.ganzhi, age_range: timingOut.current_daeun.age_range } : null,
+      // ↓ STEP D 추가분(전부 기존 saju_core 필드를 그대로 참조만 함, 신규 계산 없음)
+      next_daeun: (timingOut.near_future_daeun && timingOut.near_future_daeun[0]) ? { ganzhi: timingOut.near_future_daeun[0].ganzhi, age_range: timingOut.near_future_daeun[0].age_range } : null,
+      current_seun: timingOut.seun && timingOut.seun.year ? { year: timingOut.seun.year, trigger: timingOut.seun.trigger } : null,
+      roots_and_stems: sc.roots_and_stems, // 통근/투간
+      relations: sc.relations, // 지지 합충형파해
+      gan_relations: sc.gan_relations, // 천간합충(STEP B)
+      guiin_shinsal: sc.guiin_shinsal, // 신살/귀인(STEP B)
+      jwabeop: sc.jwabeop, // 좌法(坐法, STEP B — 지장간의 일지 기준 포태법)
+      injongbeop: sc.injongbeop, // 引從法(STEP B — 규칙 미확정, status만 노출)
+      voids: sc.voids, // 공망
+      twelve_stages: sc.twelve_stages,
+    },
+    ziwei: {
+      life_palace: { branch: zc.life_palace.branch, main_stars: zc.life_palace.main_stars, confidence: zc.life_palace.confidence },
+      body_palace: { location: zc.body_palace.location, main_stars: zc.body_palace.main_stars },
+      major_period: zc.major_period ? { age_range: zc.major_period.age_range, activated_palace: zc.major_period.activated_palace } : null,
+      // ↓ STEP D 추가분(전부 기존 ziwei_core 필드를 그대로 참조만 함, 신규 계산 없음)
+      san_fang_si_zheng: zc.life_palace.san_fang_si_zheng || null, // 명궁 삼방사정
+      sihwa: zc.sihwa, // 사화(전체 목록)
+      aux_stars: zc.aux_stars, // 보조성/살성(天馬/地劫/地空 등, STEP C)
+      time_reliability: zc.data_status, // 시간미상 시 신뢰도 근거
+      // ↓ STEP E 신설 — 주성 강도(廟/旺/得/利/平/不/陷). 혼천의로 확인된 조합만 grade 값이 있고,
+      // 나머지는 grade:null("혼천의 미확인") — AI evidence에도 이 형태 그대로 전달한다.
+      main_star_grades: { life_palace: zc.life_palace.main_star_grades, body_palace: zc.body_palace.main_star_grades },
+    },
+    // ⚠️ 이 섹션은 검증/세부 근거 조회용이다 — 1차 판단은 항상 integrated_profile을 따른다.
+    usage_note: '이 필드는 통합판정(integrated_profile)의 세부 근거를 확인하거나 인용이 필요할 때만 참고한다. 1차 판단 기준은 person/behavior/emotional_inner/life_patterns/reasons 섹션이다.',
+  };
+}
+
+// ---------- 7. 오케스트레이터 ----------
+function buildPersonProfile(sajuCoreOut, ziweiCoreOut, integratedProfileOut){
+  const timeKnownSaju = sajuCoreOut.saju_core.data_status.time === '확정';
+  const timeKnownZiwei = ziweiCoreOut.ziwei_core.data_status.birth_time_known;
+  return {
+    person_profile: {
+      data_status: {
+        birth_time_known: timeKnownSaju && timeKnownZiwei,
+        note: (!timeKnownSaju || !timeKnownZiwei)
+          ? '출생시간 미상 — 명궁/신궁/12궁 기반 판단과 시주 기반 판단의 신뢰도가 제한되어 있으므로, 이 프로필의 confidence가 낮거나 관계가 데이터부족/보완으로 표기된 항목은 더 조심스러운 어투로 서술해야 한다.'
+          : null,
+      },
+      person: ppBuildPerson(integratedProfileOut),
+      behavior: ppBuildBehavior(integratedProfileOut),
+      emotional_inner: ppBuildEmotionalInner(integratedProfileOut),
+      life_patterns: ppBuildLifePatterns(integratedProfileOut),
+      reasons: ppBuildReasons(integratedProfileOut),
+      myeongri_evidence: ppBuildMyeongriEvidence(sajuCoreOut, ziweiCoreOut),
+    },
+  };
+}
+
+
 
 /* =========================================================
    2. 렌더링
@@ -5075,6 +6730,26 @@ function buildAiPayload(){
       saju: pPerson.saju,
       ziwei: pPerson.ziwei,
     };
+    // STEP 5.2 PHASE B(2026-10) — 궁합&결혼 전용. "나"와 동일한 STEP1~4 파이프라인
+    // (buildSajuCore → buildZiweiCore → buildIntegratedProfile → buildPersonProfile)을 상대방
+    // 데이터(partnerData.saju/partnerData.ziwei)에도 그대로 한 번 더 돌려 상대방용 인물
+    // 프로필을 만든다. 기존 calcSaju()/calcZiwei() 계산 로직이나 위 payload.partner(원자료)
+    // 생성 로직은 전혀 건드리지 않고, STEP1~4의 기존 함수를 재사용만 한다 — 새 명리 판단 규칙은
+    // 추가하지 않는다. 실패해도(구조 예외 등) try/catch로 감싸 바로 위 payload.partner는 이미
+    // 만들어진 상태이므로 궁합 기능 자체는 그대로 동작하고, api/interpret.js는
+    // payload.partner_person_profile이 없으면 기존(비V3) 궁합 프롬프트로 자동 폴백한다.
+    try {
+      // 2026-10-02 STEP B — 세운(timing.seun)이 그동안 opts.seunInfo 미전달로 항상 null이었다. 현재 연도의
+      // 세운 간지를 실제로 넘겨 활성화한다(특정 연도 하드코딩 없이 currentSeunInfo()가 호출 시점 연도를 그대로 씀).
+      const partnerSajuCoreOut = buildSajuCore(partnerData.saju, { seunInfo: currentSeunInfo() });
+      const partnerZiweiCoreOut = partnerData.ziwei
+        ? buildZiweiCore(partnerData.ziwei, { birthInput: partnerData.saju.input })
+        : null;
+      if(partnerSajuCoreOut && partnerZiweiCoreOut){
+        const partnerIntegratedProfile = buildIntegratedProfile(partnerSajuCoreOut, partnerZiweiCoreOut).integrated_profile;
+        payload.partner_person_profile = buildPersonProfile(partnerSajuCoreOut, partnerZiweiCoreOut, { integrated_profile: partnerIntegratedProfile }).person_profile;
+      }
+    } catch(e){ console.warn('[STEP5.2 PHASE B] 상대방 person_profile 생성 실패 — payload.partner_person_profile 생략(기존 비V3 궁합 프롬프트로 폴백)', e); }
   }
   if(selectedAiCategory === 'newyear'){
     payload.세운 = buildSeunText(s, 2027);
@@ -5094,6 +6769,44 @@ function buildAiPayload(){
     payload.paymentId = pendingPaymentId;
   }
   payload.visitorId = VISITOR_ID;
+  // V3 STEP 1.1 + STEP 2 — 구조화 판단 레이어(saju_core/ziwei_core)를 payload에 추가로 실어보낸다.
+  // 기존 payload.saju/payload.ziwei(원자료 텍스트)는 그대로 유지 — 서버(api/interpret.js)의 기존
+  // 프롬프트 로직은 이 필드를 아직 참조하지 않으므로 실제 해석 결과에는 영향이 없다(STEP 4~5에서
+  // 프롬프트가 이 구조화 데이터를 쓰도록 바뀌기 전까지는 순수 부가 정보). try/catch로 감싸 이
+  // 신설 판단 레이어에서 예외가 나더라도 기존 결제/해석 흐름(payload 전송)은 절대 막지 않는다.
+  let sajuCoreOut = null, ziweiCoreOut = null;
+  try {
+    // 2026-10-02 STEP B — 세운 wiring: opts.seunInfo를 실제로 넘긴다(위 partner 쪽과 동일 이유).
+    sajuCoreOut = buildSajuCore(s, { seunInfo: currentSeunInfo() });
+    payload.saju_core = sajuCoreOut.saju_core;
+    payload.saju_timing = sajuCoreOut.timing;
+  } catch(e){ console.warn('[V3 STEP1.1] buildSajuCore 실패 — payload.saju_core 생략', e); }
+  if(z){
+    try {
+      ziweiCoreOut = buildZiweiCore(z, { birthInput: s.input });
+      payload.ziwei_core = ziweiCoreOut.ziwei_core;
+    } catch(e){ console.warn('[V3 STEP2] buildZiweiCore 실패 — payload.ziwei_core 생략', e); }
+  }
+  // V3 STEP 3(보정판) — saju_core/ziwei_core가 둘 다 정상 생성된 경우에만 통합 판단 레이어를 추가한다.
+  // 기존 payload.saju/ziwei/saju_core/saju_timing/ziwei_core는 그대로 유지 — 이 필드는 순수 추가이며,
+  // 서버(api/interpret.js)는 아직 이 필드를 참조하지 않으므로 실제 해석 결과에는 영향이 없다.
+  // try/catch로 감싸 이 레이어의 예외가 결제/해석 흐름(payload 전송)을 막지 않게 한다.
+  if(sajuCoreOut && ziweiCoreOut){
+    try {
+      payload.integrated_profile = buildIntegratedProfile(sajuCoreOut, ziweiCoreOut).integrated_profile;
+    } catch(e){ console.warn('[V3 STEP3] buildIntegratedProfile 실패 — payload.integrated_profile 생략', e); }
+  }
+  // V3 STEP 4 — person_profile: integrated_profile을 최우선 판단 결과로 삼아 "사람→실제 행동→
+  // 감정/내면→삶의 패턴→이유→명리 근거" 순서로 재배열한 인물 프로필. STEP 5부터 api/interpret.js가
+  // 기본/종합사주·평생운·재물운 3개 카테고리에 한해 이 필드를 실제 프롬프트에 사용한다(그 외
+  // 카테고리는 이 필드가 실려가도 참조하지 않음 — api/interpret.js의 NARRATIVE_V3_CATEGORIES 분기
+  // 참고). 기존 payload 필드는 전혀 건드리지 않으며, 이 레이어의 예외가 결제/해석 흐름을 막지
+  // 않도록 try/catch로 감싼다.
+  if(sajuCoreOut && ziweiCoreOut && payload.integrated_profile){
+    try {
+      payload.person_profile = buildPersonProfile(sajuCoreOut, ziweiCoreOut, { integrated_profile: payload.integrated_profile }).person_profile;
+    } catch(e){ console.warn('[V3 STEP4] buildPersonProfile 실패 — payload.person_profile 생략', e); }
+  }
   return payload;
 }
 function openPayModal(){
@@ -5310,8 +7023,29 @@ $('#mockPayBtn').addEventListener('click', async ()=>{
 // 분해한다. 소제목 줄은 마크다운 기호 없이 순수 텍스트이고 em dash(—)를 포함하며 짧다는 특징으로
 // 구분 — 이 형식을 못 찾으면(예: 오래된 저장 결과, 반려동물궁합처럼 다른 포맷) 기존처럼 통짜
 // 텍스트로 폴백해서 절대 깨지지 않게 한다.
+// 2026-10 "제목 구조 강제" 보정 — Narrative V3는 더 이상 em dash 소제목 형식에 기대지 않고,
+// api/interpret.js가 서버에서 [[V3_SECTION]]<제목> 마커로 큰 제목을 강제 삽입한 뒤 내려준다.
+// 이 마커가 텍스트에 하나라도 있으면 그걸 최우선으로 신뢰해 분해하고(각 section에 v3:true
+// 표시), 마커가 전혀 없으면(구버전 저장 결과, 반려동물궁합처럼 애초에 이 구조를 쓰지 않는
+// 카테고리) 기존 em dash 휴리스틱을 한 글자도 바꾸지 않고 그대로 쓴다 — 비V3 경로는 전혀
+// 영향받지 않는다.
 function parseAiSections(text){
-  const blocks = String(text||'').split(/\n\s*\n+/).map(b=>b.trim()).filter(Boolean);
+  const raw = String(text||'');
+  if(raw.includes('[[V3_SECTION]]')){
+    const parts = raw.split('[[V3_SECTION]]');
+    const sections = [];
+    const lead = parts[0].trim();
+    if(lead){ sections.push({title:null, body:lead, v3:true}); }
+    for(let i=1;i<parts.length;i++){
+      const chunk = parts[i];
+      const nlIdx = chunk.indexOf('\n');
+      const title = (nlIdx === -1 ? chunk : chunk.slice(0, nlIdx)).trim();
+      const body = (nlIdx === -1 ? '' : chunk.slice(nlIdx+1)).trim();
+      if(title){ sections.push({title, body, v3:true}); }
+    }
+    return sections;
+  }
+  const blocks = raw.split(/\n\s*\n+/).map(b=>b.trim()).filter(Boolean);
   const sections = [];
   blocks.forEach(b=>{
     const isTitle = b.length <= 100 && !b.includes('\n') && b.includes('—');
@@ -5332,8 +7066,14 @@ function renderAiResult(container, text){
   // 항상 두므로, 맨 앞 무제목 블록은 소주제로 세지 않고 목차 위 리드인 문단으로 따로 보여준다.
   const leadIn = (parsed[0] && !parsed[0].title) ? parsed[0].body : '';
   const sections = parsed.filter(s=>s.title);
-  if(sections.length < 3){
-    const paras = raw.split(/\n\s*\n+/).map(p=>p.trim()).filter(Boolean);
+  // V3 마커 기반 큰 제목은 카테고리별 최소 2~3개가 보장되므로(서버의 repair 단계 참고)
+  // 기존 em dash 휴리스틱(최소 3개)보다 기준을 낮춰도 안전하다.
+  const isV3 = parsed.some(s=>s.v3);
+  if(sections.length < (isV3 ? 2 : 3)){
+    // 혹시 마커가 1개 이하로만 나와 이 폴백 경로로 떨어지더라도, 사용자 화면에 내부 마커
+    // 문자열(`[[V3_SECTION]]`)이 그대로 노출되는 일은 없도록 안전망으로 한 번 더 제거한다.
+    const rawForFlat = raw.replace(/\[\[V3_SECTION\]\]/g, '');
+    const paras = rawForFlat.split(/\n\s*\n+/).map(p=>p.trim()).filter(Boolean);
     const flatHtml = paras.map(p=>{
       const dashIdx = p.indexOf('—');
       const isLeadTitle = dashIdx > 0 && dashIdx <= 50 && !p.slice(0, dashIdx).includes('\n');
@@ -5351,32 +7091,24 @@ function renderAiResult(container, text){
     return;
   }
   const leadInHtml = leadIn ? `<p style="white-space:pre-wrap; margin:0 0 18px;">${escapeHtml(leadIn)}</p>` : '';
-  const tocItems = sections.map((s,i)=>
-    `<div class="ai-toc-item" data-i="${i}"><span class="ai-toc-num">${String(i+1).padStart(2,'0')}</span><span>${escapeHtml(s.title)}</span></div>`
-  ).join('');
+  // V3 큰 제목은 번호 배지 없이 굵게·크게·밝은 골드 포인트 컬러로 표시한다(2026-10 "최종 UI
+  // 보정"). 기존(비V3) 소제목은 번호 원형 배지가 있는 기존 스타일을 한 글자도 바꾸지 않는다.
+  // 2026-10 "최종 UI 보정" — 목차(ai-toc) 사이드바는 제거하고 섹션 본문만 바로 보여준다.
   const secHtml = sections.map((s,i)=>
-    `<div class="ai-report-sec" data-i="${i}" id="aiSec${i}">
-       <div class="sec-h"><span class="n">${String(i+1).padStart(2,'0')}</span><h3>${escapeHtml(s.title)}</h3></div>
-       <p>${escapeHtml(s.body)}</p>
-     </div>`
+    s.v3
+      ? `<div class="ai-report-sec" data-i="${i}" id="aiSec${i}">
+           <div class="sec-h v3"><h3 class="v3-title">${escapeHtml(s.title)}</h3></div>
+           <p>${escapeHtml(s.body)}</p>
+         </div>`
+      : `<div class="ai-report-sec" data-i="${i}" id="aiSec${i}">
+           <div class="sec-h"><span class="n">${String(i+1).padStart(2,'0')}</span><h3>${escapeHtml(s.title)}</h3></div>
+           <p>${escapeHtml(s.body)}</p>
+         </div>`
   ).join('');
   container.innerHTML = `
     ${leadInHtml}
-    <div class="ai-toc-wrap"><div class="ai-toc-list">${tocItems}</div></div>
     ${secHtml}
   `;
-  const secEls = Array.from(container.querySelectorAll('.ai-report-sec'));
-  const tocEls = Array.from(container.querySelectorAll('.ai-toc-item'));
-  function setCurrent(i){
-    tocEls.forEach(el=>{ const idx=+el.dataset.i; el.classList.toggle('current', idx===i); el.classList.toggle('done', idx<i); });
-  }
-  setCurrent(0);
-  if('IntersectionObserver' in window && secEls.length){
-    const io = new IntersectionObserver((entries)=>{
-      entries.forEach(en=>{ if(en.isIntersecting) setCurrent(+en.target.dataset.i); });
-    }, {rootMargin:'-20% 0px -60% 0px', threshold:0});
-    secEls.forEach(el=>io.observe(el));
-  }
 }
 function startAiLoadingEta(){
   const el = $('#aiLoadingEta');
@@ -5885,7 +7617,10 @@ function buildPdfBlocks(row){
   const parsed = parseAiSections(row.result_text || '');
   const leadIn = (parsed[0] && !parsed[0].title) ? parsed[0].body : '';
   const sections = parsed.filter(s=>s.title);
-  const useStructured = sections.length >= 3;
+  // V3 마커 기반 큰 제목은 카테고리별 최소 2~3개가 서버에서 보장되므로(repair 단계 참고)
+  // 기존 em dash 휴리스틱(최소 3개)보다 기준을 낮춰도 안전하다.
+  const isV3 = parsed.some(s=>s.v3);
+  const useStructured = sections.length >= (isV3 ? 2 : 3);
   const catLabel = CATEGORY_LABEL[row.category] || row.category;
   const nameLabel0 = (row.name || '').trim();
 
@@ -5914,8 +7649,14 @@ function buildPdfBlocks(row){
   }
 
   if(useStructured){
+    // V3 큰 제목은 번호 배지 없이 본문보다 확실히 크고 굵게, 사주결 붉은 포인트 컬러(#b23b2e)로
+    // 표시한다(2026-10 "제목 구조 강제" 작업지시서 8번 항목). 기존(비V3) 소제목의 번호 원형
+    // 배지 스타일은 한 글자도 바꾸지 않는다.
     sections.forEach((s,i)=>{
-      blocks.push({ keepWithNext:true, html: `
+      blocks.push({ keepWithNext:true, html: s.v3 ? `
+        <div style="margin:20pt 0 10pt;">
+          <h3 style="font-family:'Noto Serif KR',serif; font-weight:900; font-size:15.5pt; color:#b23b2e; margin:0;">${escapeHtml(s.title)}</h3>
+        </div>` : `
         <div style="display:flex; align-items:center; gap:8pt; margin:18pt 0 9pt;">
           <div style="width:18pt; height:18pt; border-radius:50%; background:rgba(178,59,46,.14); color:#b23b2e; font-family:'JetBrains Mono',monospace; font-size:9pt; display:flex; align-items:center; justify-content:center; flex-shrink:0;">${String(i+1).padStart(2,'0')}</div>
           <h3 style="font-family:'Noto Serif KR',serif; font-weight:700; font-size:13.5pt; color:#241d13; margin:0;">${escapeHtml(s.title)}</h3>
@@ -5926,7 +7667,9 @@ function buildPdfBlocks(row){
       });
     });
   } else {
-    const paras = String(row.result_text || '저장된 해석 내용이 없어요.').split(/\n\s*\n+/).map(p=>p.trim()).filter(Boolean);
+    // 마커가 1개 이하로만 나와 이 폴백 경로로 떨어지더라도, PDF에 내부 마커 문자열이
+    // 그대로 찍히는 일은 없도록 안전망으로 한 번 더 제거한다.
+    const paras = String(row.result_text || '저장된 해석 내용이 없어요.').replace(/\[\[V3_SECTION\]\]/g, '').split(/\n\s*\n+/).map(p=>p.trim()).filter(Boolean);
     paras.forEach(p=>{
       const dashIdx = p.indexOf('—');
       const isLeadTitle = dashIdx > 0 && dashIdx <= 50 && !p.slice(0, dashIdx).includes('\n');
