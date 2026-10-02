@@ -15,6 +15,11 @@ const INTERPRET_JS_PATH = path.join(__dirname, '..', 'api', 'interpret.js');
 const EXPORT_NAMES = [
   'buildPrompt', 'buildPersonProfileNarrativeBlock', 'formatMyeongriCrossEvidence',
   'NARRATIVE_V3_BASE_PROMPT',
+  // 2026-10 "최종 보정" — 카테고리별 V3 프롬프트(와 함수형 2개)·분량 설정까지 테스트에서
+  // 직접 검증할 수 있도록 추가로 꺼낸다. 상수 그대로 꺼내는 것일 뿐 새 동작을 추가하지 않는다.
+  'CATEGORY_PROMPT_COMPREHENSIVE_V3', 'CATEGORY_PROMPT_WEALTH_V3', 'CATEGORY_PROMPT_LIFETIME_V3',
+  'CATEGORY_PROMPT_NEWYEAR_V3', 'buildCategoryPromptLoveV3', 'buildCategoryPromptCareerV3',
+  'buildCategoryPromptCompatibilityV3', 'MIN_LENGTH_BY_CATEGORY', 'MAX_CONTINUATION_ROUNDS_BY_CATEGORY',
 ];
 
 function loadInterpretModule() {
