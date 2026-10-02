@@ -20,6 +20,11 @@ const EXPORT_NAMES = [
   'CATEGORY_PROMPT_COMPREHENSIVE_V3', 'CATEGORY_PROMPT_WEALTH_V3', 'CATEGORY_PROMPT_LIFETIME_V3',
   'CATEGORY_PROMPT_NEWYEAR_V3', 'buildCategoryPromptLoveV3', 'buildCategoryPromptCareerV3',
   'buildCategoryPromptCompatibilityV3', 'MIN_LENGTH_BY_CATEGORY', 'MAX_CONTINUATION_ROUNDS_BY_CATEGORY',
+  // 2026-10 "최종 보정 2차" — 종합사주/평생운 마지막 고정 제목 하드 가드 상수를 테스트에서
+  // 직접 검증할 수 있도록 추가로 꺼낸다(needsContinuation 자체는 module.exports 핸들러 내부
+  // 클로저라 꺼낼 수 없으므로, 그 가드가 비교하는 제목 문자열이 카테고리 프롬프트에 실려있는
+  // 제목과 정확히 일치하는지를 교차 확인하는 용도).
+  'LIFETIME_V3_FINAL_TITLE', 'COMPREHENSIVE_V3_FINAL_TITLE',
 ];
 
 function loadInterpretModule() {
