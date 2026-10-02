@@ -7602,16 +7602,36 @@ function renderPurchaseList(container, rows, showOwner){
 // 늘린다. 배경은 페이지마다 새로 붙이며(늘리거나 여러 페이지에 걸쳐 재사용하지 않음), 각 페이지는
 // html2canvas로 따로 캡처해 jsPDF 페이지에 정확히 채운다.
 const PDF_PAGE_W = 595.28, PDF_PAGE_H = 841.89; // A4, pt (jsPDF 'a4' 기준과 동일)
+// 2026-10 "PDF 레이아웃 촘촴화" 작업지시서 — 상하좌우 여백을 페이지 크기 대비 %(좌우 23%/
+// 상단 20%/하단 25%, 지나치게 넓었음)가 아니라 mm 단위 고정값으로 바꾼다.
+// 1pt = 1/72inch, 1mm = 1/25.4inch → 1mm = 72/25.4 pt.
+const PDF_MM_TO_PT = 72 / 25.4;
+function pdfMm(v){ return v * PDF_MM_TO_PT; }
 const PDF_MARGIN = {
-  top: PDF_PAGE_H * 0.20,
-  bottom: PDF_PAGE_H * 0.25,
-  left: PDF_PAGE_W * 0.23,
-  right: PDF_PAGE_W * 0.23,
+  top: pdfMm(15.5),   // 2페이지 이후 상단 여백(권장 15~16mm의 중간)
+  bottom: pdfMm(15.5), // 권장 15~16mm의 중간
+  left: pdfMm(17.5),   // 권장 17~18mm의 중간
+  right: pdfMm(17.5),
 };
+// 첫 페이지는 콘텐츠 맨 위에 로고·카테고리 배지 헤더가 바로 오므로, 2페이지 이후보다 상단
+// 여백을 조금 더 둔다 — 첫 페이지/2페이지 이후 상단 여백을 다르게 처리하라는 요청사항.
+const PDF_MARGIN_TOP_FIRST = pdfMm(18);
 const PDF_CONTENT_W = PDF_PAGE_W - PDF_MARGIN.left - PDF_MARGIN.right;
-const PDF_CONTENT_H = PDF_PAGE_H - PDF_MARGIN.top - PDF_MARGIN.bottom;
+const PDF_CONTENT_H = PDF_PAGE_H - PDF_MARGIN.top - PDF_MARGIN.bottom;             // 2페이지 이후
+const PDF_CONTENT_H_FIRST = PDF_PAGE_H - PDF_MARGIN_TOP_FIRST - PDF_MARGIN.bottom; // 첫 페이지
 const PDF_BG_URL = 'https://sajugyeol.co.kr/pdf-bg-comprehensive.jpg';
 const PDF_PAPER_FALLBACK = '#f4ecd8';
+
+// 모든 섹션 제목(V3 큰 제목 / 기존 소제목 / 평문 폴백 제목 전부)이 공유하는 단일 스타일 —
+// 제목마다 서로 다른 margin·색상을 주던 기존 방식을 버리고, 제목 자체의 margin은 항상 0으로
+// 고정한다. "제목+본문" 간격은 아래 PDF_SECTION_MARGIN(wrapper의 margin-bottom) 하나로만
+// 결정되고, 본문 문단(<p>)의 margin-top은 항상 0이라 제목 바로 아래 간격이 흔들리지 않는다.
+const PDF_TITLE_STYLE = "font-family:'Noto Serif KR',serif; font-weight:900; font-size:13.5pt; line-height:1.32; letter-spacing:-0.015em; color:#b23b2e; margin:0;";
+// section 전체를 감싸는 wrapper의 margin — margin-top이 "섹션 사이 간격", margin-bottom이
+// "제목과 본문 사이 간격"을 고정값으로 결정한다.
+const PDF_SECTION_MARGIN = "margin:18pt 0 9pt;";
+// 본문 문단 공통 스타일 — 줄간격·자간·문단간격을 줄여 전체를 10~15% 더 촘촴하게 보이도록 한다.
+const PDF_PARA_STYLE = "font-size:10.5pt; line-height:1.66; letter-spacing:-0.015em; color:#3a3020; white-space:pre-wrap; margin:0 0 7pt;";
 
 function buildPdfBlocks(row){
   const parsed = parseAiSections(row.result_text || '');
@@ -7645,25 +7665,25 @@ function buildPdfBlocks(row){
   ` });
 
   if(useStructured && leadIn){
-    blocks.push({ keepWithNext:false, html: `<p style="font-size:11pt; line-height:1.7; color:#3a3020; white-space:pre-wrap; margin:10pt 0 0;">${escapeHtml(leadIn)}</p>` });
+    blocks.push({ keepWithNext:false, html: `<p style="${PDF_PARA_STYLE}">${escapeHtml(leadIn)}</p>` });
   }
 
   if(useStructured){
-    // V3 큰 제목은 번호 배지 없이 본문보다 확실히 크고 굵게, 사주결 붉은 포인트 컬러(#b23b2e)로
-    // 표시한다(2026-10 "제목 구조 강제" 작업지시서 8번 항목). 기존(비V3) 소제목의 번호 원형
-    // 배지 스타일은 한 글자도 바꾸지 않는다.
+    // 2026-10 "PDF 레이아웃 촘촴화" — V3 큰 제목/기존 소제목 모두 PDF_TITLE_STYLE·
+    // PDF_SECTION_MARGIN 하나로 통일한다(제목마다 다른 margin·색상을 주던 기존 방식 제거).
+    // 번호 원형 배지는 비V3 소제목에만 남겨두되, 제목 자체의 스타일과는 무관한 장식 요소다.
     sections.forEach((s,i)=>{
       blocks.push({ keepWithNext:true, html: s.v3 ? `
-        <div style="margin:20pt 0 10pt;">
-          <h3 style="font-family:'Noto Serif KR',serif; font-weight:900; font-size:15.5pt; color:#b23b2e; margin:0;">${escapeHtml(s.title)}</h3>
+        <div style="${PDF_SECTION_MARGIN}">
+          <h3 style="${PDF_TITLE_STYLE}">${escapeHtml(s.title)}</h3>
         </div>` : `
-        <div style="display:flex; align-items:center; gap:8pt; margin:18pt 0 9pt;">
+        <div style="display:flex; align-items:center; gap:8pt; ${PDF_SECTION_MARGIN}">
           <div style="width:18pt; height:18pt; border-radius:50%; background:rgba(178,59,46,.14); color:#b23b2e; font-family:'JetBrains Mono',monospace; font-size:9pt; display:flex; align-items:center; justify-content:center; flex-shrink:0;">${String(i+1).padStart(2,'0')}</div>
-          <h3 style="font-family:'Noto Serif KR',serif; font-weight:700; font-size:13.5pt; color:#241d13; margin:0;">${escapeHtml(s.title)}</h3>
+          <h3 style="${PDF_TITLE_STYLE}">${escapeHtml(s.title)}</h3>
         </div>` });
       const paras = s.body.split(/\n\s*\n+/).map(p=>p.trim()).filter(Boolean);
       paras.forEach(p=>{
-        blocks.push({ keepWithNext:false, html: `<p style="font-size:11pt; line-height:1.7; color:#3a3020; white-space:pre-wrap; margin:0 0 9pt;">${escapeHtml(p)}</p>` });
+        blocks.push({ keepWithNext:false, html: `<p style="${PDF_PARA_STYLE}">${escapeHtml(p)}</p>` });
       });
     });
   } else {
@@ -7677,13 +7697,12 @@ function buildPdfBlocks(row){
         const titlePart = p.slice(0, dashIdx).trim();
         const restPart = p.slice(dashIdx + 1).trim();
         blocks.push({ keepWithNext:true, html: `
-          <div style="display:flex; align-items:center; gap:8pt; margin:14pt 0 7pt;">
-            <span style="width:3pt; height:12pt; border-radius:2pt; background:#b23b2e; flex-shrink:0; display:inline-block;"></span>
-            <span style="font-family:'Noto Serif KR',serif; font-weight:900; font-size:13pt; color:#b23b2e;">${escapeHtml(titlePart)}</span>
+          <div style="${PDF_SECTION_MARGIN}">
+            <h3 style="${PDF_TITLE_STYLE}">${escapeHtml(titlePart)}</h3>
           </div>` });
-        blocks.push({ keepWithNext:false, html: `<p style="font-size:11pt; line-height:1.7; color:#3a3020; white-space:pre-wrap; margin:0 0 12pt;">${escapeHtml(restPart)}</p>` });
+        blocks.push({ keepWithNext:false, html: `<p style="${PDF_PARA_STYLE}">${escapeHtml(restPart)}</p>` });
       } else {
-        blocks.push({ keepWithNext:false, html: `<p style="font-size:11pt; line-height:1.7; color:#3a3020; white-space:pre-wrap; margin:0 0 12pt;">${escapeHtml(p)}</p>` });
+        blocks.push({ keepWithNext:false, html: `<p style="${PDF_PARA_STYLE}">${escapeHtml(p)}</p>` });
       }
     });
   }
@@ -7728,11 +7747,15 @@ function paginatePdfBlocks(blocks, heights){
   // 측정 시점과 실제 캡처 시점의 서브픽셀 오차에 대비한 안전 여유분 — 절대 텍스트가 잘리거나
   // 장식 영역을 침범하지 않도록 보수적으로 잡는다.
   const SAFETY_BUFFER = 16;
-  const usableH = PDF_CONTENT_H - SAFETY_BUFFER;
+  // 첫 페이지는 상단 여백(PDF_MARGIN_TOP_FIRST)이 2페이지 이후(PDF_MARGIN.top)보다 더 커서
+  // 쓸 수 있는 높이가 더 작다 — 지금 채우는 중인 페이지가 몇 번째인지(pages.length)에 따라
+  // 사용 가능한 높이를 다르게 계산한다.
+  const usableHFor = (pageIdx) => (pageIdx === 0 ? PDF_CONTENT_H_FIRST : PDF_CONTENT_H) - SAFETY_BUFFER;
 
   for(let i=0; i<blocks.length; i++){
     const b = blocks[i];
     const h = heights[i];
+    const usableH = usableHFor(pages.length);
     // 제목(keepWithNext) 뒤에 본문이 통째로 들어갈 수 있으면 반드시 함께 배치하고(고아 제목 방지),
     // 본문 자체가 한 페이지보다 커서 어차피 여러 페이지에 걸쳐야 하는 예외적인 경우에만 최소
     // 여백만 확보한다.
@@ -7784,12 +7807,17 @@ async function downloadPurchasePdf(row, btnEl){
       pageDiv.style.color = '#241d13';
       pageDiv.style.fontFamily = "'Noto Sans KR', sans-serif";
 
+      // 첫 페이지는 PDF_MARGIN_TOP_FIRST/PDF_CONTENT_H_FIRST를, 2페이지 이후는 PDF_MARGIN.top/
+      // PDF_CONTENT_H를 쓴다 — paginatePdfBlocks()의 usableHFor()와 반드시 같은 기준이어야
+      // 페이지네이션 계산과 실제 캡처 위치가 어긋나지 않는다.
+      const pageTopMargin = (p === 0) ? PDF_MARGIN_TOP_FIRST : PDF_MARGIN.top;
+      const pageContentH = (p === 0) ? PDF_CONTENT_H_FIRST : PDF_CONTENT_H;
       const inner = document.createElement('div');
       inner.style.position = 'absolute';
       inner.style.left = PDF_MARGIN.left + 'pt';
-      inner.style.top = PDF_MARGIN.top + 'pt';
+      inner.style.top = pageTopMargin + 'pt';
       inner.style.width = PDF_CONTENT_W + 'pt';
-      inner.style.height = PDF_CONTENT_H + 'pt';
+      inner.style.height = pageContentH + 'pt';
       inner.style.overflow = 'hidden';
       inner.innerHTML = pages[p].map(b=>b.html).join('');
       pageDiv.appendChild(inner);
