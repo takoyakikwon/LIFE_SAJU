@@ -6051,6 +6051,22 @@ function advanceToTimeAfterDate(){
   sheetPushedType = 'time';
   logFunnelEvent('time_sheet_open');
 }
+// 2026-10-03: 태어난 시간 "완료"(또는 "몰라요" 선택)를 누르면 곧바로 태어난 곳 검색
+// 시트로 이어지게 함 — 생년월일→시간과 같은 흐름을 한 단계 더 이어서, 입력을 끝까지
+// 끊김 없이 진행할 수 있게 한다. 시간을 몰라도 태어난 곳은 입력할 수 있으므로 동일하게 이어준다.
+// 시간 시트는 sheetPushedType으로, 태어난 곳 시트는 citySheetPushed로 서로 다른 변수를 쓰기
+// 때문에, advanceToTimeAfterDate()와 같은 이유로 back()+push() 대신 같은 히스토리 자리에서
+// replaceState로 "시간 시트 열림" → "태어난 곳 시트 열림"으로 상태만 바꿔치기한다.
+function advanceToCityAfterTime(){
+  $('#timeSheetBg').classList.remove('open');
+  sheetPushedType = null;
+  $('#citySearchInput').value = '';
+  renderCityList('');
+  $('#citySheetBg').classList.add('open');
+  history.replaceState({ view: 'citySheetOpen' }, '');
+  citySheetPushed = true;
+  logFunnelEvent('city_sheet_open');
+}
 function closeSheet(type){
   $(type==='date' ? '#dateSheetBg' : '#timeSheetBg').classList.remove('open');
   // 2026-09-22 버그 수정: 여기서 sheetPushedType을 미리 null로 지워버리면, 아래 history.back()이
@@ -6182,7 +6198,7 @@ function confirmTimePicker(){
   if($('#pkTimeUnknown').checked){
     if(!unkEl.checked){ unkEl.checked = true; unkEl.dispatchEvent(new Event('change')); }
     $('#pkManualTimeError').hidden = true;
-    closeSheet('time');
+    if(pkTarget === 'main'){ advanceToCityAfterTime(); } else { closeSheet('time'); }
     return;
   }
   if(unkEl.checked){ unkEl.checked = false; unkEl.dispatchEvent(new Event('change')); }
@@ -6202,7 +6218,11 @@ function confirmTimePicker(){
   p.timeSet = true;
   $(`#${t.timeId}`).value = `${pkPad(p.hour)}:${pkPad(p.minute)}`;
   pkUpdateTimeLabel();
-  closeSheet('time');
+  if(pkTarget === 'main'){
+    advanceToCityAfterTime();
+  } else {
+    closeSheet('time');
+  }
 }
 $('#dateConfirmBtn').addEventListener('click', confirmDatePicker);
 $('#timeConfirmBtn').addEventListener('click', confirmTimePicker);
