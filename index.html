@@ -1251,6 +1251,15 @@ window.SajuAnalytics = (function(){
      2026-10-03 수정: 기본 테두리가 너무 흐려 안 보인다는 피드백 → 진한 골드로, 에러 테두리도
      너무 어두운 톤이라는 피드백 → 더 밝고 선명한 빨강 + 은은한 글로우로 변경. */
   .manual-row input.invalid.touched{border-color:#ff5a4a; background:rgba(255,90,74,.14); box-shadow:0 0 0 3px rgba(255,90,74,.18);}
+  /* 2026-10-03: 한 칸을 다 채우면(예: 년 4자리, 월/일/시 중 더 이상 이어질 수 없는 숫자)
+     자동으로 다음 칸에 포커스를 옮기고, 그 칸 테두리를 한두 번 살짝 반짝여서
+     "여기로 넘어왔다"는 걸 알려준다. 계속 깜빡이면 산만해 보여서 2회 재생 후 멈춘다. */
+  @keyframes pkPulseHint{
+    0%{ box-shadow:0 0 0 0 rgba(224,187,90,.5); border-color:#e0bb5a; }
+    50%{ box-shadow:0 0 0 7px rgba(224,187,90,0); border-color:rgba(224,187,90,.55); }
+    100%{ box-shadow:0 0 0 0 rgba(224,187,90,0); border-color:rgba(224,187,90,.55); }
+  }
+  .manual-row input.pulse-hint{ animation:pkPulseHint .55s ease-out 2; }
   .manual-hint{font-size:10.5px; color:var(--ink-faint); text-align:center; margin-top:12px; line-height:1.6;}
   /* 시간 피커에서 지금 고른 시각이 전통 12시진 중 어디에 해당하는지 보여주는 라벨
      (2026-08-24, 타 사주앱의 12시진 목록형 UI 벤치마킹 논의 후 추가 — 분 단위 정밀 입력은
@@ -6156,13 +6165,51 @@ $('#pkTimeUnknown').addEventListener('change', (e)=>{
   if(checked) $('#pkManualTimeError').hidden = true;
   validateTimeManual();
 });
-$('#pkManualYear').addEventListener('input', ()=>{ $('#pkManualYear').classList.add('touched'); validateDateManual(); });
-$('#pkManualMonth').addEventListener('input', ()=>{ $('#pkManualMonth').classList.add('touched'); validateDateManual(); });
+// 2026-10-03: 한 칸을 다 채우면 다음 칸으로 자동 포커스 이동 + 살짝 반짝이는 힌트.
+// - maxLen까지 다 채웠을 때는 항상 넘어간다.
+// - 그 전이라도(한 자리만 쳤어도) 더 이어질 수 없는 숫자라면(singleDigitThreshold 이상) 바로 넘어간다.
+//   예: 시(0~23)에서 "3"을 치면 30~39 같은 시는 없으므로 바로 분으로 이동, "1"을 치면 10~19가
+//   될 수 있으니 기다린다.
+// - 다음 칸에 이미 값이 들어있으면(기존 값 수정 중) 건드리지 않는다.
+function pkFocusWithPulse(el){
+  if(!el || el.disabled) return;
+  if(document.activeElement !== el){
+    el.focus();
+    try{ el.select(); }catch(e){}
+  }
+  el.classList.remove('pulse-hint');
+  void el.offsetWidth; // 애니메이션 재시작을 위한 강제 리플로우
+  el.classList.add('pulse-hint');
+  el.addEventListener('animationend', ()=> el.classList.remove('pulse-hint'), { once:true });
+}
+function pkMaybeAutoAdvance(fromEl, toEl, opts){
+  const raw = fromEl.value.trim();
+  if(raw.length < opts.maxLen){
+    if(opts.singleDigitThreshold == null || raw.length !== 1) return;
+    const d = parseInt(raw, 10);
+    if(!(d >= opts.singleDigitThreshold)) return;
+  }
+  if(toEl.value.trim() !== '') return;
+  pkFocusWithPulse(toEl);
+}
+$('#pkManualYear').addEventListener('input', ()=>{
+  $('#pkManualYear').classList.add('touched');
+  const s = validateDateManual();
+  if(s.yOk) pkMaybeAutoAdvance($('#pkManualYear'), $('#pkManualMonth'), { maxLen:4 });
+});
+$('#pkManualMonth').addEventListener('input', ()=>{
+  $('#pkManualMonth').classList.add('touched');
+  const s = validateDateManual();
+  if(s.mOk) pkMaybeAutoAdvance($('#pkManualMonth'), $('#pkManualDay'), { maxLen:2, singleDigitThreshold:2 });
+});
 $('#pkManualDay').addEventListener('input', ()=>{ $('#pkManualDay').classList.add('touched'); validateDateManual(); });
 $('#pkManualHour').addEventListener('input', ()=>{
   $('#pkManualHour').classList.add('touched');
   const s = validateTimeManual();
-  if(s.hOk) pkUpdateSijinLabel(s.h);
+  if(s.hOk){
+    pkUpdateSijinLabel(s.h);
+    pkMaybeAutoAdvance($('#pkManualHour'), $('#pkManualMinute'), { maxLen:2, singleDigitThreshold:3 });
+  }
 });
 $('#pkManualMinute').addEventListener('input', ()=>{
   $('#pkManualMinute').classList.add('touched');
