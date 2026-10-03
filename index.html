@@ -305,7 +305,7 @@ window.SajuAnalytics = (function(){
   }
   /* 2026-10-03 4차 조정: "오늘의 사주" 카드를 빼고 2개(나는 어떤 사람인가/오행 균형)만
      남기면서 빈 높이만큼 카드를 더 크게 키워 "이름+생년월일까지만 보이는" 균형을 다시 맞춘다. */
-  .preview-cards{display:flex; flex-direction:column; gap:12px; margin-bottom:54px;}
+  .preview-cards{display:flex; flex-direction:column; gap:12px; margin-bottom:28px;}
   .preview-card{padding:18px 17px; border-radius:var(--radius-sm); background:var(--paper-card); border:1px solid var(--line);}
   .preview-card-top{display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;}
   .preview-card-label{font-size:11.5px; font-weight:800; color:var(--gold);}
@@ -1240,15 +1240,17 @@ window.SajuAnalytics = (function(){
   .manual-row .mfield{flex:1;}
   .manual-row .mfield label{display:block; font-size:10.5px; color:var(--ink-faint); margin-bottom:6px; text-align:center;}
   .manual-row input{
-    width:100%; padding:12px 8px; text-align:center; border-radius:10px; border:1.5px solid var(--line);
-    background:rgba(255,255,255,.04); color:var(--ink); font-size:15px; font-weight:700; font-family:inherit;
-    transition:border-color .15s ease, background .15s ease;
+    width:100%; padding:12px 8px; text-align:center; border-radius:10px; border:2px solid rgba(224,187,90,.55);
+    background:rgba(224,187,90,.07); color:var(--ink); font-size:15px; font-weight:700; font-family:inherit;
+    transition:border-color .15s ease, background .15s ease, box-shadow .15s ease;
   }
   /* 2026-10-03: 생년월일/태어난 시간 직접입력 실시간 유효성 표시. 글자를 입력하는 동안
      바로 틀렸는지 보여주고(빨간 테두리), "완료"를 누르기 전까지는 못 알아채던 문제를 줄인다.
      값을 아직 하나도 안 쳤을 때는 invalid를 주지 않아(빈 칸이 처음부터 빨갛게 보이면 더
-     부담스러우므로) touched 클래스가 같이 있을 때만 빨간 테두리를 보여준다. */
-  .manual-row input.invalid.touched{border-color:var(--seal); background:rgba(178,59,46,.10);}
+     부담스러우므로) touched 클래스가 같이 있을 때만 빨간 테두리를 보여준다.
+     2026-10-03 수정: 기본 테두리가 너무 흐려 안 보인다는 피드백 → 진한 골드로, 에러 테두리도
+     너무 어두운 톤이라는 피드백 → 더 밝고 선명한 빨강 + 은은한 글로우로 변경. */
+  .manual-row input.invalid.touched{border-color:#ff5a4a; background:rgba(255,90,74,.14); box-shadow:0 0 0 3px rgba(255,90,74,.18);}
   .manual-hint{font-size:10.5px; color:var(--ink-faint); text-align:center; margin-top:12px; line-height:1.6;}
   /* 시간 피커에서 지금 고른 시각이 전통 12시진 중 어디에 해당하는지 보여주는 라벨
      (2026-08-24, 타 사주앱의 12시진 목록형 UI 벤치마킹 논의 후 추가 — 분 단위 정밀 입력은
