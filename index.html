@@ -2421,6 +2421,38 @@ const CITY_TABLE = [
   {name:"밀양", lon:128.75},
   // 제주 · 북한
   {name:"제주", lon:126.53},{name:"서귀포", lon:126.56},{name:"평양", lon:125.75},
+  // 2026-10-03: "의성처럼 군(郡) 지역을 검색하면 없다"는 피드백 → 대한민국 82개 군을 모두 추가.
+  // 진태양시 보정은 경도 1도당 약 4분 차이라, 군 소재지 기준 근사 경도로도 실용상 충분히 정확함.
+  {name:"기장", lon:129.22},{name:"달성", lon:128.43},{name:"군위", lon:128.57},
+  {name:"강화", lon:126.48},{name:"옹진", lon:126.15},{name:"울주", lon:129.24},
+  {name:"가평", lon:127.51},{name:"양평", lon:127.49},{name:"연천", lon:127.08},
+  {name:"철원", lon:127.31},{name:"고성(강원)", lon:128.47},{name:"횡성", lon:127.98},
+  {name:"홍천", lon:127.88},{name:"화천", lon:127.71},{name:"인제", lon:128.17},
+  {name:"정선", lon:128.66},{name:"평창", lon:128.39},{name:"양구", lon:127.99},
+  {name:"양양", lon:128.62},{name:"영월", lon:128.46},
+  {name:"보은", lon:127.73},{name:"단양", lon:128.37},{name:"음성", lon:127.69},
+  {name:"괴산", lon:127.79},{name:"진천", lon:127.44},{name:"옥천", lon:127.57},
+  {name:"증평", lon:127.58},{name:"영동", lon:127.78},
+  {name:"부여", lon:126.91},{name:"청양", lon:126.80},{name:"금산", lon:127.49},
+  {name:"홍성", lon:126.66},{name:"서천", lon:126.69},{name:"태안", lon:126.30},
+  {name:"예산", lon:126.85},
+  {name:"부안", lon:126.73},{name:"고창", lon:126.70},{name:"임실", lon:127.28},
+  {name:"장수", lon:127.52},{name:"진안", lon:127.42},{name:"무주", lon:127.66},
+  {name:"순창", lon:127.14},{name:"완주", lon:127.16},
+  {name:"보성", lon:127.08},{name:"담양", lon:126.99},{name:"강진", lon:126.77},
+  {name:"고흥", lon:127.29},{name:"곡성", lon:127.29},{name:"구례", lon:127.46},
+  {name:"해남", lon:126.60},{name:"함평", lon:126.52},{name:"화순", lon:126.98},
+  {name:"장흥", lon:126.92},{name:"장성", lon:126.78},{name:"진도", lon:126.26},
+  {name:"무안", lon:126.33},{name:"신안", lon:126.11},{name:"완도", lon:126.75},
+  {name:"영암", lon:126.70},{name:"영광", lon:126.51},
+  {name:"봉화", lon:128.73},{name:"청도", lon:128.73},{name:"청송", lon:129.06},
+  {name:"칠곡", lon:128.40},{name:"고령", lon:128.26},{name:"성주", lon:128.28},
+  {name:"의성", lon:128.70},{name:"울진", lon:129.40},{name:"울릉", lon:130.90},
+  {name:"예천", lon:128.45},{name:"영덕", lon:129.37},{name:"영양", lon:129.11},
+  {name:"창녕", lon:128.49},{name:"거창", lon:127.91},{name:"고성(경남)", lon:128.32},
+  {name:"하동", lon:127.75},{name:"함안", lon:128.41},{name:"합천", lon:128.17},
+  {name:"함양", lon:127.72},{name:"남해", lon:127.89},{name:"산청", lon:127.87},
+  {name:"의령", lon:128.26},
   // 목록에 없는 경우
   {name:"목록에 없어요 (전국 평균 기준)", lon:127.5}
 ];
@@ -5630,7 +5662,7 @@ function renderCityList(query){
   const q = (query||'').trim();
   const items = q ? CITY_TABLE.filter(c=>c.name.includes(q)) : CITY_TABLE;
   if(!items.length){
-    listEl.innerHTML = `<div class="city-empty">검색 결과가 없어요. 가장 가까운 지역이나 "목록에 없어요"를 골라주세요.</div>`;
+    listEl.innerHTML = `<div class="city-empty">검색 결과가 없어요. 비슷한 이름으로 다시 검색하거나, 가장 가까운 지역 또는 "목록에 없어요"를 골라주세요.</div>`;
     return;
   }
   listEl.innerHTML = items.map(c=>{
@@ -5654,14 +5686,33 @@ function closeCitySheet(){
     history.back();
   }
 }
+function selectCity(lon, name){
+  citySelect.value = lon;
+  $('#cityBtnVal').textContent = name;
+  closeCitySheet();
+}
 $('#cityBtn').addEventListener('click', openCitySheet);
-$('#citySearchInput').addEventListener('input', (e)=> renderCityList(e.target.value));
+// 2026-10-03: 검색어가 목록의 지역 이름과 정확히 일치하면(예: "대구"를 다 입력) 따로 탭하지
+// 않아도 바로 선택되도록 함. 단, "고성(강원)/고성(경남)"처럼 같은 이름이 둘 이상이면 어느 쪽인지
+// 알 수 없으므로 자동 선택하지 않고 직접 고르게 둔다. 선택된 항목이 눈에 보이게(금색 강조)
+// 아주 짧게 보여준 다음 닫는다 — 탭했을 때와 비슷한 느낌을 주기 위함.
+$('#citySearchInput').addEventListener('input', (e)=>{
+  const val = e.target.value;
+  const q = val.trim();
+  const matches = q ? CITY_TABLE.filter(c=>c.name === q) : [];
+  if(matches.length === 1){
+    const exact = matches[0];
+    citySelect.value = exact.lon;
+    renderCityList(val);
+    setTimeout(()=> selectCity(exact.lon, exact.name), 220);
+    return;
+  }
+  renderCityList(val);
+});
 $('#cityList').addEventListener('click', (e)=>{
   const btn = e.target.closest('.city-item');
   if(!btn) return;
-  citySelect.value = btn.dataset.lon;
-  $('#cityBtnVal').textContent = btn.dataset.name;
-  closeCitySheet();
+  selectCity(btn.dataset.lon, btn.dataset.name);
 });
 $('#citySheetBg').addEventListener('click', (e)=>{
   if(e.target.id === 'citySheetBg') closeCitySheet();
