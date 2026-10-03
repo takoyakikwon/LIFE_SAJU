@@ -220,7 +220,7 @@ window.SajuAnalytics = (function(){
   .topbar{
     position:relative; z-index:1;
     display:flex; align-items:center; gap:10px;
-    padding:20px 22px 14px;
+    padding:26px 22px 18px;
     border-bottom:1px solid var(--line);
   }
   .topbar .mark{
@@ -269,7 +269,7 @@ window.SajuAnalytics = (function(){
   main{position:relative; z-index:1; flex:1; overflow-y:auto; padding-bottom:24px;}
   main::-webkit-scrollbar{display:none;}
   /* ---------- INPUT VIEW ---------- */
-  #view-input{padding:18px 22px 22px;}
+  #view-input{padding:22px;}
   .hero-line{
     font-family:"Noto Serif KR"; font-weight:700; font-size:15px;
     line-height:1.7; color:var(--ink); margin:4px 0 22px;
@@ -289,26 +289,28 @@ window.SajuAnalytics = (function(){
      입력 전에 "뭐가 무료로 나오는지" 먼저 보여준다. 예시 카드는 실제로 결제 없이 나오는 무료
      패널(사주팔자/오행분포/오늘의 사주)에서만 발췌 — 재물·일처럼 유료 카테고리 내용은 넣지 않는다
      (무료라고 보여주고 실제로는 결제해야 나오면 신뢰를 깎으므로).*/
-  .hero-sub-new{font-size:13.5px; line-height:1.7; color:var(--ink-soft); margin:2px 0 12px; letter-spacing:-0.15px;}
+  .hero-sub-new{font-size:14px; line-height:1.8; color:var(--ink-soft); margin:2px 0 16px; letter-spacing:-0.15px;}
   .hero-sub-new b{color:var(--ink); font-weight:700;}
   .hero-meta-chip{
-    display:inline-flex; align-items:center; gap:6px; margin:0 0 18px;
-    padding:7px 13px; border-radius:999px; background:rgba(224,187,90,.12);
-    border:1px solid var(--gold-line); color:var(--gold); font-size:12px; font-weight:700;
+    display:inline-flex; align-items:center; gap:6px; margin:0 0 24px;
+    padding:8px 14px; border-radius:999px; background:rgba(224,187,90,.12);
+    border:1px solid var(--gold-line); color:var(--gold); font-size:12.5px; font-weight:700;
   }
   /* 2026-10-03 3차 조정: 2차 압축이 과했다("이름, 생년월일 정도만 나오면 될 거 같은데" —
      태어난 시간/성별까지 보일 필요는 없음). 예시 카드 쪽은 다시 읽기 편한 크기로 되돌리고,
      대신 카드 사이 간격만 살짝 줄여서 "이름+생년월일까지만 보이는" 지점을 맞춘다. */
   .preview-intro{
-    font-size:12.5px; font-weight:700; color:var(--ink-faint); margin:0 0 10px;
+    font-size:12.5px; font-weight:700; color:var(--ink-faint); margin:0 0 14px;
     display:flex; align-items:center; gap:6px;
   }
-  .preview-cards{display:flex; flex-direction:column; gap:9px; margin-bottom:24px;}
-  .preview-card{padding:13px 14px; border-radius:var(--radius-sm); background:var(--paper-card); border:1px solid var(--line);}
-  .preview-card-top{display:flex; align-items:center; justify-content:space-between; margin-bottom:5px;}
+  /* 2026-10-03 4차 조정: "오늘의 사주" 카드를 빼고 2개(나는 어떤 사람인가/오행 균형)만
+     남기면서 빈 높이만큼 카드를 더 크게 키워 "이름+생년월일까지만 보이는" 균형을 다시 맞춘다. */
+  .preview-cards{display:flex; flex-direction:column; gap:12px; margin-bottom:54px;}
+  .preview-card{padding:18px 17px; border-radius:var(--radius-sm); background:var(--paper-card); border:1px solid var(--line);}
+  .preview-card-top{display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;}
   .preview-card-label{font-size:11.5px; font-weight:800; color:var(--gold);}
   .preview-card .ex-tag{font-size:9.5px; font-weight:700; color:#8fd99b; background:rgba(143,217,155,.12); padding:2px 7px; border-radius:999px;}
-  .preview-card-text{font-size:12.5px; line-height:1.65; color:var(--ink-soft);}
+  .preview-card-text{font-size:13px; line-height:1.75; color:var(--ink-soft);}
   /* 생년월일을 확정하면 바로 아래 dm-preview(일간 미리보기)가 뜬다는 걸 입력 전에 미리
      알려줘서, "입력하면 진짜 내 얘기가 바로 나온다"는 걸 체감시킨다. */
   .date-hint{display:flex; align-items:center; gap:6px; margin:8px 0 0; font-size:11.5px; color:var(--gold); font-weight:700;}
@@ -346,6 +348,10 @@ window.SajuAnalytics = (function(){
     display:flex; align-items:center; gap:8px; margin-top:8px;
     font-size:13px; color:var(--ink-soft);
   }
+  /* 2026-10-03: "태어난 시간을 몰라요" 같은 체크박스 글자가 너무 흐리게 보인다는 피드백 —
+     .checkline은 여러 화면에서 같은 패턴(체크박스+짧은 설명)에 재사용되므로 전체적으로
+     더 또렷하게 보이도록 밝기/굵기를 올린다. */
+  .checkline label{color:var(--ink); font-weight:600;}
   .checkline input{accent-color:var(--seal); width:15px; height:15px;}
   .submit-btn{
     width:100%; margin-top:10px; padding:16px 0;
@@ -1482,10 +1488,6 @@ window.SajuAnalytics = (function(){
         <div class="preview-card">
           <div class="preview-card-top"><span class="preview-card-label">오행 균형</span><span class="ex-tag">무료 · 예시</span></div>
           <div class="preview-card-text">"목(木) 기운이 두드러지고 금(金)이 약한 편이에요. 추진력은 있지만 마무리에 더 신경 쓰면 좋아요."</div>
-        </div>
-        <div class="preview-card">
-          <div class="preview-card-top"><span class="preview-card-label">오늘의 사주</span><span class="ex-tag">무료 · 예시</span></div>
-          <div class="preview-card-text">"오늘은 전반적으로 안정적인 흐름이에요. 애정운 78 · 금전운 65 · 건강운 82."</div>
         </div>
       </div>
       <div class="share-preview-card" id="sharePreviewCard" hidden>
@@ -5939,26 +5941,53 @@ function openSheet(type, target){
     if(pkTarget === 'main') logFunnelEvent('date_sheet_open');
   } else {
     if($('#'+t.unknownId).checked) return;
-    $('#pkTimeUnknown').checked = false;
-    $('#pkManualHour').disabled = false;
-    $('#pkManualMinute').disabled = false;
-    if(p.timeSet){
-      $('#pkManualHour').value = p.hour;
-      $('#pkManualMinute').value = p.minute;
-    } else {
-      $('#pkManualHour').value = '';
-      $('#pkManualMinute').value = '';
-    }
-    $('#pkManualTimeError').hidden = true;
-    $$('#time-manual input[type="text"]').forEach(el=> el.classList.remove('touched'));
-    validateTimeManual();
-    pkUpdateSijinLabel(p.hour);
+    prepareTimeSheetFields(t, p);
     $('#timeSheetBg').classList.add('open');
     setTimeout(pkInitTimeWheels, 10);
     history.pushState({ view: 'sheetOpen', sheet: 'time' }, '');
     sheetPushedType = 'time';
     if(pkTarget === 'main') logFunnelEvent('time_sheet_open');
   }
+}
+// openSheet('time', ...)와 아래 advanceToTimeAfterDate() 둘 다 쓰는 시간 시트 필드 준비 로직
+// (값 채우기/지우기, 에러 숨김, touched 해제, 유효성 재계산, 시진 라벨) — 중복 방지용으로 분리.
+function prepareTimeSheetFields(t, p){
+  $('#pkTimeUnknown').checked = false;
+  $('#pkManualHour').disabled = false;
+  $('#pkManualMinute').disabled = false;
+  if(p.timeSet){
+    $('#pkManualHour').value = p.hour;
+    $('#pkManualMinute').value = p.minute;
+  } else {
+    $('#pkManualHour').value = '';
+    $('#pkManualMinute').value = '';
+  }
+  $('#pkManualTimeError').hidden = true;
+  $$('#time-manual input[type="text"]').forEach(el=> el.classList.remove('touched'));
+  validateTimeManual();
+  pkUpdateSijinLabel(p.hour);
+}
+// 2026-10-03: 생년월일 "완료"를 누르면 곧바로 태어난 시간 시트로 이어지게 해달라는 요청 —
+// 시간 버튼을 따로 또 눌러야 하는 수고를 없앤다. closeSheet('date') + openSheet('time')를
+// 그대로 이어붙이면 안 되는 이유: closeSheet가 쓰는 history.back()은 비동기라, 그 뒤에 바로
+// openSheet가 history.pushState로 새 항목을 쌓아버리면, 나중에 도착하는 back()의 popstate가
+// sheetPushedType을 읽을 때 이미 'time'으로 바뀐 걸 보고 방금 연 시간 시트를 도로 닫아버리는
+// 경쟁 상태(race condition)가 생긴다(날짜 시트 쪽 history.back이 시간 시트를 오작동으로 닫힘).
+// 그래서 back()/push() 대신 같은 히스토리 자리에서 replaceState로 "날짜 시트 열림" →
+// "시간 시트 열림"으로 상태만 바꿔치기한다 — 역사 스택에 새 항목을 쌓지 않으므로 레이스가
+// 생기지 않고, 뒤로가기를 누르면 바로 입력 화면으로 돌아간다(날짜 시트가 다시 뜨지 않음 —
+// 이미 확정해서 닫은 시트이므로 자연스러운 동작).
+function advanceToTimeAfterDate(){
+  const t = PICKER_TARGETS.main;
+  const p = pkState.main;
+  if($('#'+t.unknownId).checked){ closeSheet('date'); return; } // 이미 "몰라요"면 강제로 열지 않는다
+  $('#dateSheetBg').classList.remove('open');
+  prepareTimeSheetFields(t, p);
+  $('#timeSheetBg').classList.add('open');
+  setTimeout(pkInitTimeWheels, 10);
+  history.replaceState({ view: 'sheetOpen', sheet: 'time' }, '');
+  sheetPushedType = 'time';
+  logFunnelEvent('time_sheet_open');
 }
 function closeSheet(type){
   $(type==='date' ? '#dateSheetBg' : '#timeSheetBg').classList.remove('open');
@@ -6073,8 +6102,15 @@ function confirmDatePicker(){
     $(`#${t.dateBtnValId}`).textContent = `${p.year}년 ${p.month}월 ${p.day}일 (양력)`;
   }
   $(`#${t.dateBtnValId}`).classList.remove('placeholder');
-  closeSheet('date');
   if(t.afterDateConfirm) t.afterDateConfirm();
+  // 2026-10-03: 생년월일을 확정하면 곧바로 태어난 시간 입력으로 이어서 보여준다(본인 입력
+  // 한정 — 상대방/궁합 입력은 기존처럼 각자 버튼을 눌러 따로 연다). "시간을 몰라요"를 이미
+  // 체크해둔 상태라면 advanceToTimeAfterDate 안에서 그냥 날짜 시트만 닫는다.
+  if(pkTarget === 'main'){
+    advanceToTimeAfterDate();
+  } else {
+    closeSheet('date');
+  }
 }
 function confirmTimePicker(){
   const t = PICKER_TARGETS[pkTarget];
