@@ -220,7 +220,7 @@ window.SajuAnalytics = (function(){
   .topbar{
     position:relative; z-index:1;
     display:flex; align-items:center; gap:10px;
-    padding:22px 22px 16px;
+    padding:20px 22px 14px;
     border-bottom:1px solid var(--line);
   }
   .topbar .mark{
@@ -269,7 +269,7 @@ window.SajuAnalytics = (function(){
   main{position:relative; z-index:1; flex:1; overflow-y:auto; padding-bottom:24px;}
   main::-webkit-scrollbar{display:none;}
   /* ---------- INPUT VIEW ---------- */
-  #view-input{padding:22px;}
+  #view-input{padding:18px 22px 22px;}
   .hero-line{
     font-family:"Noto Serif KR"; font-weight:700; font-size:15px;
     line-height:1.7; color:var(--ink); margin:4px 0 22px;
@@ -289,23 +289,26 @@ window.SajuAnalytics = (function(){
      입력 전에 "뭐가 무료로 나오는지" 먼저 보여준다. 예시 카드는 실제로 결제 없이 나오는 무료
      패널(사주팔자/오행분포/오늘의 사주)에서만 발췌 — 재물·일처럼 유료 카테고리 내용은 넣지 않는다
      (무료라고 보여주고 실제로는 결제해야 나오면 신뢰를 깎으므로).*/
-  .hero-sub-new{font-size:13.5px; line-height:1.75; color:var(--ink-soft); margin:2px 0 12px; letter-spacing:-0.15px;}
+  .hero-sub-new{font-size:13.5px; line-height:1.7; color:var(--ink-soft); margin:2px 0 12px; letter-spacing:-0.15px;}
   .hero-sub-new b{color:var(--ink); font-weight:700;}
   .hero-meta-chip{
-    display:inline-flex; align-items:center; gap:6px; margin:0 0 20px;
+    display:inline-flex; align-items:center; gap:6px; margin:0 0 18px;
     padding:7px 13px; border-radius:999px; background:rgba(224,187,90,.12);
     border:1px solid var(--gold-line); color:var(--gold); font-size:12px; font-weight:700;
   }
+  /* 2026-10-03 3차 조정: 2차 압축이 과했다("이름, 생년월일 정도만 나오면 될 거 같은데" —
+     태어난 시간/성별까지 보일 필요는 없음). 예시 카드 쪽은 다시 읽기 편한 크기로 되돌리고,
+     대신 카드 사이 간격만 살짝 줄여서 "이름+생년월일까지만 보이는" 지점을 맞춘다. */
   .preview-intro{
     font-size:12.5px; font-weight:700; color:var(--ink-faint); margin:0 0 10px;
     display:flex; align-items:center; gap:6px;
   }
-  .preview-cards{display:flex; flex-direction:column; gap:8px; margin-bottom:22px;}
-  .preview-card{padding:12px 14px; border-radius:var(--radius-sm); background:var(--paper-card); border:1px solid var(--line);}
+  .preview-cards{display:flex; flex-direction:column; gap:9px; margin-bottom:24px;}
+  .preview-card{padding:13px 14px; border-radius:var(--radius-sm); background:var(--paper-card); border:1px solid var(--line);}
   .preview-card-top{display:flex; align-items:center; justify-content:space-between; margin-bottom:5px;}
   .preview-card-label{font-size:11.5px; font-weight:800; color:var(--gold);}
   .preview-card .ex-tag{font-size:9.5px; font-weight:700; color:#8fd99b; background:rgba(143,217,155,.12); padding:2px 7px; border-radius:999px;}
-  .preview-card-text{font-size:12.5px; line-height:1.6; color:var(--ink-soft);}
+  .preview-card-text{font-size:12.5px; line-height:1.65; color:var(--ink-soft);}
   /* 생년월일을 확정하면 바로 아래 dm-preview(일간 미리보기)가 뜬다는 걸 입력 전에 미리
      알려줘서, "입력하면 진짜 내 얘기가 바로 나온다"는 걸 체감시킨다. */
   .date-hint{display:flex; align-items:center; gap:6px; margin:8px 0 0; font-size:11.5px; color:var(--gold); font-weight:700;}
