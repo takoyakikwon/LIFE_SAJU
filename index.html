@@ -315,7 +315,9 @@ window.SajuAnalytics = (function(){
     margin-bottom:7px; letter-spacing:0.2px;
   }
   .field.optional label{font-size:11px; font-weight:500; color:var(--ink-faint); margin-bottom:5px;}
-  .field.optional input[type="text"]{padding:10px 13px; font-size:13.5px; border-color:rgba(212,175,99,.12);}
+  /* 2026-10-03 수정: 테두리를 너무 연하게(투명도 12%) 줄였더니 입력칸 자체가 안 보인다는
+     피드백 — 크기(패딩/글자)만 살짝 작게 유지하고, 테두리는 다른 필드와 같은 밝기로 되돌린다. */
+  .field.optional input[type="text"]{padding:10px 13px; font-size:13.5px; border-color:var(--line); background:rgba(212,175,99,.09);}
   .field.tight{margin-bottom:12px;}
   .field input[type="text"], .field input[type="date"], .field input[type="time"], .field input[type="email"], .field textarea, .field select{
     width:100%; padding:13px 14px; font-size:15px;
