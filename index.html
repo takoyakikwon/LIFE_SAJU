@@ -284,11 +284,39 @@ window.SajuAnalytics = (function(){
     background:var(--paper-deep); border-radius:var(--radius-sm);
   }
   .hero-scope b{color:var(--ink-soft); font-weight:700;}
+  /* 2026-10-03: 첫 화면 후킹 개편 — 감성 문구(hero-tagline) 바로 아래를 "혜택+소요시간" 한 줄 +
+     무료 결과 예시 카드로 교체. 폼을 열어보지도 않고 이탈하는 비율이 높다는 퍼널 데이터에 대응해,
+     입력 전에 "뭐가 무료로 나오는지" 먼저 보여준다. 예시 카드는 실제로 결제 없이 나오는 무료
+     패널(사주팔자/오행분포/오늘의 사주)에서만 발췌 — 재물·일처럼 유료 카테고리 내용은 넣지 않는다
+     (무료라고 보여주고 실제로는 결제해야 나오면 신뢰를 깎으므로).*/
+  .hero-sub-new{font-size:13.5px; line-height:1.75; color:var(--ink-soft); margin:4px 0 14px;}
+  .hero-sub-new b{color:var(--ink); font-weight:700;}
+  .hero-meta-chip{
+    display:inline-flex; align-items:center; gap:6px; margin:0 0 20px;
+    padding:7px 13px; border-radius:999px; background:rgba(224,187,90,.12);
+    border:1px solid var(--gold-line); color:var(--gold); font-size:12px; font-weight:700;
+  }
+  .preview-intro{
+    font-size:12.5px; font-weight:700; color:var(--ink-faint); margin:0 0 10px;
+    display:flex; align-items:center; gap:6px;
+  }
+  .preview-cards{display:flex; flex-direction:column; gap:8px; margin-bottom:22px;}
+  .preview-card{padding:12px 14px; border-radius:var(--radius-sm); background:var(--paper-card); border:1px solid var(--line);}
+  .preview-card-top{display:flex; align-items:center; justify-content:space-between; margin-bottom:5px;}
+  .preview-card-label{font-size:11.5px; font-weight:800; color:var(--gold);}
+  .preview-card .ex-tag{font-size:9.5px; font-weight:700; color:#8fd99b; background:rgba(143,217,155,.12); padding:2px 7px; border-radius:999px;}
+  .preview-card-text{font-size:12.5px; line-height:1.6; color:var(--ink-soft);}
+  /* 생년월일을 확정하면 바로 아래 dm-preview(일간 미리보기)가 뜬다는 걸 입력 전에 미리
+     알려줘서, "입력하면 진짜 내 얘기가 바로 나온다"는 걸 체감시킨다. */
+  .date-hint{display:flex; align-items:center; gap:6px; margin:8px 0 0; font-size:11.5px; color:var(--gold); font-weight:700;}
   .field{margin-bottom:16px;}
   .field label{
     display:block; font-size:12px; font-weight:700; color:var(--ink-soft);
     margin-bottom:7px; letter-spacing:0.2px;
   }
+  .field.optional label{font-size:11px; font-weight:500; color:var(--ink-faint); margin-bottom:5px;}
+  .field.optional input[type="text"]{padding:10px 13px; font-size:13.5px; border-color:rgba(212,175,99,.12);}
+  .field.tight{margin-bottom:12px;}
   .field input[type="text"], .field input[type="date"], .field input[type="time"], .field input[type="email"], .field textarea, .field select{
     width:100%; padding:13px 14px; font-size:15px;
     border:1.5px solid var(--line); border-radius:var(--radius-sm);
@@ -1199,7 +1227,13 @@ window.SajuAnalytics = (function(){
   .manual-row input{
     width:100%; padding:12px 8px; text-align:center; border-radius:10px; border:1.5px solid var(--line);
     background:rgba(255,255,255,.04); color:var(--ink); font-size:15px; font-weight:700; font-family:inherit;
+    transition:border-color .15s ease, background .15s ease;
   }
+  /* 2026-10-03: 생년월일/태어난 시간 직접입력 실시간 유효성 표시. 글자를 입력하는 동안
+     바로 틀렸는지 보여주고(빨간 테두리), "완료"를 누르기 전까지는 못 알아채던 문제를 줄인다.
+     값을 아직 하나도 안 쳤을 때는 invalid를 주지 않아(빈 칸이 처음부터 빨갛게 보이면 더
+     부담스러우므로) touched 클래스가 같이 있을 때만 빨간 테두리를 보여준다. */
+  .manual-row input.invalid.touched{border-color:var(--seal); background:rgba(178,59,46,.10);}
   .manual-hint{font-size:10.5px; color:var(--ink-faint); text-align:center; margin-top:12px; line-height:1.6;}
   /* 시간 피커에서 지금 고른 시각이 전통 12시진 중 어디에 해당하는지 보여주는 라벨
      (2026-08-24, 타 사주앱의 12시진 목록형 UI 벤치마킹 논의 후 추가 — 분 단위 정밀 입력은
@@ -1214,7 +1248,11 @@ window.SajuAnalytics = (function(){
   .sheet-confirm{
     margin-top:22px; width:100%; padding:15px; border-radius:14px; border:none;
     background:linear-gradient(90deg,var(--violet),var(--pink)); color:#fff; font-weight:700; font-size:14.5px; cursor:pointer;
+    transition:opacity .15s ease;
   }
+  /* 값이 다 맞게 입력되기 전까지 완료 버튼을 눌러도 소용없다는 걸 시각적으로 보여준다
+     (2026-10-03, 완료 누른 뒤에만 에러를 알려주던 방식 대신 실시간 검증으로 전환). */
+  .sheet-confirm:disabled{opacity:.4; cursor:not-allowed;}
   /* ---------- 첫인상 임팩트: 히어로 카피 / 살아있는 배경 / 일간 즉시 미리보기 / 결과 리빌 연출 ---------- */
   @keyframes twinkle{ 0%,100%{opacity:.35;} 50%{opacity:.7;} }
   .phone::before{ animation:twinkle 5.5s ease-in-out infinite; }
@@ -1424,14 +1462,29 @@ window.SajuAnalytics = (function(){
     <!-- INPUT VIEW -->
     <section id="view-input">
       <p class="hero-tagline">당신이 모르는<br>당신의 이야기가 시작됩니다</p>
-      <p class="hero-line">태어난 순간, 하늘은 <b>년·월·일·시</b> 네 개의 도장을 찍습니다.<br>그 도장의 비밀을 알려드리겠습니다.</p>
-      <p class="hero-scope"><b>무료</b>로 사주팔자를 확인하고, <b>심층풀이</b>를 통해 나의 재물·연애·직업·삶의 흐름을 자세히 볼 수 있어요.</p>
+      <p class="hero-sub-new">사주팔자 · 자미두수로 <b>성향 · 오행 균형 · 오늘의 운세</b>를 무료로 바로 확인해보세요.</p>
+      <div class="hero-meta-chip">⏱ 입력 1분 · 결제 없이 무료 결과 확인</div>
+      <div class="preview-intro">✨ 무료 결과에서는 이런 걸 확인할 수 있어요</div>
+      <div class="preview-cards">
+        <div class="preview-card">
+          <div class="preview-card-top"><span class="preview-card-label">나는 어떤 사람인가</span><span class="ex-tag">무료 · 예시</span></div>
+          <div class="preview-card-text">"겉으로는 책임감이 강하지만, 안에서는 판단권을 갖고 싶어 하는 사람입니다."</div>
+        </div>
+        <div class="preview-card">
+          <div class="preview-card-top"><span class="preview-card-label">오행 균형</span><span class="ex-tag">무료 · 예시</span></div>
+          <div class="preview-card-text">"목(木) 기운이 두드러지고 금(金)이 약한 편이에요. 추진력은 있지만 마무리에 더 신경 쓰면 좋아요."</div>
+        </div>
+        <div class="preview-card">
+          <div class="preview-card-top"><span class="preview-card-label">오늘의 사주</span><span class="ex-tag">무료 · 예시</span></div>
+          <div class="preview-card-text">"오늘은 전반적으로 안정적인 흐름이에요. 애정운 78 · 금전운 65 · 건강운 82."</div>
+        </div>
+      </div>
       <div class="share-preview-card" id="sharePreviewCard" hidden>
         <div class="share-preview-label" id="sharePreviewLabel"></div>
         <p class="share-preview-excerpt" id="sharePreviewExcerpt"></p>
         <p class="share-preview-cta">나의 사주도 무료로 확인해볼까요? 아래에 생년월일을 입력해보세요 👇</p>
       </div>
-      <div class="field">
+      <div class="field optional">
         <label for="inpName">이름 (선택)</label>
         <input type="text" id="inpName" placeholder="예: 홍길동">
       </div>
@@ -1441,6 +1494,7 @@ window.SajuAnalytics = (function(){
           <span class="val placeholder" id="dateBtnVal">생년월일을 선택해주세요</span>
           <span class="ic">📅</span>
         </button>
+        <div class="date-hint">✨ 입력하면 바로 당신의 일간(日干)이 나와요</div>
       </div>
       <div class="dm-preview" id="dmPreview" hidden>
         <div class="dm-preview-badge" id="dmPreviewBadge"></div>
@@ -1482,14 +1536,14 @@ window.SajuAnalytics = (function(){
         </div>
         <input type="time" id="inpTime" value="">
       </div>
-      <div class="field">
+      <div class="field tight">
         <label>성별</label>
         <div class="seg" id="genderSeg">
           <button type="button" data-val="남" class="active">남자</button>
           <button type="button" data-val="여">여자</button>
         </div>
       </div>
-      <div class="field">
+      <div class="field tight">
         <label>태어난 곳 (진태양시 보정)</label>
         <button type="button" class="picker-btn" id="cityBtn">
           <span class="val" id="cityBtnVal">서울</span>
@@ -1556,15 +1610,11 @@ window.SajuAnalytics = (function(){
         <div class="sheet-handle"></div>
         <div class="sheet-title">태어난 시간</div>
         <div class="manual-panel active" id="time-manual">
-          <div class="seg" id="pkAmPmSeg" style="margin-bottom:10px;">
-            <button type="button" data-val="AM" class="active">오전</button>
-            <button type="button" data-val="PM">오후</button>
-          </div>
           <div class="manual-row">
-            <div class="mfield"><label>시 (1~12)</label><input type="text" inputmode="numeric" maxlength="2" id="pkManualHour" placeholder="2"></div>
+            <div class="mfield"><label>시 (0~23)</label><input type="text" inputmode="numeric" maxlength="2" id="pkManualHour" placeholder="17"></div>
             <div class="mfield"><label>분 (0~59)</label><input type="text" inputmode="numeric" maxlength="2" id="pkManualMinute" placeholder="30"></div>
           </div>
-          <p class="manual-hint">예: 오후 2시 30분생이면 오후 · 2 · 30</p>
+          <p class="manual-hint">24시간 기준으로 입력해주세요. 예: 오후 5시 30분생이면 17 · 30</p>
           <div class="sijin-hint" id="manualSijinLabel"></div>
           <div id="pkManualTimeError" hidden class="ai-error" style="margin-top:8px;"></div>
           <div class="checkline" id="pkTimeUnknownRow" style="margin-top:10px;">
@@ -5829,11 +5879,15 @@ $$('#pkCalSeg button').forEach(btn=>{
     pk().calType = btn.dataset.val;
     $('#pkLeapRow').hidden = (pk().calType !== 'lunar');
     pkInitDateWheels();
+    // 양력/음력이 바뀌면 그 달의 마지막 날짜(말일) 기준도 달라지므로, 이미 입력해둔 "일"이
+    // 여전히 유효한지 즉시 다시 검사한다.
+    validateDateManual();
   });
 });
 $('#pkLeap').addEventListener('change', (e)=>{
   pk().leap = e.target.checked;
   pkRefreshDayWheel();
+  validateDateManual();
 });
 function switchPickerTab(btn, sheet, tab){
   const sheetEl = $(sheet==='date' ? '#dateSheetBg' : '#timeSheetBg');
@@ -5865,6 +5919,10 @@ function openSheet(type, target){
     $('#pkManualMonth').value = p.dateSet ? p.month : '';
     $('#pkManualDay').value = p.dateSet ? p.day : '';
     $('#pkManualDateError').hidden = true;
+    // 2026-10-03: 입력칸을 막 열었을 땐 아직 아무것도 "건드리지" 않은 상태이므로 touched를
+    // 빼서 빨간 테두리가 보이지 않게 하고, 완료 버튼 활성/비활성 상태만 먼저 맞춰둔다.
+    $$('#date-manual input').forEach(el=> el.classList.remove('touched'));
+    validateDateManual();
     $('#dateSheetBg').classList.add('open');
     setTimeout(pkInitDateWheels, 10);
     history.pushState({ view: 'sheetOpen', sheet: 'date' }, '');
@@ -5876,17 +5934,15 @@ function openSheet(type, target){
     $('#pkManualHour').disabled = false;
     $('#pkManualMinute').disabled = false;
     if(p.timeSet){
-      const h12 = p.hour % 12 === 0 ? 12 : p.hour % 12;
-      const ampm = p.hour < 12 ? 'AM' : 'PM';
-      $('#pkManualHour').value = h12;
+      $('#pkManualHour').value = p.hour;
       $('#pkManualMinute').value = p.minute;
-      $$('#pkAmPmSeg button').forEach(b=> b.classList.toggle('active', b.dataset.val === ampm));
     } else {
       $('#pkManualHour').value = '';
       $('#pkManualMinute').value = '';
-      $$('#pkAmPmSeg button').forEach(b=> b.classList.toggle('active', b.dataset.val === 'AM'));
     }
     $('#pkManualTimeError').hidden = true;
+    $$('#time-manual input[type="text"]').forEach(el=> el.classList.remove('touched'));
+    validateTimeManual();
     pkUpdateSijinLabel(p.hour);
     $('#timeSheetBg').classList.add('open');
     setTimeout(pkInitTimeWheels, 10);
@@ -5920,28 +5976,77 @@ function pkUpdateTimeLabel(target){
   $(`#${t.timeBtnValId}`).textContent = `${ap} ${h12}시 ${pkPad(p.minute)}분`;
   $(`#${t.timeBtnValId}`).classList.remove('placeholder');
 }
+// 2026-10-03: 생년월일/태어난 시간 직접입력 실시간 유효성 검사. "완료" 누른 뒤에만
+// 틀렸다고 알려주던 방식(얼럿성 에러 문구)이 입력 오류율을 높인다고 판단해, 입력하는
+// 동안 바로바로(빨간 테두리 + 완료 버튼 비활성화) 보여주는 방식으로 바꾼다. dateManualState/
+// timeManualState는 "지금 칸에 든 값이 유효한가"만 순수 계산하고, validateXManual은 그 결과를
+// 화면(테두리 색, 완료 버튼 상태)에 반영한다 — confirm 핸들러와 input 이벤트가 같은 판정 로직을
+// 공유해서 서로 다른 기준으로 어긋나지 않게 한다.
+function dateManualState(){
+  const yRaw = $('#pkManualYear').value.trim();
+  const mRaw = $('#pkManualMonth').value.trim();
+  const dRaw = $('#pkManualDay').value.trim();
+  const y = parseInt(yRaw, 10), m = parseInt(mRaw, 10), d = parseInt(dRaw, 10);
+  const yOk = yRaw !== '' && Number.isInteger(y) && y >= 1900 && y <= new Date().getFullYear();
+  const mOk = mRaw !== '' && Number.isInteger(m) && m >= 1 && m <= 12;
+  // 월까지 정해져야 그 달의 실제 마지막 날짜(2월 28/29일 등)를 알 수 있으므로, 아직 연/월이
+  // 안 정해졌으면 일단 31일까지 느슨하게 허용해둔다(연/월을 마저 입력하면 바로 다시 좁혀짐).
+  let dMax = 31;
+  if(yOk && mOk){
+    const p = pk();
+    dMax = p.calType === 'lunar' ? pkLunarMaxDay(y, m, p.leap) : pkSolarMaxDay(y, m);
+  }
+  const dOk = dRaw !== '' && Number.isInteger(d) && d >= 1 && d <= dMax;
+  return { yRaw, mRaw, dRaw, y, m, d, yOk, mOk, dOk, valid: yOk && mOk && dOk };
+}
+function validateDateManual(){
+  const s = dateManualState();
+  $('#pkManualYear').classList.toggle('invalid', !s.yOk);
+  $('#pkManualMonth').classList.toggle('invalid', !s.mOk);
+  $('#pkManualDay').classList.toggle('invalid', !s.dOk);
+  $('#dateConfirmBtn').disabled = !s.valid;
+  return s;
+}
+function timeManualState(){
+  const hRaw = $('#pkManualHour').value.trim();
+  const minRaw = $('#pkManualMinute').value.trim();
+  const h = parseInt(hRaw, 10), mi = parseInt(minRaw, 10);
+  const hOk = hRaw !== '' && Number.isInteger(h) && h >= 0 && h <= 23;
+  const mOk = minRaw !== '' && Number.isInteger(mi) && mi >= 0 && mi <= 59;
+  return { hRaw, minRaw, h, mi, hOk, mOk, valid: hOk && mOk };
+}
+function validateTimeManual(){
+  // "태어난 시간을 몰라요"를 체크한 상태에서는 시/분 칸이 비활성화돼 있으니 그 칸들은 빨갛게
+  // 보일 필요가 없고, 완료 버튼도 눌러서 바로 확정할 수 있어야 한다.
+  if($('#pkTimeUnknown').checked){
+    $('#pkManualHour').classList.remove('invalid');
+    $('#pkManualMinute').classList.remove('invalid');
+    $('#timeConfirmBtn').disabled = false;
+    return { valid: true };
+  }
+  const s = timeManualState();
+  $('#pkManualHour').classList.toggle('invalid', !s.hOk);
+  $('#pkManualMinute').classList.toggle('invalid', !s.mOk);
+  $('#timeConfirmBtn').disabled = !s.valid;
+  return s;
+}
 function confirmDatePicker(){
   const t = PICKER_TARGETS[pkTarget];
   const p = pk();
   const manualActive = $('#date-manual').classList.contains('active');
   if(manualActive){
-    // 직접입력 칸이 비어있거나(위 openSheet에서 dateSet=false면 비워두므로) 값이 이상하면,
-    // 예전처럼 기존 기본값으로 조용히 대체하지 않고 명확히 에러를 보여주고 완료를 막는다 —
-    // 안 그러면 사용자가 아무것도 안 쓰고 완료를 눌러도 내부 기본 날짜로 조용히 제출될 수 있음.
-    const yRaw = $('#pkManualYear').value.trim();
-    const mRaw = $('#pkManualMonth').value.trim();
-    const dRaw = $('#pkManualDay').value.trim();
-    const y = parseInt(yRaw, 10), m = parseInt(mRaw, 10), d = parseInt(dRaw, 10);
-    const valid = yRaw && mRaw && dRaw && Number.isInteger(y) && Number.isInteger(m) && Number.isInteger(d) &&
-      y >= 1900 && y <= new Date().getFullYear() && m >= 1 && m <= 12 && d >= 1 && d <= 31;
-    if(!valid){
+    // 완료 버튼이 평소엔 비활성화돼 있어 여기 도달할 땐 이미 유효한 경우가 대부분이지만,
+    // 방어적으로 한 번 더 검사한다(다른 경로로 confirmDatePicker가 호출될 가능성 대비).
+    const s = validateDateManual();
+    if(!s.valid){
+      $$('#date-manual input').forEach(el=> el.classList.add('touched'));
       $('#pkManualDateError').textContent = '년/월/일을 모두 정확히 입력해주세요.';
       $('#pkManualDateError').hidden = false;
       if(pkTarget === 'main') logFunnelEvent('date_input_error');
       return;
     }
     $('#pkManualDateError').hidden = true;
-    p.year = y; p.month = m; p.day = d;
+    p.year = s.y; p.month = s.m; p.day = s.d;
   }
   p.dateSet = true;
   // 기존 계산 로직(setupLunarDateInput)이 그대로 읽는 백업 요소에 값 반영
@@ -5975,21 +6080,17 @@ function confirmTimePicker(){
   }
   if(unkEl.checked){ unkEl.checked = false; unkEl.dispatchEvent(new Event('change')); }
   if(manualActive){
-    const hRaw = $('#pkManualHour').value.trim();
-    const minRaw = $('#pkManualMinute').value.trim();
-    const h12 = parseInt(hRaw, 10), mi = parseInt(minRaw, 10);
-    const ampm = $('#pkAmPmSeg button.active')?.dataset.val || 'AM';
-    const valid = hRaw && minRaw && Number.isInteger(h12) && Number.isInteger(mi) && h12 >= 1 && h12 <= 12 && mi >= 0 && mi <= 59;
-    if(!valid){
-      $('#pkManualTimeError').textContent = '오전/오후와 시(1~12)·분(0~59)을 모두 정확히 입력해주세요.';
+    const s = validateTimeManual();
+    if(!s.valid){
+      $('#pkManualHour').classList.add('touched');
+      $('#pkManualMinute').classList.add('touched');
+      $('#pkManualTimeError').textContent = '시(0~23)·분(0~59)을 모두 정확히 입력해주세요.';
       $('#pkManualTimeError').hidden = false;
       if(pkTarget === 'main') logFunnelEvent('time_input_error');
       return;
     }
     $('#pkManualTimeError').hidden = true;
-    let h = h12 % 12;
-    if(ampm === 'PM') h += 12;
-    p.hour = h; p.minute = mi;
+    p.hour = s.h; p.minute = s.mi;
   }
   p.timeSet = true;
   $(`#${t.timeId}`).value = `${pkPad(p.hour)}:${pkPad(p.minute)}`;
@@ -5998,32 +6099,27 @@ function confirmTimePicker(){
 }
 $('#dateConfirmBtn').addEventListener('click', confirmDatePicker);
 $('#timeConfirmBtn').addEventListener('click', confirmTimePicker);
-$$('#pkAmPmSeg button').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    $$('#pkAmPmSeg button').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    const h12 = parseInt($('#pkManualHour').value.trim(), 10);
-    if(Number.isInteger(h12) && h12>=1 && h12<=12){
-      let h = h12 % 12;
-      if(btn.dataset.val === 'PM') h += 12;
-      pkUpdateSijinLabel(h);
-    }
-  });
-});
+// 2026-10-03: 오전/오후 토글을 없애고 시(0~23)를 직접 입력하는 24시간제로 바꿨다 — "오후 1시"를
+// "13"으로 치는 사람이 많은데(디지털시계·출생증명서가 보통 24시간 표기라 더 익숙함), 기존
+// 1~12 + 오전/오후 방식에서는 그게 전부 범위 오류로 막혀 입력 오류율이 높았던 것으로 보인다.
 $('#pkTimeUnknown').addEventListener('change', (e)=>{
   const checked = e.target.checked;
   $('#pkManualHour').disabled = checked;
   $('#pkManualMinute').disabled = checked;
   if(checked) $('#pkManualTimeError').hidden = true;
+  validateTimeManual();
 });
+$('#pkManualYear').addEventListener('input', ()=>{ $('#pkManualYear').classList.add('touched'); validateDateManual(); });
+$('#pkManualMonth').addEventListener('input', ()=>{ $('#pkManualMonth').classList.add('touched'); validateDateManual(); });
+$('#pkManualDay').addEventListener('input', ()=>{ $('#pkManualDay').classList.add('touched'); validateDateManual(); });
 $('#pkManualHour').addEventListener('input', ()=>{
-  const h12 = parseInt($('#pkManualHour').value.trim(), 10);
-  const ampm = $('#pkAmPmSeg button.active')?.dataset.val || 'AM';
-  if(Number.isInteger(h12) && h12>=1 && h12<=12){
-    let h = h12 % 12;
-    if(ampm === 'PM') h += 12;
-    pkUpdateSijinLabel(h);
-  }
+  $('#pkManualHour').classList.add('touched');
+  const s = validateTimeManual();
+  if(s.hOk) pkUpdateSijinLabel(s.h);
+});
+$('#pkManualMinute').addEventListener('input', ()=>{
+  $('#pkManualMinute').classList.add('touched');
+  validateTimeManual();
 });
 // 제출 직후 계산 결과를 곧바로 보여주지 않고, 사주 여덟 글자가 도장처럼 하나씩
 // 찍히는 리빌 연출을 짧게 보여준 다음 실제 렌더링(onComplete)을 실행한다.
