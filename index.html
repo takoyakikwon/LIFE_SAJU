@@ -6398,18 +6398,19 @@ $('#submitBtn').addEventListener('click', ()=>{
     } catch(err){
       alert(err.message);
       logFunnelEvent('submit_blocked');
+      logFunnelEvent('submit_blocked_lunar');
       return;
     }
   } else {
     const dateVal = $('#inpDate').value;
-    if(!dateVal){ alert('생년월일을 입력해주세요.'); logFunnelEvent('submit_blocked'); return; }
+    if(!dateVal){ alert('생년월일을 입력해주세요.'); logFunnelEvent('submit_blocked'); logFunnelEvent('submit_blocked_date'); return; }
     [y,m,d] = dateVal.split('-').map(Number);
   }
   const unknownTime = $('#inpUnknown').checked;
   let hour=12, minute=0;
   if(!unknownTime){
     const timeVal = $('#inpTime').value;
-    if(!timeVal){ alert('태어난 시간을 선택하거나, 모르신다면 "태어난 시간을 몰라요"를 체크해주세요.'); logFunnelEvent('submit_blocked'); return; }
+    if(!timeVal){ alert('태어난 시간을 선택하거나, 모르신다면 "태어난 시간을 몰라요"를 체크해주세요.'); logFunnelEvent('submit_blocked'); logFunnelEvent('submit_blocked_time'); return; }
     [hour,minute] = timeVal.split(':').map(Number);
   }
   const lonVal = parseFloat(citySelect.value);
@@ -8208,11 +8209,16 @@ const FUNNEL_STEP_LABELS = {
   date_input_error: '생년월일 입력 오류',
   time_sheet_open: '태어난 시간 입력 시도',
   time_input_error: '시간 입력 오류',
+  city_sheet_open: '태어난 곳 입력 시도',
   submit_click: "'내 사주 보기' 클릭",
   submit_blocked: '제출 막힘(필수값 누락)',
+  // 2026-10-04: 막힘 사유별 세분화 — submit_blocked는 합계로 그대로 두고, 아래 3개로 원인을 나눠 본다.
+  submit_blocked_date: '막힘: 생년월일 미입력',
+  submit_blocked_time: '막힘: 태어난 시간 미입력',
+  submit_blocked_lunar: '막힘: 음력 날짜 오류',
   form_submit: '기본운세 확인 완료',
 };
-const FUNNEL_STEP_ORDER = ['visit','date_sheet_open','date_input_error','time_sheet_open','time_input_error','submit_click','submit_blocked','form_submit'];
+const FUNNEL_STEP_ORDER = ['visit','date_sheet_open','date_input_error','time_sheet_open','time_input_error','city_sheet_open','submit_click','submit_blocked','submit_blocked_date','submit_blocked_time','submit_blocked_lunar','form_submit'];
 // 2026-09-26: 방문 이후 어느 입력 단계에서 이탈하는지 세분화해서 보여주는 패널.
 // funnel_events에 쌓이는 세분화 이벤트(date_sheet_open 등)를 event_type별 방문자 수로 집계하는
 // admin_funnel_steps RPC를 호출한다(위 admin_funnel_summary와 별개 RPC — 기존 요약 로직은 그대로 둠).
