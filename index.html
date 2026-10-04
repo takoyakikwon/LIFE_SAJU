@@ -1089,6 +1089,13 @@ window.SajuAnalytics = (function(){
   .history-status.failed, .history-status.refunded{ background:rgba(251,113,133,.16); color:#fb7185; }
   .history-result{ margin-top:9px; padding-top:9px; border-top:1px dashed var(--line); font-size:11.5px; line-height:1.7; white-space:pre-wrap; color:var(--ink-soft); }
   .history-empty{ text-align:center; padding:26px 10px; color:var(--ink-faint); font-size:12px; }
+  .campaign-table-wrap{ margin:2px 0 14px; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .campaign-table{ width:100%; border-collapse:collapse; font-size:11px; min-width:380px; }
+  .campaign-table th{ text-align:right; font-weight:600; color:var(--ink-faint); padding:6px 4px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  .campaign-table td{ text-align:right; padding:7px 4px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  .campaign-table th:first-child, .campaign-table td:first-child{ text-align:left; white-space:normal; word-break:break-all; }
+  .campaign-table td.src{ font-weight:700; }
+  .campaign-table td.src small{ display:block; font-weight:400; color:var(--ink-faint); }
   .admin-summary{ display:flex; gap:8px; margin:2px 0 14px; }
   .admin-summary .stat{ flex:1; text-align:center; border:1px solid var(--line); border-radius:var(--radius-sm); padding:10px 6px; background:var(--paper-card); }
   .admin-summary .stat .n{ font-family:"Noto Serif KR"; font-weight:900; font-size:15px; }
@@ -2111,6 +2118,8 @@ window.SajuAnalytics = (function(){
     <div class="admin-summary" id="funnelSummary"></div>
     <div class="admin-section-title">단계별 이탈 현황</div>
     <div class="admin-summary" id="funnelStepsSummary"></div>
+    <div class="admin-section-title">광고별 유입 · 결제</div>
+    <div id="campaignSummary" class="campaign-table-wrap"></div>
     <div class="admin-section-title">결제 요약</div>
     <div class="admin-summary" id="adminSummary"></div>
     <div class="admin-section-title-row">
@@ -7762,16 +7771,64 @@ function getVisitorId(){
   }
 }
 const VISITOR_ID = getVisitorId();
+// 2026-10-04: 광고 유입 출처 추적. 광고 링크의 utm_source/utm_medium/utm_campaign/utm_content와
+// 레퍼러 도메인을 "처음 들어온 광고" 기준(first-touch)으로 기기에 기억해 두고, 이후 모든
+// funnel_events 행에 함께 남긴다. 같은 visitor_id로 결제(purchases)와 이어지므로 광고별
+// 유입→기본운세 확인→결제를 볼 수 있다. 개인정보는 담지 않는다.
+const ATTR_KEY = 'sajuAttribution_v1';
+function cleanAttr(v){
+  return String(v == null ? '' : v).trim().toLowerCase().replace(/[^\p{L}\p{N}_\-\.\+ ]/gu, '').slice(0, 64);
+}
+function captureAttribution(){
+  let saved = null;
+  try{ saved = JSON.parse(localStorage.getItem(ATTR_KEY) || 'null'); } catch(e){}
+  const q = new URLSearchParams(location.search);
+  const cur = {
+    utm_source: cleanAttr(q.get('utm_source')),
+    utm_medium: cleanAttr(q.get('utm_medium')),
+    utm_campaign: cleanAttr(q.get('utm_campaign')),
+    utm_content: cleanAttr(q.get('utm_content')),
+    referrer_host: '',
+  };
+  try{
+    if(document.referrer){
+      const h = new URL(document.referrer).hostname.replace(/^www\./, '');
+      if(h && h !== location.hostname) cur.referrer_host = cleanAttr(h);
+    }
+  } catch(e){}
+  const hasUtm = !!cur.utm_source;
+  // 이미 광고 출처(utm)가 저장돼 있으면 그대로 유지(처음 들어온 광고 기준). 저장된 게 없거나
+  // 레퍼러뿐이었는데 이번에 UTM이 붙은 링크로 들어왔다면 UTM으로 갱신한다.
+  if(saved && saved.utm_source) return saved;
+  if(saved && !hasUtm) return saved;
+  try{ localStorage.setItem(ATTR_KEY, JSON.stringify(cur)); } catch(e){}
+  return cur;
+}
+const ATTRIBUTION = captureAttribution();
 // 실패해도 사용자 경험에는 절대 영향을 주면 안 되므로 결과를 기다리지 않고(fire-and-forget),
 // 에러도 조용히 무시한다(funnel_events 테이블이 아직 없어도 앱 동작에는 지장 없음).
+// 출처 컬럼이 아직 DB에 없으면(SQL 미실행) 거부될 수 있어, 그때는 출처 없이 한 번 더 기록해
+// 기존 퍼널 집계가 끊기지 않게 한다.
 function logFunnelEvent(eventType){
   if(!sb) return;
   try{
-    sb.from('funnel_events').insert({
+    const base = {
       event_type: eventType,
       visitor_id: VISITOR_ID,
       user_id: (currentSession && currentSession.user) ? currentSession.user.id : null,
-    }).then(()=>{}, ()=>{});
+    };
+    const withAttr = Object.assign({}, base, {
+      utm_source: ATTRIBUTION.utm_source || null,
+      utm_medium: ATTRIBUTION.utm_medium || null,
+      utm_campaign: ATTRIBUTION.utm_campaign || null,
+      utm_content: ATTRIBUTION.utm_content || null,
+      referrer_host: ATTRIBUTION.referrer_host || null,
+    });
+    sb.from('funnel_events').insert(withAttr).then((res)=>{
+      if(res && res.error){
+        sb.from('funnel_events').insert(base).then(()=>{}, ()=>{});
+      }
+    }, ()=>{});
   } catch(e){ /* 무시 */ }
 }
 
@@ -8222,6 +8279,32 @@ const FUNNEL_STEP_ORDER = ['visit','date_sheet_open','date_input_error','time_sh
 // 2026-09-26: 방문 이후 어느 입력 단계에서 이탈하는지 세분화해서 보여주는 패널.
 // funnel_events에 쌓이는 세분화 이벤트(date_sheet_open 등)를 event_type별 방문자 수로 집계하는
 // admin_funnel_steps RPC를 호출한다(위 admin_funnel_summary와 별개 RPC — 기존 요약 로직은 그대로 둠).
+// 2026-10-04: 광고별(매체·캠페인) 유입→기본운세 확인→결제 표. admin_funnel_by_campaign RPC 사용.
+const SOURCE_LABELS = { naver:'네이버', daangn:'당근', meta:'메타', direct:'직접/기타' };
+async function refreshCampaignSummary(startISO, endISO){
+  const el = $('#campaignSummary');
+  if(!el || !sb) return;
+  el.innerHTML = '<div class="history-empty">불러오는 중...</div>';
+  const { data, error } = await sb.rpc('admin_funnel_by_campaign', { p_start: startISO, p_end: endISO });
+  if(error){
+    el.innerHTML = '<div class="history-empty">불러오지 못했어요 (' + escapeHtml(error.message) + ')</div>';
+    return;
+  }
+  if(!data || !data.length){
+    el.innerHTML = '<div class="history-empty">이 기간에 기록된 유입이 없어요</div>';
+    return;
+  }
+  const rows = data.map(r=>{
+    const srcKey = r.source || 'direct';
+    const label = SOURCE_LABELS[srcKey] || srcKey;
+    const camp = r.campaign ? escapeHtml(r.campaign) : '(캠페인 없음)';
+    const v = r.visitors || 0, s = r.submitters || 0, p = r.purchasers || 0;
+    const pct = v ? Math.round(s/v*100) : 0;
+    const rev = (r.revenue || 0).toLocaleString('ko-KR');
+    return `<tr><td class="src">${escapeHtml(label)}<small>${camp}</small></td><td>${v}</td><td>${s} (${pct}%)</td><td>${p}</td><td>${rev}원</td></tr>`;
+  }).join('');
+  el.innerHTML = `<table class="campaign-table"><thead><tr><th>매체 / 캠페인</th><th>방문자</th><th>운세확인</th><th>결제</th><th>매출</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
 async function refreshFunnelSteps(startISO, endISO){
   const el = $('#funnelStepsSummary');
   if(!el || !sb) return;
@@ -8479,6 +8562,7 @@ function applyAdminPeriod(startISO, endISO, label){
   currentPeriodLabel = label || '전체';
   refreshFunnelSummary(startISO, endISO);
   refreshFunnelSteps(startISO, endISO);
+  refreshCampaignSummary(startISO, endISO);
   refreshPurchaseList(startISO, endISO);
   refreshInquiryList(startISO, endISO);
 }
