@@ -2141,6 +2141,7 @@ window.SajuAnalytics = (function(){
         <button type="button" id="adminDateSearchBtn">검색</button>
       </div>
     </div>
+    <div id="adminPeriodNote" style="font-size:11px;color:var(--gold);font-weight:700;margin:2px 0 6px;"></div>
     <div class="admin-section-title">유입 퍼널</div>
     <div class="admin-summary" id="funnelSummary"></div>
     <div class="admin-section-title">단계별 이탈 현황</div>
@@ -8268,7 +8269,9 @@ async function refreshFunnelSummary(startISO, endISO){
   const funnelEl = $('#funnelSummary');
   if(!funnelEl || !sb) return;
   funnelEl.innerHTML = '<div class="history-empty">불러오는 중...</div>';
+  const mySeq = adminRefreshSeq;
   const { data: funnel, error: fErr } = await sb.rpc('admin_funnel_summary', { p_start: startISO, p_end: endISO });
+  if(mySeq !== adminRefreshSeq) return;
   if(fErr || !funnel || !funnel.length){
     funnelEl.innerHTML = '<div class="history-empty">불러오지 못했어요' + (fErr ? (' (' + escapeHtml(fErr.message) + ')') : '') + '</div>';
     return;
@@ -8326,7 +8329,9 @@ async function refreshCampaignSummary(startISO, endISO){
   if(!el || !sb) return;
   el.innerHTML = '<div class="history-empty">불러오는 중...</div>';
   if(mediaEl) mediaEl.innerHTML = '';
+  const mySeq = ++adCampaignSeq;
   const { data, error } = await sb.rpc('admin_funnel_by_campaign', { p_start: startISO, p_end: endISO });
+  if(mySeq !== adCampaignSeq) return;
   if(error){
     el.innerHTML = '<div class="history-empty">불러오지 못했어요 (' + escapeHtml(error.message) + ')</div>';
     return;
@@ -8383,7 +8388,9 @@ async function refreshFunnelSteps(startISO, endISO){
   if(!el || !sb) return;
   el.style.flexWrap = 'wrap';
   el.innerHTML = '<div class="history-empty">불러오는 중...</div>';
+  const mySeq = adminRefreshSeq;
   const { data: steps, error: sErr } = await sb.rpc('admin_funnel_steps', { p_start: startISO, p_end: endISO });
+  if(mySeq !== adminRefreshSeq) return;
   if(sErr){
     el.innerHTML = '<div class="history-empty">불러오지 못했어요 (' + escapeHtml(sErr.message) + ')</div>';
     return;
@@ -8405,6 +8412,12 @@ let lastPurchasesRaw = [];
 let purchaseProviderFilter = 'real';
 let lastInquiriesData = [];
 let currentPeriodLabel = '전체';
+// 2026-10-04: 관리자 화면 기간을 빠르게 바꾸면(예: 열자마자 '오늘' 클릭) 먼저 요청한 느린 조회(결제내역은
+// result_text 때문에 무거움)가 나중에 도착해서 방금 고른 기간의 숫자를 덮어쓰는 문제가 있었다 —
+// 퍼널은 오늘인데 결제 요약은 다른 기간 값이 섞여 보이던 "간헐적 결제 금액 오류"의 원인.
+// 기간이 바뀔 때마다 번호를 올리고, 응답이 도착했을 때 번호가 달라졌으면(=낡은 응답) 버린다.
+let adminRefreshSeq = 0;
+let adCampaignSeq = 0;
 function csvEscape(val){
   const s = (val === null || val === undefined) ? '' : String(val);
   if(/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
@@ -8471,7 +8484,9 @@ async function refreshPurchaseList(startISO, endISO){
     .limit(500);
   if(startISO) q = q.gte('created_at', startISO);
   if(endISO) q = q.lt('created_at', endISO);
+  const mySeq = adminRefreshSeq;
   const { data: purchases, error: pErr } = await q;
+  if(mySeq !== adminRefreshSeq) return;
   if(pErr){
     purchaseEl.innerHTML = '<div class="history-empty">불러오지 못했어요. (' + escapeHtml(pErr.message) + ')</div>';
     lastPurchasesRaw = [];
@@ -8522,7 +8537,9 @@ async function refreshInquiryList(startISO, endISO){
     .limit(200);
   if(startISO) q = q.gte('created_at', startISO);
   if(endISO) q = q.lt('created_at', endISO);
+  const mySeq = adminRefreshSeq;
   const { data: inquiries, error: iErr } = await q;
+  if(mySeq !== adminRefreshSeq) return;
   if(iErr){
     inquiryEl.innerHTML = '<div class="history-empty">불러오지 못했어요. (' + escapeHtml(iErr.message) + ')</div>';
     lastInquiriesData = [];
@@ -8633,6 +8650,9 @@ function renderInquiryList(inquiryEl, inquiries){
 }
 function applyAdminPeriod(startISO, endISO, label){
   currentPeriodLabel = label || '전체';
+  adminRefreshSeq++;
+  const noteEl = $('#adminPeriodNote');
+  if(noteEl) noteEl.textContent = `지금 보는 기간: ${currentPeriodLabel}`;
   refreshFunnelSummary(startISO, endISO);
   refreshFunnelSteps(startISO, endISO);
   refreshPurchaseList(startISO, endISO);
