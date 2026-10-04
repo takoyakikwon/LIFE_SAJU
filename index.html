@@ -1090,9 +1090,9 @@ window.SajuAnalytics = (function(){
   .history-result{ margin-top:9px; padding-top:9px; border-top:1px dashed var(--line); font-size:11.5px; line-height:1.7; white-space:pre-wrap; color:var(--ink-soft); }
   .history-empty{ text-align:center; padding:26px 10px; color:var(--ink-faint); font-size:12px; }
   .campaign-table-wrap{ margin:2px 0 14px; overflow-x:auto; -webkit-overflow-scrolling:touch; }
-  .campaign-table{ width:100%; border-collapse:collapse; font-size:11px; min-width:380px; }
-  .campaign-table th{ text-align:right; font-weight:600; color:var(--ink-faint); padding:6px 4px; border-bottom:1px solid var(--line); white-space:nowrap; }
-  .campaign-table td{ text-align:right; padding:7px 4px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  .campaign-table{ width:100%; border-collapse:collapse; font-size:10.5px; }
+  .campaign-table th{ text-align:right; font-weight:600; color:var(--ink-faint); padding:6px 3px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  .campaign-table td{ text-align:right; padding:7px 3px; border-bottom:1px solid var(--line); white-space:nowrap; }
   .campaign-table th:first-child, .campaign-table td:first-child{ text-align:left; white-space:normal; word-break:break-all; }
   .campaign-table td.src{ font-weight:700; }
   .campaign-table td.src small{ display:block; font-weight:400; color:var(--ink-faint); }
@@ -2095,6 +2095,33 @@ window.SajuAnalytics = (function(){
     <button class="modal-cancel" id="historyModalCancel">닫기</button>
   </div>
 </div>
+<div id="adModal" class="modal-overlay" hidden>
+  <div class="modal-card modal-card-wide">
+    <div class="modal-title">광고 분석 — 유입 · 결제</div>
+    <div class="admin-period-bar">
+      <div class="funnel-period-tabs" id="adPeriodTabs">
+        <button type="button" class="active" data-period="all">전체</button>
+        <button type="button" data-period="today">오늘</button>
+        <button type="button" data-period="week">이번 주</button>
+        <button type="button" data-period="month">이번 달</button>
+        <button type="button" data-period="quarter">이번 분기</button>
+        <button type="button" data-period="year">올해</button>
+      </div>
+      <div class="admin-date-range">
+        <input type="date" id="adDateFrom" aria-label="시작일">
+        <span>~</span>
+        <input type="date" id="adDateTo" aria-label="종료일">
+        <button type="button" id="adDateSearchBtn">검색</button>
+      </div>
+    </div>
+    <div class="admin-section-title">매체별 합계</div>
+    <div id="mediaSummary" class="campaign-table-wrap"></div>
+    <div class="admin-section-title">캠페인별</div>
+    <div id="campaignSummary" class="campaign-table-wrap"></div>
+    <p class="modal-desc" style="margin-top:6px;">처음 들어온 광고 기준이에요. 꼬리표(UTM)가 없는 방문은 "직접/기타"로 보여요. 관리자 무료 열람은 매출에서 제외돼요.</p>
+    <button class="modal-cancel" id="adModalCancel">닫기</button>
+  </div>
+</div>
 <div id="adminModal" class="modal-overlay" hidden>
   <div class="modal-card modal-card-wide">
     <div class="modal-title">관리자 — 결제/문의 현황</div>
@@ -2118,8 +2145,6 @@ window.SajuAnalytics = (function(){
     <div class="admin-summary" id="funnelSummary"></div>
     <div class="admin-section-title">단계별 이탈 현황</div>
     <div class="admin-summary" id="funnelStepsSummary"></div>
-    <div class="admin-section-title">광고별 유입 · 결제</div>
-    <div id="campaignSummary" class="campaign-table-wrap"></div>
     <div class="admin-section-title">결제 요약</div>
     <div class="admin-summary" id="adminSummary"></div>
     <div class="admin-section-title-row">
@@ -8281,10 +8306,26 @@ const FUNNEL_STEP_ORDER = ['visit','date_sheet_open','date_input_error','time_sh
 // admin_funnel_steps RPC를 호출한다(위 admin_funnel_summary와 별개 RPC — 기존 요약 로직은 그대로 둠).
 // 2026-10-04: 광고별(매체·캠페인) 유입→기본운세 확인→결제 표. admin_funnel_by_campaign RPC 사용.
 const SOURCE_LABELS = { naver:'네이버', daangn:'당근', meta:'메타', direct:'직접/기타' };
+function campaignRowsHtml(rows, withCampaign){
+  return rows.map(r=>{
+    const srcKey = r.source || 'direct';
+    const label = SOURCE_LABELS[srcKey] || srcKey;
+    const camp = withCampaign ? `<small>${r.campaign ? escapeHtml(r.campaign) : '(캠페인 없음)'}</small>` : '';
+    const v = r.visitors || 0, sb2 = r.submitters || 0, p = r.purchasers || 0;
+    const pct = v ? Math.round(sb2/v*100) : 0;
+    const rev = (r.revenue || 0).toLocaleString('ko-KR');
+    return `<tr><td class="src">${escapeHtml(label)}${camp}</td><td>${v}</td><td>${sb2} (${pct}%)</td><td>${p}</td><td>${rev}원</td></tr>`;
+  }).join('');
+}
+function campaignTableHtml(rows, withCampaign){
+  return `<table class="campaign-table"><thead><tr><th>${withCampaign ? '매체 / 캠페인' : '매체'}</th><th>방문자</th><th>운세확인</th><th>결제</th><th>매출</th></tr></thead><tbody>${campaignRowsHtml(rows, withCampaign)}</tbody></table>`;
+}
 async function refreshCampaignSummary(startISO, endISO){
   const el = $('#campaignSummary');
+  const mediaEl = $('#mediaSummary');
   if(!el || !sb) return;
   el.innerHTML = '<div class="history-empty">불러오는 중...</div>';
+  if(mediaEl) mediaEl.innerHTML = '';
   const { data, error } = await sb.rpc('admin_funnel_by_campaign', { p_start: startISO, p_end: endISO });
   if(error){
     el.innerHTML = '<div class="history-empty">불러오지 못했어요 (' + escapeHtml(error.message) + ')</div>';
@@ -8294,17 +8335,49 @@ async function refreshCampaignSummary(startISO, endISO){
     el.innerHTML = '<div class="history-empty">이 기간에 기록된 유입이 없어요</div>';
     return;
   }
-  const rows = data.map(r=>{
-    const srcKey = r.source || 'direct';
-    const label = SOURCE_LABELS[srcKey] || srcKey;
-    const camp = r.campaign ? escapeHtml(r.campaign) : '(캠페인 없음)';
-    const v = r.visitors || 0, s = r.submitters || 0, p = r.purchasers || 0;
-    const pct = v ? Math.round(s/v*100) : 0;
-    const rev = (r.revenue || 0).toLocaleString('ko-KR');
-    return `<tr><td class="src">${escapeHtml(label)}<small>${camp}</small></td><td>${v}</td><td>${s} (${pct}%)</td><td>${p}</td><td>${rev}원</td></tr>`;
-  }).join('');
-  el.innerHTML = `<table class="campaign-table"><thead><tr><th>매체 / 캠페인</th><th>방문자</th><th>운세확인</th><th>결제</th><th>매출</th></tr></thead><tbody>${rows}</tbody></table>`;
+  // 매체별 합계는 캠페인 행을 매체(source)로 묶어 더한 것
+  const bySrc = {};
+  data.forEach(r=>{
+    const k = r.source || 'direct';
+    const a = bySrc[k] || (bySrc[k] = { source:k, visitors:0, submitters:0, purchasers:0, revenue:0 });
+    a.visitors += Number(r.visitors)||0; a.submitters += Number(r.submitters)||0;
+    a.purchasers += Number(r.purchasers)||0; a.revenue += Number(r.revenue)||0;
+  });
+  const mediaRows = Object.values(bySrc).sort((a,b)=> b.visitors - a.visitors);
+  if(mediaEl) mediaEl.innerHTML = campaignTableHtml(mediaRows, false);
+  el.innerHTML = campaignTableHtml(data, true);
 }
+function applyAdPeriod(startISO, endISO){ refreshCampaignSummary(startISO, endISO); }
+$$('#adPeriodTabs button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    $$('#adPeriodTabs button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    $('#adDateFrom').value = ''; $('#adDateTo').value = '';
+    applyAdPeriod(computeFunnelPeriodStart(btn.dataset.period), null);
+  });
+});
+$('#adDateSearchBtn').addEventListener('click', ()=>{
+  const fromVal = $('#adDateFrom').value, toVal = $('#adDateTo').value;
+  if(!fromVal && !toVal){ alert('시작일 또는 종료일을 선택해주세요.'); return; }
+  const startISO = fromVal ? new Date(fromVal + 'T00:00:00').toISOString() : null;
+  let endISO = null;
+  if(toVal){ const d = new Date(toVal + 'T00:00:00'); d.setDate(d.getDate() + 1); endISO = d.toISOString(); }
+  $$('#adPeriodTabs button').forEach(b=>b.classList.remove('active'));
+  applyAdPeriod(startISO, endISO);
+});
+function openAdModal(){
+  $('#adModal').hidden = false;
+  if(!sb || !currentSession){
+    $('#campaignSummary').innerHTML = '<div class="history-empty">로그인이 필요해요.</div>';
+    $('#mediaSummary').innerHTML = '';
+    return;
+  }
+  $('#adDateFrom').value = ''; $('#adDateTo').value = '';
+  $$('#adPeriodTabs button').forEach(b=>b.classList.toggle('active', b.dataset.period === 'all'));
+  applyAdPeriod(null, null);
+}
+function closeAdModal(){ $('#adModal').hidden = true; }
+$('#adModalCancel').addEventListener('click', closeAdModal);
 async function refreshFunnelSteps(startISO, endISO){
   const el = $('#funnelStepsSummary');
   if(!el || !sb) return;
@@ -8562,7 +8635,6 @@ function applyAdminPeriod(startISO, endISO, label){
   currentPeriodLabel = label || '전체';
   refreshFunnelSummary(startISO, endISO);
   refreshFunnelSteps(startISO, endISO);
-  refreshCampaignSummary(startISO, endISO);
   refreshPurchaseList(startISO, endISO);
   refreshInquiryList(startISO, endISO);
 }
@@ -8694,11 +8766,13 @@ function renderLoginModal(){
       '<button class="menu-btn" id="historyMenuBtn">📋 내 결제내역</button>' +
       '<button class="menu-btn" id="inquiryMenuBtn">📮 문의하기</button>' +
       (isAdmin ? '<button class="menu-btn" id="adminMenuBtn">🛠 관리자 페이지</button>' : '') +
+      (isAdmin ? '<button class="menu-btn" id="adMenuBtn">📈 광고 분석</button>' : '') +
       '<button class="logout-btn" id="logoutBtn">로그아웃</button>' +
       '<button class="modal-cancel" id="loginModalCancel">닫기</button>';
     $('#historyMenuBtn').addEventListener('click', ()=>{ closeLoginModal(); openHistoryModal(); });
     $('#inquiryMenuBtn').addEventListener('click', ()=>{ closeLoginModal(); openInquiryModal(); });
     if(isAdmin){ $('#adminMenuBtn').addEventListener('click', ()=>{ closeLoginModal(); openAdminModal(); }); }
+    if(isAdmin){ $('#adMenuBtn').addEventListener('click', ()=>{ closeLoginModal(); openAdModal(); }); }
     $('#logoutBtn').addEventListener('click', async ()=>{
       if(sb){ await sb.auth.signOut(); }
       closeLoginModal();
