@@ -284,6 +284,9 @@ window.SajuAnalytics = (function(){
     background:var(--paper-deep); border-radius:var(--radius-sm);
   }
   .hero-scope b{color:var(--ink-soft); font-weight:700;}
+  .hero-line-main{margin:0 0 14px; font-size:14px; letter-spacing:-0.4px; word-break:keep-all;}
+  .hero-scope-main{margin:0 0 26px; font-size:12.5px;}
+  .hero-scope-main b{color:var(--gold);}
   /* 2026-10-03: 첫 화면 후킹 개편 — 감성 문구(hero-tagline) 바로 아래를 "혜택+소요시간" 한 줄 +
      무료 결과 예시 카드로 교체. 폼을 열어보지도 않고 이탈하는 비율이 높다는 퍼널 데이터에 대응해,
      입력 전에 "뭐가 무료로 나오는지" 먼저 보여준다. 예시 카드는 실제로 결제 없이 나오는 무료
@@ -1516,19 +1519,10 @@ window.SajuAnalytics = (function(){
     <!-- INPUT VIEW -->
     <section id="view-input">
       <p class="hero-tagline">당신이 모르는<br>당신의 이야기가 시작됩니다</p>
-      <p class="hero-sub-new">사주팔자 · 자미두수로 <b>성향 · 오행 균형 · 오늘의 운세</b>를 무료로 바로 확인해보세요.</p>
-      <div class="hero-meta-chip">⏱ 입력 1분 · 결제 없이 무료 결과 확인</div>
-      <div class="preview-intro">✨ 무료 결과에서는 이런 걸 확인할 수 있어요</div>
-      <div class="preview-cards">
-        <div class="preview-card">
-          <div class="preview-card-top"><span class="preview-card-label">나는 어떤 사람인가</span><span class="ex-tag">무료 · 예시</span></div>
-          <div class="preview-card-text">"겉으로는 책임감이 강하지만, 안에서는 판단권을 갖고 싶어 하는 사람입니다."</div>
-        </div>
-        <div class="preview-card">
-          <div class="preview-card-top"><span class="preview-card-label">오행 균형</span><span class="ex-tag">무료 · 예시</span></div>
-          <div class="preview-card-text">"목(木) 기운이 두드러지고 금(金)이 약한 편이에요. 추진력은 있지만 마무리에 더 신경 쓰면 좋아요."</div>
-        </div>
-      </div>
+      <p class="hero-line hero-line-main">태어난 순간, 하늘은 <b>년·월·일·시</b> 네 개의 도장을 찍습니다.<br>그 도장의 비밀을 알려드리겠습니다.</p>
+      <!-- 2026-10-04: 무료 예시 카드를 걷어내고 예전 범위 안내 문구를 복원 — 메인 개편(10/3) 이후
+           "무료"만 강조돼 심층풀이(유료)가 있다는 걸 모르고 들어온 방문자의 결제가 0건이 된 의심에 대응. -->
+      <p class="hero-scope hero-scope-main"><b>무료</b>로 사주팔자를 확인하고, <b>심층풀이</b>를 통해 나의 재물·연애·직업·삶의 흐름을 자세히 볼 수 있어요.</p>
       <div class="share-preview-card" id="sharePreviewCard" hidden>
         <div class="share-preview-label" id="sharePreviewLabel"></div>
         <p class="share-preview-excerpt" id="sharePreviewExcerpt"></p>
