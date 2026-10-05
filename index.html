@@ -7555,6 +7555,9 @@ function showAskError(msg){
 function refreshAskButton(){
   const btn = $('#askSubmitBtn');
   if(!btn || askBusy) return;
+  // 2026-10-05: 답변 미리보기 박스가 떠 있는 동안에는 위쪽 제출 버튼을 숨긴다(바로 아래 '전체 답변 보기' 버튼과 겹쳐 결제 유도처럼 보임).
+  // 질문 문장을 고치면 미리보기를 닫고 다시 보인다.
+  btn.style.display = ($('#askPreview') && !$('#askPreview').hidden) ? 'none' : '';
   const isAdmin = !!(currentProfile && currentProfile.is_admin);
   const bal = askWallet.balance || 0;
   btn.textContent = bal > 0
@@ -7586,6 +7589,13 @@ function showAskPreviewBox(opts){
   $('#askPreviewFade').hidden = !opts.note;
   $('#askFullBtn').hidden = !opts.showFull;
   $('#askPreview').hidden = false;
+  refreshAskButton();
+}
+function askInputChanged(){
+  $('#askCount').textContent = `${$('#askInput').value.length}/200`;
+  showAskError('');
+  const pv = $('#askPreview');
+  if(pv && !pv.hidden && !askBusy && cleanAskInput() !== askQuestionText){ pv.hidden = true; refreshAskButton(); }
 }
 function resetAskCard(){
   askQuestionText = '';
@@ -7766,7 +7776,7 @@ function refreshAskAgainLabel(){
   if(!btn) return;
   const isAdmin = !!(currentProfile && currentProfile.is_admin);
   const bal = askWallet.balance || 0;
-  btn.textContent = bal > 0 ? `다른 질문하기 · 남은 ${bal}개` : (isAdmin ? '다른 질문하기' : '다른 질문하기 · 이용권 3,900원~');
+  btn.textContent = bal > 0 ? `다른 질문하기 · 남은 ${bal}개` : '다른 질문하기';
   const code = getStoredWalletCode();
   const showCode = !currentSession && !!code;
   const box = $('#askAgainCode');
@@ -7827,6 +7837,7 @@ async function submitAskQuestion(){
   $('#askPreview').hidden = true;
   askBusy = true;
   const btn = $('#askSubmitBtn');
+  btn.style.display = '';
   btn.disabled = true;
   btn.textContent = '사주를 읽는 중…';
   logFunnelEvent('qa_question_submit');
@@ -7868,15 +7879,11 @@ async function submitAskQuestion(){
     refreshAskButton();
   }
 }
-$('#askInput').addEventListener('input', ()=>{
-  $('#askCount').textContent = `${$('#askInput').value.length}/200`;
-  showAskError('');
-});
+$('#askInput').addEventListener('input', askInputChanged);
 $$('#askChips .ask-chip').forEach(chip=>{
   chip.addEventListener('click', ()=>{
     $('#askInput').value = chip.textContent.trim();
-    $('#askCount').textContent = `${$('#askInput').value.length}/200`;
-    showAskError('');
+    askInputChanged();
   });
 });
 $('#askSubmitBtn').addEventListener('click', submitAskQuestion);
