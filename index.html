@@ -1217,6 +1217,9 @@ window.SajuAnalytics = (function(){
   .ask-preview-text p{margin:0 0 9px; font-size:13.5px; line-height:1.75; color:var(--ink); white-space:pre-wrap; word-break:keep-all;}
   .ask-preview-text .ask-pv-title{display:block; font-family:"Noto Serif KR"; font-weight:900; font-size:12px; color:var(--seal); margin-bottom:2px;}
   .ask-preview-fade{font-size:12px; color:var(--ink-soft); margin:2px 0 12px; line-height:1.55;}
+  .ask-again{margin-top:16px; padding:16px; border-radius:var(--radius-sm); border:1.5px solid var(--gold); background:linear-gradient(160deg, rgba(244,196,99,.12), rgba(244,196,99,.03));}
+  .ask-again-title{font-family:"Noto Serif KR"; font-weight:900; font-size:15px; color:var(--ink);}
+  .ask-again-sub{font-size:12px; color:var(--ink-soft); margin:4px 0 10px; line-height:1.55;}
   .ask-note{font-size:10.5px; color:var(--ink-faint); margin-top:10px; line-height:1.6;}
   .cat-back{
     background:none; border:none; padding:0; margin-bottom:2px;
@@ -2105,6 +2108,12 @@ window.SajuAnalytics = (function(){
         </div>
         <div id="aiResult" hidden>
           <div class="ai-result-text interpret-box" id="aiResultText"></div>
+          <div class="ask-again" id="askAgain" hidden>
+            <div class="ask-again-title">이어서 더 물어보세요</div>
+            <div class="ask-again-sub">답을 읽고 나서 생긴 궁금증, 질문 하나씩 바로 풀어드려요.</div>
+            <div class="ask-chips" id="askAgainChips"></div>
+            <button type="button" class="submit-btn" id="askAgainBtn">다른 질문하기 · 2,900원</button>
+          </div>
           <div class="ai-result-note" id="aiResultNote"></div>
         </div>
         <div id="aiError" hidden class="ai-error"></div>
@@ -7509,6 +7518,57 @@ $$('#askChips .ask-chip').forEach(chip=>{
 });
 $('#askSubmitBtn').addEventListener('click', submitAskQuestion);
 $('#askFullBtn').addEventListener('click', goToAskPay);
+// 질문 답변 아래 "이어서 더 물어보세요": 답을 읽고 생긴 다음 궁금증을 바로 다음 질문(2,900원)으로 잇는다.
+// 이어지는 질문 칩은 방금 질문에 들어 있는 주제어로 고른 고정 문구다(AI 호출 없음, 비용 0).
+const ASK_FOLLOWUPS = [
+  { re: /돈|재물|수입|월급|투자|부업|저축|재테크|부자/, qs: ['그럼 어떤 방식으로 수입을 늘리는 게 잘 맞을까요?', '올해 돈이 새는 걸 막으려면 뭘 조심해야 하나요?', '부업을 시작한다면 언제가 좋을까요?'] },
+  { re: /이직|취업|직장|회사|사업|창업|커리어|퇴사|승진|일/, qs: ['지금 자리에서 더 버티는 게 나을까요, 움직이는 게 나을까요?', '저에게 잘 맞는 일하는 방식은 뭔가요?', '올해 안에 움직인다면 언제가 가장 좋을까요?'] },
+  { re: /연애|결혼|만나|이별|재회|사랑|썸|남자친구|여자친구|배우자|애인/, qs: ['저는 어떤 사람과 있을 때 가장 편한가요?', '제가 연애에서 반복하는 패턴은 뭔가요?', '앞으로 인연이 들어오는 시기는 언제쯤인가요?'] },
+  { re: /지치|피곤|우울|스트레스|불안|힘들|건강|번아웃/, qs: ['제 에너지가 가장 잘 회복되는 방식은 뭔가요?', '올해 몸과 마음이 흔들리기 쉬운 때는 언제인가요?', '컨디션을 지키려면 어떤 생활 리듬이 맞을까요?'] },
+];
+const ASK_FOLLOWUPS_DEFAULT = ['올해 가장 조심해야 할 시기는 언제인가요?', '제가 지금 가장 먼저 바꿔야 할 한 가지는 뭔가요?', '앞으로 1~2년 안에 운이 풀리는 시기는 언제인가요?'];
+function pickAskFollowups(q){
+  const hit = ASK_FOLLOWUPS.find(f => f.re.test(q || ''));
+  return hit ? hit.qs : ASK_FOLLOWUPS_DEFAULT;
+}
+function showAskAgain(question){
+  const box = $('#askAgain');
+  if(!box) return;
+  const chips = $('#askAgainChips');
+  chips.textContent = '';
+  pickAskFollowups(question).forEach(q=>{
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'ask-chip';
+    b.textContent = q;
+    b.addEventListener('click', ()=> askAgain(q));
+    chips.appendChild(b);
+  });
+  const isAdmin = !!(currentProfile && currentProfile.is_admin);
+  $('#askAgainBtn').textContent = isAdmin ? '다른 질문하기' : '다른 질문하기 · 2,900원';
+  box.hidden = false;
+}
+// 결과 화면에서 질문 카드로 돌아간다. 뒤로가기 처리(aiResult 트랩)는 이미 popstate 핸들러가
+// "결과 → 카테고리 목록" 복귀로 정리해 주므로, 트랩이 있으면 history.back()으로 그 경로를 그대로 탄다.
+function askAgain(prefill){
+  logFunnelEvent('qa_again_click');
+  const finish = ()=>{
+    $('#askInput').value = prefill || '';
+    $('#askCount').textContent = `${$('#askInput').value.length}/200`;
+    showAskError('');
+    const c = $('#askCard');
+    if(c && c.scrollIntoView) c.scrollIntoView({ block: 'start' });
+    if(!prefill) $('#askInput').focus({ preventScroll: true });
+  };
+  if(aiResultPushedState){
+    history.back();
+    setTimeout(finish, 120);
+  } else {
+    resetAiPanel();
+    finish();
+  }
+}
+$('#askAgainBtn').addEventListener('click', ()=> askAgain(''));
 $('#hookAskBtn')?.addEventListener('click', ()=>{
   activateGroup('ai');
   setTimeout(()=>{ const c = $('#askCard'); if(c && c.scrollIntoView) c.scrollIntoView({ block: 'start' }); else window.scrollTo(0,0); }, 0);
@@ -7740,6 +7800,7 @@ async function runAiInterpretation(){
     }
     renderAiResult($('#aiResultText'), lastAiResultText);
     renderAiResultNote();
+    if(payload.category === 'ask' && data.interpretation){ showAskAgain(askQuestionText); } else { $('#askAgain').hidden = true; }
     $('#aiResult').hidden = false;
     // 뒤로가기(브라우저/기기 back)를 누르면 이 결과 화면에서 페이지 자체를 이탈하는 대신
     // 유료 콘텐츠 목록으로 돌아가도록 히스토리에 상태를 하나 쌓아둔다. 같은 결과를 보는 동안
