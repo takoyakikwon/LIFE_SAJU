@@ -29,6 +29,7 @@ src="https://www.facebook.com/tr?id=1580294783832483&ev=PageView&noscript=1"
 window.SajuAnalytics = (function(){
   function safeFbq(){
     try{
+      if(/\.vercel\.app$/i.test(location.hostname)) return; // 미리보기 주소의 테스트는 광고 전환에 섞지 않는다
       if(typeof fbq === 'function') fbq.apply(null, arguments);
     } catch(e){ /* Pixel 오류가 앱 동작에 영향을 주면 안 됨 */ }
   }
@@ -287,6 +288,20 @@ window.SajuAnalytics = (function(){
   .hero-line-main{margin:0 0 14px; font-size:14px; letter-spacing:-0.4px; word-break:keep-all;}
   .hero-scope-main{margin:0 0 26px; font-size:12.5px;}
   .hero-scope-main b{color:var(--gold);}
+  /* 2026-10-05: 메인 안내 카드(질문 상담 + 3단계 흐름) */
+  .hero-ask-card{margin:0 0 24px; padding:14px; border-radius:16px; border:1px solid var(--gold); background:linear-gradient(160deg, rgba(244,196,99,.17), rgba(244,196,99,.04));}
+  .hero-ask-head{display:flex; align-items:center; gap:8px; margin-bottom:6px;}
+  .hero-ask-ic{font-size:20px; line-height:1;}
+  .hero-ask-title{font-family:"Noto Serif KR"; font-weight:900; font-size:15px; color:var(--ink); word-break:keep-all;}
+  .hero-ask-desc{font-size:12.5px; line-height:1.6; color:var(--ink-soft); margin:0 0 12px; word-break:keep-all;}
+  .hero-ask-desc b{color:var(--gold); font-weight:700;}
+  .hero-ask-steps{display:flex; align-items:stretch; gap:6px; margin:0; padding:0; list-style:none;}
+  .hero-ask-step{flex:1; min-width:0; padding:10px 4px 9px; border-radius:12px; text-align:center; border:1px solid var(--gold-line); background:rgba(212,175,99,.07);}
+  .hero-ask-step .n{display:inline-flex; width:20px; height:20px; border-radius:50%; align-items:center; justify-content:center; background:var(--gold); color:#241d13; font-size:11px; font-weight:900; margin-bottom:5px;}
+  .hero-ask-step .t{display:block; font-size:12px; font-weight:800; color:var(--ink); line-height:1.35; word-break:keep-all;}
+  .hero-ask-step .s{display:block; font-size:10.5px; color:var(--ink-soft); margin-top:2px; line-height:1.3; word-break:keep-all;}
+  .hero-ask-step.hot{background:linear-gradient(160deg, rgba(244,196,99,.2), rgba(244,196,99,.06)); border-color:var(--gold);}
+  .hero-ask-arrow{align-self:center; color:var(--gold); font-size:10px; flex:none;}
   /* 2026-10-03: 첫 화면 후킹 개편 — 감성 문구(hero-tagline) 바로 아래를 "혜택+소요시간" 한 줄 +
      무료 결과 예시 카드로 교체. 폼을 열어보지도 않고 이탈하는 비율이 높다는 퍼널 데이터에 대응해,
      입력 전에 "뭐가 무료로 나오는지" 먼저 보여준다. 예시 카드는 실제로 결제 없이 나오는 무료
@@ -776,6 +791,7 @@ window.SajuAnalytics = (function(){
     color:var(--gold); font-size:13.5px; font-weight:800; cursor:pointer; font-family:"Noto Sans KR";
   }
   .hook-teaser-btn:active{ transform:translateY(1px); }
+  .hook-ask-btn{ margin-top:8px; background:transparent; }
   /* 2026-08-25 이어지는 스크롤 + 마스코트 개편 — "목차 미리보기(챕터+가격 리스트)"는 방향이
      맞지 않아 걷어내고, 대신 무료 5개 그룹을 하나의 스크롤로 이어붙이면서 사이사이 마스코트
      코멘트 + 훅 한 줄(hook-quote, 기존 tocFreeTeaser() 데이터 재사용) + CTA 카드를 배치한다. */
@@ -1183,6 +1199,78 @@ window.SajuAnalytics = (function(){
     color:#241d13; font-family:"JetBrains Mono",monospace; font-weight:700; font-size:9px;
     letter-spacing:.05em;
   }
+  /* 질문형 상담 카드 (2026-10-05) */
+  .ask-card{
+    border:1.5px solid var(--gold); border-radius:var(--radius-sm);
+    background:linear-gradient(160deg, rgba(244,196,99,.12), rgba(244,196,99,.03));
+    padding:16px; margin-bottom:18px;
+  }
+  .ask-card-badge{
+    display:inline-block; padding:2px 9px; border-radius:999px; margin-bottom:8px;
+    background:linear-gradient(160deg, var(--gold), #b8912f); color:#241d13;
+    font-family:"JetBrains Mono",monospace; font-weight:700; font-size:9.5px; letter-spacing:.05em;
+  }
+  .ask-card-title{font-family:"Noto Serif KR"; font-weight:900; font-size:16px; color:var(--ink); line-height:1.5; word-break:keep-all;}
+  .ask-card-sub{font-size:12px; color:var(--ink-soft); margin:4px 0 12px; line-height:1.55;}
+  .ask-chips{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;}
+  .ask-chip{
+    background:rgba(244,196,99,.10); border:1px solid var(--gold-line); border-radius:999px;
+    padding:6px 11px; font-size:11.5px; color:var(--ink); cursor:pointer; font-family:"Noto Sans KR";
+  }
+  .ask-chip:active{transform:translateY(1px);}
+  .ask-input{
+    width:100%; box-sizing:border-box; resize:none; padding:12px; font-size:14px; line-height:1.55;
+    font-family:"Noto Sans KR"; color:var(--ink); background:var(--paper-card);
+    border:1.5px solid var(--gold-line); border-radius:var(--radius-sm);
+  }
+  .ask-input:focus{outline:none; border-color:var(--gold);}
+  .ask-meta{text-align:right; font-size:11px; color:var(--ink-faint); margin:2px 2px 8px;}
+  .ask-error{font-size:12px; color:var(--seal); margin:0 0 8px; line-height:1.55;}
+  .ask-preview{margin-top:14px; padding:14px; border-radius:var(--radius-sm); border:1px solid var(--gold-line); background:var(--paper-card);}
+  .ask-preview-label{font-size:11.5px; font-weight:800; color:var(--gold); margin-bottom:8px;}
+  .ask-preview-text p{margin:0 0 9px; font-size:13.5px; line-height:1.75; color:var(--ink); white-space:pre-wrap; word-break:keep-all;}
+  .ask-preview-text .ask-pv-title{display:block; font-family:"Noto Serif KR"; font-weight:900; font-size:12px; color:var(--seal); margin-bottom:2px;}
+  .ask-preview-fade{font-size:12px; color:var(--ink-soft); margin:2px 0 12px; line-height:1.55;}
+  .ask-again{margin-top:16px; padding:16px; border-radius:var(--radius-sm); border:1.5px solid var(--gold); background:linear-gradient(160deg, rgba(244,196,99,.12), rgba(244,196,99,.03));}
+  .ask-again-title{font-family:"Noto Serif KR"; font-weight:900; font-size:15px; color:var(--ink);}
+  .ask-again-sub{font-size:12px; color:var(--ink-soft); margin:4px 0 10px; line-height:1.55;}
+  .ask-link{background:none; border:none; padding:2px 0; color:var(--gold); font-size:11.5px; font-weight:700; cursor:pointer; text-decoration:underline; font-family:"Noto Sans KR";}
+  .ask-wallet{margin:0 0 12px; padding:10px 12px; border-radius:var(--radius-sm); border:1px solid var(--gold-line); background:rgba(244,196,99,.08);}
+  .ask-wallet-line{display:flex; justify-content:space-between; align-items:center; gap:8px;}
+  .ask-wallet-count{font-size:13px; font-weight:800; color:var(--gold);}
+  .ask-wallet-code{margin-top:8px;}
+  .ask-wallet-code-note{font-size:11px; color:var(--ink-soft); line-height:1.6; margin-bottom:6px;}
+  .ask-wallet-code-row{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .ask-wallet-code-row code{font-family:"JetBrains Mono",monospace; font-size:13px; letter-spacing:.04em; color:var(--ink); background:var(--paper-card); border:1px solid var(--gold-line); border-radius:8px; padding:6px 10px; user-select:all;}
+  .ask-restore-row{margin-top:8px;}
+  .ask-restore{margin-top:8px;}
+  .ask-restore-line{display:flex; gap:8px;}
+  .ask-restore-input{flex:1; min-width:0; padding:9px 10px; font-size:13px; font-family:"JetBrains Mono",monospace; color:var(--ink); background:var(--paper-card); border:1.5px solid var(--gold-line); border-radius:var(--radius-sm);}
+  .ask-pack-head{margin:14px 0 12px; padding:12px; border-radius:var(--radius-sm); border:1px solid var(--gold-line); background:var(--paper-card);}
+  .ask-pack-qlabel{font-size:11px; font-weight:800; color:var(--gold); margin-bottom:4px;}
+  .ask-pack-q{font-family:"Noto Serif KR"; font-weight:700; font-size:14px; line-height:1.6; color:var(--ink); word-break:keep-all;}
+  .ask-pack-sub{font-size:11.5px; color:var(--ink-soft); margin-top:6px; line-height:1.55;}
+  .ask-pack-list{display:flex; flex-direction:column; gap:9px;}
+  .ask-pack{position:relative; display:grid; grid-template-columns:1fr auto; grid-template-areas:"name price"; align-items:center; text-align:left; width:100%; padding:14px 16px; cursor:pointer; border:1.5px solid var(--gold-line); border-radius:var(--radius-sm); background:var(--paper-card); font-family:"Noto Sans KR";}
+  .ask-pack:active{transform:translateY(1px);}
+  .ask-pack-hot{border-color:var(--gold); background:linear-gradient(160deg, rgba(244,196,99,.16), rgba(244,196,99,.04));}
+  .ask-pack-name{grid-area:name; font-family:"Noto Serif KR"; font-weight:900; font-size:15px; color:var(--ink);}
+  .ask-pack-price{grid-area:price; font-family:"Noto Serif KR"; font-weight:900; font-size:16px; color:var(--seal); text-align:right; line-height:1.25;}
+  .ask-pack-price s{display:block; font-family:"Noto Sans KR"; font-weight:500; font-size:11px; color:var(--ink-faint); text-decoration:line-through;}
+  .ask-pack-off{display:inline-block; margin-right:6px; padding:1px 6px; border-radius:6px; background:#c0392b; color:#fff; font-family:"Noto Sans KR"; font-size:11px; font-weight:800; vertical-align:middle;}
+  .ask-pack-badge{position:absolute; top:-8px; right:12px; padding:1px 8px; border-radius:999px; background:linear-gradient(160deg, var(--gold), #b8912f); color:#241d13; font-size:10px; font-weight:800;}
+  .ask-pack-guest{margin-top:12px; padding:11px 12px; font-size:11.5px; line-height:1.65; color:var(--ink); border-radius:var(--radius-sm); border:1px dashed var(--gold); background:rgba(244,196,99,.07);}
+  .ask-pack-admin{margin-top:10px; font-size:11.5px; color:var(--gold); font-weight:700;}
+  .ask-pack-note{margin-top:10px; font-size:10.5px; color:var(--ink-faint); line-height:1.6;}
+  .ask-again-code{margin:0 0 10px; padding:9px 10px; border-radius:var(--radius-sm); background:rgba(244,196,99,.08); border:1px solid var(--gold-line);}
+  .ask-again-code-label{font-size:11.5px; font-weight:800; color:var(--gold); margin-bottom:6px;}
+  .ask-again-code-label span{font-weight:500; color:var(--ink-soft);}
+  .ask-bonus{margin:0 0 14px; padding:14px 16px; border-radius:var(--radius-sm); border:1.5px solid var(--gold); background:linear-gradient(160deg, rgba(244,196,99,.16), rgba(244,196,99,.04));}
+  .ask-bonus-title{font-family:"Noto Serif KR"; font-weight:900; font-size:15px; color:var(--ink);}
+  .ask-bonus-text{font-size:12.5px; line-height:1.65; color:var(--ink); margin:6px 0 10px;}
+  .ask-bonus-code{margin-bottom:10px;}
+  .cat-option-gift{margin-top:8px; display:inline-block; padding:3px 9px; border-radius:999px; background:rgba(244,196,99,.16); border:1px solid var(--gold); color:var(--gold); font-size:11.5px; font-weight:800;}
+  .ask-note{font-size:10.5px; color:var(--ink-faint); margin-top:10px; line-height:1.6;}
   .cat-back{
     background:none; border:none; padding:0; margin-bottom:2px;
     color:var(--ink-faint); font-size:12.5px; cursor:pointer; font-family:"Noto Sans KR"; font-weight:500;
@@ -1430,6 +1518,8 @@ window.SajuAnalytics = (function(){
     display:flex; position:absolute; inset:0; z-index:5;
     align-items:flex-start; justify-content:center; padding-top:64px; pointer-events:none;
   }
+  /* 심층풀이(AI) 화면은 그 자체가 결제 화면이라 잠금 안내 배지가 헤더 위에 겹쳐 보임 → 숨김 */
+  #view-result.ai-mode .locked-zone-overlay{ display:none !important; }
   .locked-zone-badge{
     background:rgba(20,16,12,.82); color:#f4e9d8; font-size:13px; font-weight:700;
     padding:10px 18px; border-radius:999px; border:1px solid rgba(244,196,99,.38);
@@ -1522,7 +1612,20 @@ window.SajuAnalytics = (function(){
       <p class="hero-line hero-line-main">태어난 순간, 하늘은 <b>년·월·일·시</b> 네 개의 도장을 찍습니다.<br>그 도장의 비밀을 알려드리겠습니다.</p>
       <!-- 2026-10-04: 무료 예시 카드를 걷어내고 예전 범위 안내 문구를 복원 — 메인 개편(10/3) 이후
            "무료"만 강조돼 심층풀이(유료)가 있다는 걸 모르고 들어온 방문자의 결제가 0건이 된 의심에 대응. -->
-      <p class="hero-scope hero-scope-main"><b>무료</b>로 사주팔자를 확인하고, <b>심층풀이</b>를 통해 나의 재물·연애·직업·삶의 흐름을 자세히 볼 수 있어요.</p>
+      <!-- 2026-10-05: 질문형 상담 도입에 맞춰 메인 안내를 "질문 카드 + 3단계 흐름"으로 교체(목업 A+E).
+           예전 안내문("무료로 사주팔자를 확인하고, 심층풀이를 통해…")은 아래 주석으로 보관 — 되돌릴 때 사용.
+           <p class="hero-scope hero-scope-main"><b>무료</b>로 사주팔자를 확인하고, <b>심층풀이</b>를 통해 나의 재물·연애·직업·삶의 흐름을 자세히 볼 수 있어요.</p> -->
+      <div class="hero-ask-card" id="heroAskCard">
+        <div class="hero-ask-head"><span class="hero-ask-ic" aria-hidden="true">💬</span><span class="hero-ask-title">이제 사주에게 직접 물어보세요</span></div>
+        <p class="hero-ask-desc">생년월일을 넣으면 <b>무료 사주</b>와 함께 <b>고민 상담</b>까지 해드립니다.</p>
+        <ol class="hero-ask-steps">
+          <li class="hero-ask-step"><span class="n">1</span><span class="t">생년월일 입력</span><span class="s">10초면 끝</span></li>
+          <li class="hero-ask-arrow" aria-hidden="true">▶</li>
+          <li class="hero-ask-step"><span class="n">2</span><span class="t">무료 사주 확인</span><span class="s">내 일간·오행</span></li>
+          <li class="hero-ask-arrow" aria-hidden="true">▶</li>
+          <li class="hero-ask-step hot"><span class="n">3</span><span class="t">고민 질문하기</span><span class="s">첫 질문 무료</span></li>
+        </ol>
+      </div>
       <div class="share-preview-card" id="sharePreviewCard" hidden>
         <div class="share-preview-label" id="sharePreviewLabel"></div>
         <p class="share-preview-excerpt" id="sharePreviewExcerpt"></p>
@@ -1687,6 +1790,7 @@ window.SajuAnalytics = (function(){
         <div class="hook-teaser-label">✦ 지금 나온 결과, 한눈에 보면</div>
         <div class="hook-teaser-text" id="hookTeaserText"></div>
         <button type="button" class="hook-teaser-btn" id="hookTeaserBtn">내 사주 더 깊이 알아보기 →</button>
+        <button type="button" class="hook-teaser-btn hook-ask-btn" id="hookAskBtn">💬 궁금한 걸 직접 물어보기</button>
       </div>
       <div class="subtab-bar" id="subtabBar" hidden></div>
       <div class="panel active" data-panel="palja">
@@ -1859,6 +1963,41 @@ window.SajuAnalytics = (function(){
         <p class="section-desc">지금까지 계산된 사주·자미두수 데이터를 바탕으로 성격과 기질, 지금의 흐름을 자세히 풀어드려요.</p>
         <div id="aiLocked">
           <div id="aiStepCategory">
+            <div class="ask-card" id="askCard">
+              <div class="ask-card-badge">NEW · 질문형 상담</div>
+              <div class="ask-card-title">지금 가장 궁금한 한 가지, 직접 물어보세요</div>
+              <div class="ask-card-sub">내 사주를 바탕으로 질문 하나에 곧바로 답해드려요.</div>
+              <div class="ask-wallet" id="askWallet" hidden>
+                <div class="ask-wallet-line"><span class="ask-wallet-count" id="askWalletCount"></span><button type="button" class="ask-link" id="askWalletCodeToggle" hidden>복구 코드 보기</button></div>
+                <div class="ask-wallet-code" id="askWalletCodeBox" hidden>
+                  <div class="ask-wallet-code-note">이 코드를 꼭 저장해 두세요. 기기를 바꾸거나 브라우저 데이터를 지우면, 이 코드로 남은 질문을 되살릴 수 있어요. 로그인하면 계정에 자동으로 연결돼요.</div>
+                  <div class="ask-wallet-code-row"><code id="askWalletCode"></code><button type="button" class="ask-chip" id="askWalletCopyBtn">복사</button></div>
+                </div>
+              </div>
+              <div class="ask-chips" id="askChips">
+                <button type="button" class="ask-chip">올해 이직해도 될까요?</button>
+                <button type="button" class="ask-chip">지금 만나는 사람, 계속 만나도 될까요?</button>
+                <button type="button" class="ask-chip">올해 돈이 모이는 시기는 언제일까요?</button>
+                <button type="button" class="ask-chip">사업을 시작해도 될까요?</button>
+                <button type="button" class="ask-chip">요즘 자꾸 지치는 이유가 뭘까요?</button>
+              </div>
+              <textarea id="askInput" class="ask-input" maxlength="200" rows="3" placeholder="예) 올해 안에 이직하는 게 나을까요?"></textarea>
+              <div class="ask-meta"><span id="askCount">0/200</span></div>
+              <div class="ask-error" id="askError" hidden></div>
+              <button type="button" class="submit-btn" id="askSubmitBtn">무료로 한 줄 답 받기</button>
+              <div class="ask-preview" id="askPreview" hidden>
+                <div class="ask-preview-label" id="askPreviewLabel">✦ 무료 맛보기</div>
+                <div class="ask-preview-text" id="askPreviewBody"></div>
+                <div class="ask-preview-fade" id="askPreviewFade">이어지는 이유와 지금 해볼 행동은 전체 답변에서 확인할 수 있어요.</div>
+                <button type="button" class="submit-btn" id="askFullBtn">전체 답변 보기 · 2,900원</button>
+              </div>
+              <div class="ask-note">사주·자미두수를 근거로 당신의 고민을 상담해드립니다.</div>
+              <div class="ask-restore-row"><button type="button" class="ask-link" id="askRestoreToggle">질문 이용권 코드가 있어요</button></div>
+              <div class="ask-restore" id="askRestoreBox" hidden>
+                <div class="ask-restore-line"><input type="text" id="askRestoreInput" class="ask-restore-input" placeholder="XXXX-XXXX-XXXX-XXXX" maxlength="24" autocomplete="off" autocapitalize="characters"><button type="button" class="ask-chip" id="askRestoreBtn">불러오기</button></div>
+                <div class="ask-error" id="askRestoreMsg" hidden></div>
+              </div>
+            </div>
             <p class="section-desc" style="margin-bottom:14px;">원하는 리포트를 선택해주세요.</p>
             <div class="cat-picker">
               <button type="button" class="cat-option" data-cat="comprehensive">
@@ -1870,6 +2009,7 @@ window.SajuAnalytics = (function(){
                 <div class="cat-option-badge">PREMIUM</div>
                 <div class="cat-option-name">평생운 프리미엄 👑</div>
                 <div class="cat-option-desc">과거부터 지금, 그리고 앞으로의 대운까지 — 이 사람의 인생 전체를 하나의 이야기로 풀어드려요. 귀인이 오는 시기, 투자와 건강까지 챙기는 가장 깊은 리포트예요.</div>
+                <div class="cat-option-gift">🎁 구매하면 질문권 2회 증정 (3,900원 상당)</div>
                 <div class="cat-option-price">24,900원</div>
               </button>
               <button type="button" class="cat-option" data-cat="love">
@@ -2028,6 +2168,25 @@ window.SajuAnalytics = (function(){
             <button class="submit-btn" id="compatFreeUnlockBtn" style="margin-top:16px;">더 깊이 풀어보기</button>
           </div>
 
+          <div id="aiStepAskPack" hidden>
+            <button type="button" class="cat-back" id="askPackBackBtn">← 돌아가기</button>
+            <div class="ask-pack-head">
+              <div class="ask-pack-qlabel">내 질문</div>
+              <div class="ask-pack-q" id="askPackQuestion"></div>
+              <div class="ask-pack-sub">질문 이용권을 고르면 이 질문에 바로 답해드리고, 남은 횟수는 언제든 이어서 쓸 수 있어요.</div>
+            </div>
+            <div class="ask-pack-list">
+              <button type="button" class="ask-pack" data-pack="2"><span class="ask-pack-name">질문 2회권</span><span class="ask-pack-price"><s>6,000원</s><span class="ask-pack-off">35%</span>3,900원</span></button>
+              <button type="button" class="ask-pack ask-pack-hot" data-pack="5"><span class="ask-pack-badge">인기</span><span class="ask-pack-name">질문 5회권</span><span class="ask-pack-price"><s>15,000원</s><span class="ask-pack-off">47%</span>7,900원</span></button>
+              <button type="button" class="ask-pack" data-pack="10"><span class="ask-pack-name">질문 10회권</span><span class="ask-pack-price"><s>30,000원</s><span class="ask-pack-off">54%</span>13,900원</span></button>
+            </div>
+            <div class="ask-pack-admin" id="askPackAdmin" hidden>관리자 테스트: 결제 없이 충전되고, 바로 1회 사용돼요.</div>
+            <div class="ask-pack-guest" id="askPackGuest" hidden>
+              <b>로그인 없이 구매하시나요?</b> 이용권은 지금 쓰고 있는 이 브라우저에 저장돼요. 기기를 바꾸거나 브라우저 데이터를 지우면 남은 횟수를 볼 수 없으니, 결제 후 나오는 <b>복구 코드</b>를 꼭 저장해 두세요. 로그인하고 구매하면 어느 기기에서든 쓸 수 있어요.
+            </div>
+            <div class="ask-pack-note">유효기간은 구매일로부터 1년이에요. 답변을 만들지 못한 경우에는 횟수가 차감되지 않아요.</div>
+          </div>
+
           <div id="aiStepPay" hidden>
             <button type="button" class="cat-back" id="payBackBtn">← 다른 리포트 선택</button>
             <div class="ai-price-card" style="margin-top:14px;">
@@ -2045,7 +2204,26 @@ window.SajuAnalytics = (function(){
           </div>
         </div>
         <div id="aiResult" hidden>
+          <div class="ask-bonus" id="askBonusBox" hidden>
+            <div class="ask-bonus-title">🎁 평생운 구매 선물</div>
+            <div class="ask-bonus-text" id="askBonusText"></div>
+            <div class="ask-bonus-code" id="askBonusCode" hidden>
+              <div class="ask-again-code-label">🔑 질문 이용권 복구 코드 <span>(기기를 바꿀 때 필요해요)</span></div>
+              <div class="ask-wallet-code-row"><code id="askBonusCodeText"></code><button type="button" class="ask-chip" id="askBonusCopyBtn">복사</button></div>
+            </div>
+            <button type="button" class="submit-btn" id="askBonusGoBtn">질문하러 가기</button>
+          </div>
           <div class="ai-result-text interpret-box" id="aiResultText"></div>
+          <div class="ask-again" id="askAgain" hidden>
+            <div class="ask-again-title">이어서 더 물어보세요</div>
+            <div class="ask-again-code" id="askAgainCode" hidden>
+              <div class="ask-again-code-label">🔑 질문 이용권 복구 코드 <span>(기기를 바꿀 때 필요해요)</span></div>
+              <div class="ask-wallet-code-row"><code id="askAgainCodeText"></code><button type="button" class="ask-chip" id="askAgainCopyBtn">복사</button></div>
+            </div>
+            <div class="ask-again-sub">답을 읽고 나서 생긴 궁금증, 질문 하나씩 바로 풀어드려요.</div>
+            <div class="ask-chips" id="askAgainChips"></div>
+            <button type="button" class="submit-btn" id="askAgainBtn">다른 질문하기 · 2,900원</button>
+          </div>
           <div class="ai-result-note" id="aiResultNote"></div>
         </div>
         <div id="aiError" hidden class="ai-error"></div>
@@ -5602,6 +5780,19 @@ let aiLoadingEtaTimer = null;
 // 있도록 마지막으로 받은 해석 텍스트를 잠깐 들고 있는다. 로그인 사용자도 이 버튼으로 즉시 저장 가능.
 let lastAiResultText = '';
 let selectedAiCategory = null;
+// 질문형 상담 상태(2026-10-05). resetAiPanel()/resetAskCard()가 새 분석 때 비운다.
+let askQuestionText = '';
+let askPreviewText = '';
+let askRequestMode = null; // 'preview' | 'check' — buildAiPayload가 payload.askMode로 싣는 일회성 값
+let askBusy = false;
+let pendingRestoreAsk = null;
+// 질문 이용권(지갑) 상태 — 서버가 잔액의 원본이고, 여기는 화면 표시용 사본이다(2026-10-05).
+let askWallet = { balance: 0, expiresAt: null };
+let askWalletLastFetch = 0;
+let selectedAskPack = null;
+let askUseWallet = false;
+// Vercel 미리보기 주소(*.vercel.app)에서는 테스트 트래픽이 실제 퍼널/광고 지표에 섞이지 않도록 로깅을 끈다.
+const IS_PREVIEW_HOST = /\.vercel\.app$/i.test(location.hostname);
 let selectedLoveStatus = null;
 let selectedJobStatus = null; // 취업·사업·이동운 카테고리에서 고른 현재 신분(직장인/자영업/프리랜서 등)
 let partnerGenderVal = "남";
@@ -5673,6 +5864,7 @@ const AI_CATEGORY_META = {
   pet: { price: '1,900원', desc: '1회 결제로 반려동물궁합 리포트를 확인할 수 있어요.' },
   career: { price: '7,900원', desc: '1회 결제로 취업·사업·이동운 리포트를 확인할 수 있어요.' },
   lifetime: { price: '24,900원', desc: '1회 결제로 평생운 프리미엄 리포트를 확인할 수 있어요.' },
+  ask: { price: '3,900원', desc: '질문 이용권 2회' }, // 이용권을 고를 때 chooseAskPack()이 선택한 상품으로 바꾼다
 };
 // 2026-09-23: Meta Pixel InitiateCheckout의 content_name용 — .cat-option-name의 표시 문구와
 // 동일하게(이모지만 제외) 맞춰뒀다. 다른 로직에서는 쓰지 않는, Pixel 전용 상품명 매핑이다.
@@ -5685,6 +5877,7 @@ const AI_CATEGORY_DISPLAY_NAME = {
   career: '취업·사업·이동운',
   pet: '반려동물궁합',
   lifetime: '평생운 프리미엄',
+  ask: '질문형 상담',
 };
 $$('#genderSeg button').forEach(btn=>{
   btn.addEventListener('click', ()=>{
@@ -6480,6 +6673,8 @@ $('#submitBtn').addEventListener('click', ()=>{
     const restoreLoveStatus = pendingRestoreLoveStatus, restoreJobStatus = pendingRestoreJobStatus;
     const restorePartnerData = pendingRestorePartnerData, restorePetData = pendingRestorePetData;
     const restoreContentUnlocked = pendingRestoreContentUnlocked;
+    const restoreAsk = pendingRestoreAsk;
+    pendingRestoreAsk = null;
     pendingRestoreGroup = null;
     pendingRestoreCategory = null;
     pendingRestorePaymentId = null;
@@ -6515,6 +6710,10 @@ $('#submitBtn').addEventListener('click', ()=>{
       selectedJobStatus = restoreJobStatus;
       partnerData = restorePartnerData;
       petData = restorePetData;
+      if(restoreCategory === 'ask' && restoreAsk){
+        askQuestionText = restoreAsk.question; askPreviewText = restoreAsk.preview; selectedAskPack = restoreAsk.pack;
+        if(restoreAsk.pack) AI_CATEGORY_META.ask = { price: fmtWon(ASK_PACK_INFO[restoreAsk.pack].price), desc: `질문 이용권 ${restoreAsk.pack}회` };
+      }
       pendingPaymentId = restorePaymentId;
       aiUnlocked = true;
       // 2026-09-20: 모바일 결제 리디렉션 복귀 = 방금 결제가 완료된 상태로 돌아온 것이므로,
@@ -6622,6 +6821,7 @@ function activateGroup(groupKey){
   // 2026-08-25 이어지는 스크롤 개편: 무료 5개 그룹은 하나의 스크롤로 항상 같이 보이고,
   // 심층풀이(ai)만 별도 화면으로 전환된다 — #view-result에 ai-mode 클래스로 표시.
   $('#view-result').classList.toggle('ai-mode', groupKey === 'ai');
+  if(groupKey === 'ai'){ refreshAskWallet(); } // 질문 이용권 잔액 갱신(15초 안에 다시 부르면 건너뜀)
 }
 // 2026-09-20 신규: 십성~종합풀이 블러 락 상태를 화면에 반영한다. contentUnlocked가 false면
 // #lockedContentZone에 .locked를 씌워 블러+잠금 배지를 보여주고, 안내 CTA 카드(#lockedZoneCta)도
@@ -6727,10 +6927,11 @@ function resetAiPanel(){
   $$('#jobStatusSeg button').forEach(b=>b.classList.remove('active'));
   $('#partnerError').hidden = true;
   $('#petError').hidden = true;
+  resetAskCard();
 }
 // AI 패널 내부의 단계(카테고리 선택 → 부가입력 → 결제) 전환
 function showAiStep(stepId){
-  ['aiStepCategory','aiStepLove','aiStepCareer','aiStepPartner','aiStepPet','aiStepCompatFree','aiStepPay'].forEach(id=>{
+  ['aiStepCategory','aiStepLove','aiStepCareer','aiStepPartner','aiStepPet','aiStepCompatFree','aiStepAskPack','aiStepPay'].forEach(id=>{
     $('#'+id).hidden = (id !== stepId);
   });
   // 카테고리 목록 밖으로 처음 나갈 때만 히스토리 트랩을 하나 세운다(위 aiStepPushedState 주석 참고).
@@ -6745,6 +6946,9 @@ function showAiStep(stepId){
   }
 }
 function goToAiPayStep(){
+  // 질문형 상담은 질문 없이 결제 단계로 들어오면 안 된다(로그인 복귀 등으로 질문이 비어 있을 수 있음) —
+  // 결제 후에 서버가 질문 없음으로 거절하는 일이 없도록 결제 전에 막는다.
+  if(selectedAiCategory === 'ask'){ if(askQuestionText) showAskPackStep(); else showAiStep('aiStepCategory'); return; }
   const meta = AI_CATEGORY_META[selectedAiCategory] || AI_CATEGORY_META.comprehensive;
   // 2026-09-24: 관리자 계정은 가격 화면(aiStepPay)을 보여주지 않고, 카테고리 선택(또는 마지막
   // 부가입력 단계)이 끝나는 즉시 결제 없이 바로 심층풀이를 생성한다 — 모든 카테고리·모든
@@ -6760,7 +6964,7 @@ function goToAiPayStep(){
     return;
   }
   $('#aiPriceAmt').textContent = meta.price;
-  $('#aiPriceDesc').textContent = meta.desc;
+  $('#aiPriceDesc').textContent = meta.desc + (selectedAiCategory === 'lifetime' ? ' 🎁 구매하면 질문권 2회(3,900원 상당)를 선물로 드려요.' : '');
   // Meta Pixel: 심층풀이 상품을 선택하고 실제 결제 단계(가격·결제하기 버튼 화면)로 진입한
   // 시점 (2026-09-23). 모든 카테고리·모든 진입 경로(바로결제/연애상태·신분 선택 후/궁합
   // 상대방 입력 후/로그인 리다이렉트 복원)가 전부 이 함수 하나를 거치므로 한 곳에서만 호출한다.
@@ -7105,6 +7309,14 @@ function buildAiPayload(){
   if(selectedAiCategory === 'pet' && petData){
     payload.pet = petData;
   }
+  if(selectedAiCategory === 'ask'){
+    payload.question = askQuestionText;
+    if(askPreviewText) payload.askPreviewText = askPreviewText;
+    if(askRequestMode) payload.askMode = askRequestMode;
+    if(askUseWallet) payload.useWallet = true;
+    if(selectedAskPack) payload.pack = selectedAskPack;
+  }
+  { const wc = getStoredWalletCode(); if(wc && (selectedAiCategory === 'ask' || selectedAiCategory === 'lifetime')) payload.walletCode = wc; }
   if(currentSession && currentSession.access_token){
     payload.access_token = currentSession.access_token;
   }
@@ -7157,6 +7369,13 @@ function buildAiPayload(){
 function openPayModal(){
   const meta = AI_CATEGORY_META[selectedAiCategory] || AI_CATEGORY_META.comprehensive;
   $('#modalPrice').textContent = meta.price;
+  if(selectedAiCategory === 'ask' && selectedAskPack){
+    $('#payModalDesc').textContent = currentSession
+      ? `결제하면 계정에 질문 ${selectedAskPack}회가 충전돼요. 어느 기기에서든 쓸 수 있어요. (유효기간 1년)`
+      : '로그인 없이 구매하면 이용권이 이 브라우저에 저장돼요. 결제 후 나오는 복구 코드를 꼭 저장해 두세요. 기기를 바꾸면 그 코드로 되살릴 수 있어요. (유효기간 1년)';
+    $('#payModal').hidden = false;
+    return;
+  }
   // 비회원도 구매할 수 있지만(2026-08-25), 로그인 여부에 따라 재열람 가능 여부가 다르므로 미리 안내한다.
   // 2026-08-30: 포트원 결제창(현재 테스트 채널)이 실제로 뜨므로, "임시 체험" 문구는 제거했다.
   $('#payModalDesc').textContent = currentSession
@@ -7285,6 +7504,403 @@ $('#partnerBackBtn').addEventListener('click', ()=>{ showAiStep('aiStepCategory'
 $('#compatFreeBackBtn').addEventListener('click', ()=>{ showAiStep('aiStepCategory'); });
 $('#compatFreeUnlockBtn').addEventListener('click', ()=>{ goToAiPayStep(); });
 $('#payBackBtn').addEventListener('click', ()=>{ showAiStep('aiStepCategory'); });
+// ---- 질문형 상담(2026-10-05) ----
+// 흐름: 질문 입력 → (방문자당 1회) 무료 맛보기 → "전체 답변 보기" → 기존 결제 모달/포트원 결제 →
+// runAiInterpretation(category='ask'). 맛보기를 이미 썼으면 '사전 점검(check)'만 거친 뒤 바로 결제로 간다
+// — 위기/운명단정 질문은 결제 전에 걸러져 돈이 나가지 않는다. 한도는 서버(qa_free_usage)가 최종 강제하고,
+// 아래 localStorage 표식은 화면 문구를 맞추기 위한 편의일 뿐이다.
+const ASK_PREVIEW_USED_KEY = 'sajuAskPreviewUsed_v1';
+function askPreviewUsed(){ try{ return localStorage.getItem(ASK_PREVIEW_USED_KEY) === '1'; } catch(e){ return false; } }
+function markAskPreviewUsed(){ try{ localStorage.setItem(ASK_PREVIEW_USED_KEY, '1'); } catch(e){} }
+function cleanAskInput(){ return String($('#askInput').value || '').replace(/\s+/g, ' ').trim().slice(0, 200); }
+function showAskError(msg){
+  const el = $('#askError');
+  el.textContent = msg || '';
+  el.hidden = !msg;
+}
+function refreshAskButton(){
+  const btn = $('#askSubmitBtn');
+  if(!btn || askBusy) return;
+  const isAdmin = !!(currentProfile && currentProfile.is_admin);
+  const bal = askWallet.balance || 0;
+  btn.textContent = bal > 0
+    ? `질문하고 답변 받기 · 남은 ${bal}개 사용`
+    : ((askPreviewUsed() && !isAdmin) ? '질문하고 답변 받기 · 이용권 3,900원~' : '무료로 한 줄 답 받기');
+}
+function renderAskPreviewText(text){
+  const body = $('#askPreviewBody');
+  body.textContent = '';
+  String(text || '').split(/\n+/).map(s=>s.trim()).filter(Boolean).forEach(line=>{
+    const p = document.createElement('p');
+    const idx = line.indexOf(' — ');
+    if(idx > 0 && idx <= 12){
+      const t = document.createElement('span');
+      t.className = 'ask-pv-title';
+      t.textContent = line.slice(0, idx);
+      p.appendChild(t);
+      p.appendChild(document.createTextNode(line.slice(idx + 3)));
+    } else {
+      p.textContent = line;
+    }
+    body.appendChild(p);
+  });
+}
+function showAskPreviewBox(opts){
+  $('#askPreviewLabel').textContent = opts.label;
+  if(opts.text) renderAskPreviewText(opts.text); else $('#askPreviewBody').textContent = '';
+  $('#askPreviewFade').textContent = opts.note || '';
+  $('#askPreviewFade').hidden = !opts.note;
+  $('#askFullBtn').hidden = !opts.showFull;
+  $('#askPreview').hidden = false;
+}
+function resetAskCard(){
+  askQuestionText = '';
+  askPreviewText = '';
+  askRequestMode = null;
+  askBusy = false;
+  const preview = $('#askPreview');
+  if(preview) preview.hidden = true;
+  showAskError('');
+  refreshAskButton();
+}
+// 전체 답변으로 가는 길: 남은 이용권이 있으면 1회 차감해서 바로 답하고, 없으면 이용권(2/5/10회) 선택 화면으로 간다.
+function goToAskPay(){
+  if(!askQuestionText) return;
+  logFunnelEvent('qa_full_click');
+  selectedAiCategory = 'ask';
+  if((askWallet.balance || 0) > 0) useWalletAndRun();
+  else showAskPackStep();
+}
+function useWalletAndRun(){
+  selectedAiCategory = 'ask';
+  selectedAskPack = null;
+  askUseWallet = true;
+  logFunnelEvent('qa_wallet_use');
+  aiUnlocked = true;
+  contentUnlocked = true;
+  applyContentLockState();
+  saveResultSnapshot();
+  runAiInterpretation();
+}
+function showAskPackStep(){
+  const q = askQuestionText.length > 80 ? askQuestionText.slice(0, 80) + '…' : askQuestionText;
+  $('#askPackQuestion').textContent = `"${q}"`;
+  $('#askPackGuest').hidden = !!currentSession;
+  $('#askPackAdmin').hidden = !(currentProfile && currentProfile.is_admin);
+  showAiStep('aiStepAskPack');
+}
+function chooseAskPack(n){
+  const info = ASK_PACK_INFO[n];
+  if(!info || !askQuestionText) return;
+  selectedAskPack = n;
+  selectedAiCategory = 'ask';
+  AI_CATEGORY_META.ask = { price: fmtWon(info.price), desc: `질문 이용권 ${n}회` };
+  logFunnelEvent('qa_pack_select');
+  if(currentProfile && currentProfile.is_admin){
+    // 관리자 테스트: 결제 없이 충전하고 1회 사용(서버가 access_token으로 관리자 여부를 다시 검증한다)
+    aiUnlocked = true; contentUnlocked = true; applyContentLockState(); saveResultSnapshot();
+    runAiInterpretation();
+    return;
+  }
+  if(window.SajuAnalytics){
+    window.SajuAnalytics.initiateCheckout({ content_name: `질문 이용권 ${n}회`, value: info.price });
+  }
+  openPayModal();
+}
+// 결제가 끝난 이용권을 서버에 충전한다(서버가 포트원에서 결제를 다시 조회·검증). 실패하면 에러로 올려보낸다.
+async function purchaseAskPack(base){
+  const n = selectedAskPack;
+  const body = Object.assign({}, base, { category: 'ask_pack', pack: n });
+  delete body.question; delete body.askPreviewText; delete body.useWallet; delete body.askMode;
+  const wc = getStoredWalletCode();
+  if(wc) body.walletCode = wc;
+  const res = await fetch('/api/interpret', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const d = await res.json().catch(()=>({}));
+  if(!res.ok){
+    const e = new Error((d && d.error) || `이용권 충전에 실패했어요. (${res.status})`);
+    e.code = d && d.code;
+    throw e;
+  }
+  if(d.walletCode) setStoredWalletCode(d.walletCode);
+  askWallet = { balance: d.balance || 0, expiresAt: d.expiresAt || null };
+  askWalletLastFetch = Date.now();
+  renderAskWallet();
+  if(window.SajuAnalytics && base.paymentId){
+    window.SajuAnalytics.purchase({ paymentId: base.paymentId, value: ASK_PACK_INFO[n].price });
+  }
+  selectedAskPack = null;
+  return d;
+}
+$$('#aiStepAskPack .ask-pack').forEach(btn=>{
+  btn.addEventListener('click', ()=> chooseAskPack(parseInt(btn.dataset.pack, 10)));
+});
+$('#askPackBackBtn').addEventListener('click', ()=>{ showAiStep('aiStepCategory'); });
+
+// ---- 이용권 지갑 표시/복구 ----
+const ASK_WALLET_KEY = 'sajuAskWallet_v1';
+const ASK_PACK_INFO = { 2: { price: 3900 }, 5: { price: 7900 }, 10: { price: 13900 } };
+function fmtWon(n){ return Number(n).toLocaleString('ko-KR') + '원'; }
+function getStoredWalletCode(){ try{ return localStorage.getItem(ASK_WALLET_KEY) || ''; } catch(e){ return ''; } }
+function setStoredWalletCode(c){ try{ if(c) localStorage.setItem(ASK_WALLET_KEY, c); else localStorage.removeItem(ASK_WALLET_KEY); } catch(e){} }
+async function copyTextToClipboard(t){
+  try{ await navigator.clipboard.writeText(t); return true; }
+  catch(e){
+    try{
+      const ta = document.createElement('textarea');
+      ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      const ok = document.execCommand('copy'); ta.remove(); return ok;
+    } catch(e2){ return false; }
+  }
+}
+function wireCopyButton(btnId, getText){
+  const btn = $('#' + btnId);
+  if(!btn) return;
+  btn.addEventListener('click', async ()=>{
+    const ok = await copyTextToClipboard(getText());
+    const prev = btn.textContent;
+    btn.textContent = ok ? '복사됨' : '길게 눌러 복사';
+    setTimeout(()=>{ btn.textContent = prev; }, 1500);
+  });
+}
+function renderAskWallet(){
+  const isLogged = !!currentSession;
+  const code = getStoredWalletCode();
+  const bal = askWallet.balance || 0;
+  const box = $('#askWallet');
+  if(!box) return;
+  box.hidden = !(bal > 0 || (!isLogged && !!code));
+  let label = `남은 질문 ${bal}개`;
+  if(bal > 0 && askWallet.expiresAt){
+    const d = new Date(askWallet.expiresAt);
+    if(!isNaN(d)) label += ` · ${d.getFullYear()}.${d.getMonth()+1}.${d.getDate()}까지`;
+  }
+  $('#askWalletCount').textContent = label;
+  const canCode = !isLogged && !!code;
+  $('#askWalletCodeToggle').hidden = !canCode;
+  $('#askWalletCode').textContent = code;
+  if(!canCode) $('#askWalletCodeBox').hidden = true;
+  $('#askRestoreToggle').hidden = isLogged;
+  if(isLogged) $('#askRestoreBox').hidden = true;
+  refreshAskButton();
+  refreshAskAgainLabel();
+}
+// 서버에서 잔액을 가져온다(비회원은 복구 코드, 로그인 사용자는 계정). 로그인 상태에서 비회원 코드가 남아 있으면 서버가 계정 지갑으로 합친다.
+async function refreshAskWallet(force){
+  const code = getStoredWalletCode();
+  if(!code && !currentSession){ askWallet = { balance: 0, expiresAt: null }; renderAskWallet(); return null; }
+  if(!force && Date.now() - askWalletLastFetch < 15000) return null;
+  askWalletLastFetch = Date.now();
+  try{
+    const res = await fetch('/api/interpret', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category: 'ask', askMode: 'wallet', walletCode: code || undefined, access_token: currentSession ? currentSession.access_token : undefined, visitorId: VISITOR_ID }),
+    });
+    const d = await res.json().catch(()=>null);
+    if(!res.ok || !d) return null;
+    askWallet = { balance: d.balance || 0, expiresAt: d.expiresAt || null };
+    if(d.linked && currentSession) setStoredWalletCode('');
+    renderAskWallet();
+    return d;
+  } catch(e){ return null; }
+}
+function applyAskWalletResponse(d){
+  if(!d) return;
+  if(d.askWallet){ askWallet = { balance: d.askWallet.balance || 0, expiresAt: d.askWallet.expiresAt || askWallet.expiresAt }; }
+  if(d.askBonus && d.askBonus.amount > 0){
+    if(d.askBonus.walletCode) setStoredWalletCode(d.askBonus.walletCode);
+    askWallet = { balance: d.askBonus.balance || 0, expiresAt: d.askBonus.expiresAt || null };
+  }
+  askWalletLastFetch = Date.now();
+  renderAskWallet();
+}
+function showLifetimeBonus(b){
+  const box = $('#askBonusBox');
+  if(!box) return;
+  if(!b || !(b.amount > 0)){ box.hidden = true; return; }
+  const isLogged = !!currentSession;
+  $('#askBonusText').textContent = isLogged
+    ? `질문권 ${b.amount}회가 계정에 충전됐어요. 지금 남은 질문은 ${b.balance}개이고, 어느 기기에서든 쓸 수 있어요. 궁금한 걸 직접 물어보세요!`
+    : `질문권 ${b.amount}회가 충전됐어요. 지금 남은 질문은 ${b.balance}개예요. 로그인 없이 구매하셨다면 아래 복구 코드를 꼭 저장해 두세요. 궁금한 걸 직접 물어보세요!`;
+  const code = getStoredWalletCode();
+  $('#askBonusCode').hidden = isLogged || !code;
+  $('#askBonusCodeText').textContent = code;
+  box.hidden = false;
+}
+function refreshAskAgainLabel(){
+  const btn = $('#askAgainBtn');
+  if(!btn) return;
+  const isAdmin = !!(currentProfile && currentProfile.is_admin);
+  const bal = askWallet.balance || 0;
+  btn.textContent = bal > 0 ? `다른 질문하기 · 남은 ${bal}개` : (isAdmin ? '다른 질문하기' : '다른 질문하기 · 이용권 3,900원~');
+  const code = getStoredWalletCode();
+  const showCode = !currentSession && !!code;
+  const box = $('#askAgainCode');
+  if(box){ box.hidden = !showCode; $('#askAgainCodeText').textContent = code; }
+}
+wireCopyButton('askWalletCopyBtn', ()=> getStoredWalletCode());
+wireCopyButton('askAgainCopyBtn', ()=> getStoredWalletCode());
+wireCopyButton('askBonusCopyBtn', ()=> getStoredWalletCode());
+$('#askWalletCodeToggle').addEventListener('click', ()=>{ $('#askWalletCodeBox').hidden = !$('#askWalletCodeBox').hidden; });
+$('#askRestoreToggle').addEventListener('click', ()=>{ $('#askRestoreBox').hidden = !$('#askRestoreBox').hidden; });
+$('#askRestoreBtn').addEventListener('click', async ()=>{
+  const msg = $('#askRestoreMsg');
+  const v = $('#askRestoreInput').value.trim().toUpperCase();
+  const showMsg = (t)=>{ msg.textContent = t; msg.hidden = !t; };
+  if(v.replace(/[^A-Z0-9]/g, '').length < 12){ showMsg('코드를 정확히 입력해주세요. (예: ABCD-EFGH-JKLM-NPQR)'); return; }
+  const btn = $('#askRestoreBtn');
+  btn.disabled = true;
+  const prev = getStoredWalletCode();
+  setStoredWalletCode(v);
+  const d = await refreshAskWallet(true);
+  btn.disabled = false;
+  if(!d || d.codeNotFound){
+    setStoredWalletCode(prev);
+    renderAskWallet();
+    showMsg('이 코드로 이용권을 찾지 못했어요. 코드를 다시 확인해주세요.');
+    return;
+  }
+  logFunnelEvent('qa_wallet_restore');
+  $('#askRestoreInput').value = '';
+  $('#askRestoreBox').hidden = true;
+  showMsg('');
+  renderAskWallet();
+});
+$('#askBonusGoBtn').addEventListener('click', ()=> askAgain(''));
+// (초기 표시는 로그인 초기화·AI 탭 진입 때 refreshAskWallet()/renderAskWallet()가 처리한다 — 이 위치는 currentSession 선언보다 앞이라 여기서 부르면 안 된다)
+
+async function askRequest(mode){
+  selectedAiCategory = 'ask';
+  askRequestMode = mode;
+  let payload;
+  try{ payload = buildAiPayload(); } finally { askRequestMode = null; }
+  if(!payload) throw new Error('먼저 사주 결과를 확인해주세요.');
+  const res = await fetch('/api/interpret', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(()=>({}));
+  return { ok: res.ok, status: res.status, data };
+}
+async function submitAskQuestion(){
+  if(askBusy) return;
+  const q = cleanAskInput();
+  if(q.length < 2){ showAskError('궁금한 내용을 두 글자 이상 적어주세요.'); return; }
+  showAskError('');
+  askQuestionText = q;
+  askPreviewText = '';
+  $('#askPreview').hidden = true;
+  askBusy = true;
+  const btn = $('#askSubmitBtn');
+  btn.disabled = true;
+  btn.textContent = '사주를 읽는 중…';
+  logFunnelEvent('qa_question_submit');
+  const isAdmin = !!(currentProfile && currentProfile.is_admin);
+  try{
+    const hasCredit = (askWallet.balance || 0) > 0;
+    const mode = (hasCredit || (askPreviewUsed() && !isAdmin)) ? 'check' : 'preview';
+    const r = await askRequest(mode);
+    if(!r.ok){
+      const code = r.data && r.data.code;
+      if(code === 'visitor_used' || code === 'daily_cap' || code === 'ip_limit'){
+        if(code === 'visitor_used') markAskPreviewUsed();
+        showAskPreviewBox({ label: '✦ 안내', text: '', note: r.data.error || '', showFull: true });
+        return;
+      }
+      showAskError((r.data && r.data.error) || `요청에 실패했어요. (${r.status}) 잠시 후 다시 시도해주세요.`);
+      return;
+    }
+    const d = r.data || {};
+    if(d.kind === 'blocked'){
+      logFunnelEvent('qa_blocked');
+      showAskPreviewBox({ label: '✦ 안내', text: d.text, note: '', showFull: false });
+      return;
+    }
+    if(d.kind === 'preview'){
+      markAskPreviewUsed();
+      askPreviewText = d.text || '';
+      logFunnelEvent('qa_preview_shown');
+      showAskPreviewBox({ label: '✦ 무료 맛보기', text: askPreviewText, note: '이어지는 이유와 지금 해볼 행동은 전체 답변에서 확인할 수 있어요.', showFull: true });
+      return;
+    }
+    if(d.kind === 'ok'){ goToAskPay(); return; }
+    showAskError('답변을 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
+  } catch(err){
+    showAskError('네트워크 오류가 발생했어요. 잠시 후 다시 시도해주세요.');
+  } finally {
+    askBusy = false;
+    btn.disabled = false;
+    refreshAskButton();
+  }
+}
+$('#askInput').addEventListener('input', ()=>{
+  $('#askCount').textContent = `${$('#askInput').value.length}/200`;
+  showAskError('');
+});
+$$('#askChips .ask-chip').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    $('#askInput').value = chip.textContent.trim();
+    $('#askCount').textContent = `${$('#askInput').value.length}/200`;
+    showAskError('');
+  });
+});
+$('#askSubmitBtn').addEventListener('click', submitAskQuestion);
+$('#askFullBtn').addEventListener('click', goToAskPay);
+// 질문 답변 아래 "이어서 더 물어보세요": 답을 읽고 생긴 다음 궁금증을 바로 다음 질문(2,900원)으로 잇는다.
+// 이어지는 질문 칩은 방금 질문에 들어 있는 주제어로 고른 고정 문구다(AI 호출 없음, 비용 0).
+const ASK_FOLLOWUPS = [
+  { re: /돈|재물|수입|월급|투자|부업|저축|재테크|부자/, qs: ['그럼 어떤 방식으로 수입을 늘리는 게 잘 맞을까요?', '올해 돈이 새는 걸 막으려면 뭘 조심해야 하나요?', '부업을 시작한다면 언제가 좋을까요?'] },
+  { re: /이직|취업|직장|회사|사업|창업|커리어|퇴사|승진|일/, qs: ['지금 자리에서 더 버티는 게 나을까요, 움직이는 게 나을까요?', '저에게 잘 맞는 일하는 방식은 뭔가요?', '올해 안에 움직인다면 언제가 가장 좋을까요?'] },
+  { re: /연애|결혼|만나|이별|재회|사랑|썸|남자친구|여자친구|배우자|애인/, qs: ['저는 어떤 사람과 있을 때 가장 편한가요?', '제가 연애에서 반복하는 패턴은 뭔가요?', '앞으로 인연이 들어오는 시기는 언제쯤인가요?'] },
+  { re: /지치|피곤|우울|스트레스|불안|힘들|건강|번아웃/, qs: ['제 에너지가 가장 잘 회복되는 방식은 뭔가요?', '올해 몸과 마음이 흔들리기 쉬운 때는 언제인가요?', '컨디션을 지키려면 어떤 생활 리듬이 맞을까요?'] },
+];
+const ASK_FOLLOWUPS_DEFAULT = ['올해 가장 조심해야 할 시기는 언제인가요?', '제가 지금 가장 먼저 바꿔야 할 한 가지는 뭔가요?', '앞으로 1~2년 안에 운이 풀리는 시기는 언제인가요?'];
+function pickAskFollowups(q){
+  const hit = ASK_FOLLOWUPS.find(f => f.re.test(q || ''));
+  return hit ? hit.qs : ASK_FOLLOWUPS_DEFAULT;
+}
+function showAskAgain(question){
+  const box = $('#askAgain');
+  if(!box) return;
+  const chips = $('#askAgainChips');
+  chips.textContent = '';
+  pickAskFollowups(question).forEach(q=>{
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'ask-chip';
+    b.textContent = q;
+    b.addEventListener('click', ()=> askAgain(q));
+    chips.appendChild(b);
+  });
+  refreshAskAgainLabel();
+  box.hidden = false;
+}
+// 결과 화면에서 질문 카드로 돌아간다. 뒤로가기 처리(aiResult 트랩)는 이미 popstate 핸들러가
+// "결과 → 카테고리 목록" 복귀로 정리해 주므로, 트랩이 있으면 history.back()으로 그 경로를 그대로 탄다.
+function askAgain(prefill){
+  logFunnelEvent('qa_again_click');
+  const finish = ()=>{
+    $('#askInput').value = prefill || '';
+    $('#askCount').textContent = `${$('#askInput').value.length}/200`;
+    showAskError('');
+    const c = $('#askCard');
+    if(c && c.scrollIntoView) c.scrollIntoView({ block: 'start' });
+    if(!prefill) $('#askInput').focus({ preventScroll: true });
+  };
+  if(aiResultPushedState){
+    history.back();
+    setTimeout(finish, 120);
+  } else {
+    resetAiPanel();
+    finish();
+  }
+}
+$('#askAgainBtn').addEventListener('click', ()=> askAgain(''));
+$('#hookAskBtn')?.addEventListener('click', ()=>{
+  activateGroup('ai');
+  setTimeout(()=>{ const c = $('#askCard'); if(c && c.scrollIntoView) c.scrollIntoView({ block: 'start' }); else window.scrollTo(0,0); }, 0);
+});
 // 2026-08-30: 포트원(PortOne) V2 결제창을 실제로 띄운다(KG이니시스 테스트 채널).
 // 결제창의 성공/실패는 여기서 참고만 하고, 최종 신뢰는 서버(api/interpret.js)가
 // paymentId를 포트원에 재조회해서 판단한다 — 클라이언트 응답만으로 아래를 판단해
@@ -7294,6 +7910,7 @@ $('#mockPayBtn').addEventListener('click', async ()=>{
   // (버튼을 빠르게 두 번 누르면 결제창이 중복으로 뜨거나 OpenAI 호출/purchases 기록이
   // 중복될 수 있어서 막아둠).
   if(aiInterpretInFlight) return;
+  if(selectedAiCategory === 'ask' && (!askQuestionText || !selectedAskPack)){ closePayModal(); showAiStep('aiStepCategory'); return; }
   if(!window.PortOne){
     alert('결제 모듈을 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
     return;
@@ -7480,6 +8097,7 @@ async function runAiInterpretation(){
   if(aiInterpretInFlight) return; // 이중 호출 방지 (버튼 가드와 별개로 함수 자체도 재진입을 막아둠)
   const payload = buildAiPayload();
   if(!payload){ return; }
+  askUseWallet = false; // 이번 요청에만 쓰는 일회성 값
   aiInterpretInFlight = true;
   $('#aiLocked').hidden = true;
   $('#aiError').hidden = true;
@@ -7487,6 +8105,15 @@ async function runAiInterpretation(){
   $('#aiLoading').hidden = false;
   startAiLoadingEta();
   try{
+    // 질문: 이용권을 방금 결제했다면(또는 관리자 테스트) 먼저 충전하고, 그 이용권에서 1회를 써서 답변을 받는다.
+    if(payload.category === 'ask' && selectedAskPack && (payload.paymentId || (currentProfile && currentProfile.is_admin))){
+      await purchaseAskPack(payload);
+      delete payload.paymentId;
+      delete payload.pack;
+      payload.useWallet = true;
+      const wc = getStoredWalletCode();
+      if(wc) payload.walletCode = wc;
+    }
     const res = await fetch('/api/interpret', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -7494,12 +8121,14 @@ async function runAiInterpretation(){
     });
     if(!res.ok){
       const errBody = await res.json().catch(()=>({}));
-      throw new Error(errBody.error || `요청 실패 (${res.status})`);
+      const e = new Error(errBody.error || `요청 실패 (${res.status})`);
+      e.code = errBody.code;
+      throw e;
     }
     const data = await res.json();
     $('#aiLoading').hidden = true;
     stopAiLoadingEta();
-    lastAiResultText = data.interpretation || '해석 결과를 받아오지 못했어요.';
+    lastAiResultText = data.interpretation || (data.kind === 'blocked' && data.text) || '해석 결과를 받아오지 못했어요.';
     // Meta Pixel: 서버(api/interpret.js)가 포트원 결제를 실제로 재조회·검증한 뒤에만
     // 도달하는 이 지점에서만 Purchase를 발생시킨다 (2026-09-23). 결제 실패/취소/중단이면
     // 서버가 402를 돌려주고 이 줄 자체에 도달하지 못하므로(위 catch로 빠짐) 별도 분기가
@@ -7511,6 +8140,9 @@ async function runAiInterpretation(){
     }
     renderAiResult($('#aiResultText'), lastAiResultText);
     renderAiResultNote();
+    applyAskWalletResponse(data);
+    if(payload.category === 'ask' && data.interpretation){ showAskAgain(askQuestionText); } else { $('#askAgain').hidden = true; }
+    showLifetimeBonus(payload.category === 'lifetime' ? data.askBonus : null);
     $('#aiResult').hidden = false;
     // 뒤로가기(브라우저/기기 back)를 누르면 이 결과 화면에서 페이지 자체를 이탈하는 대신
     // 유료 콘텐츠 목록으로 돌아가도록 히스토리에 상태를 하나 쌓아둔다. 같은 결과를 보는 동안
@@ -7532,7 +8164,9 @@ async function runAiInterpretation(){
     const isLoginError = /로그인/.test(err.message);
     $('#aiError').textContent = isLoginError
       ? err.message
-      : '심층풀이를 불러오지 못했어요. (' + err.message + ') 이 기능은 배포 후 /api/interpret 서버 함수가 연결되어 있어야 동작합니다.';
+      : (payload.category === 'ask'
+          ? '질문 답변을 불러오지 못했어요. (' + err.message + ')' + (err.code === 'pack_failed' ? '' : ' 남은 질문 횟수는 차감되지 않아요.')
+          : '심층풀이를 불러오지 못했어요. (' + err.message + ') 이 기능은 배포 후 /api/interpret 서버 함수가 연결되어 있어야 동작합니다.');
     $('#aiLocked').hidden = false;
   } finally {
     aiInterpretInFlight = false;
@@ -7654,6 +8288,8 @@ function renderAiResultNote(){
       + '<button class="ai-result-note-btn" id="aiResultPdfBtn">📄 지금 PDF로 저장하기</button>' + '<button class="ai-result-note-btn" id="aiResultShareBtn">💬 카카오톡으로 공유하기</button>';
     $('#aiResultPdfBtn').addEventListener('click', (e)=>{ downloadCurrentResultPdf(e.currentTarget); });
   }
+  // 질문형 상담은 개인적인 질문이 담겨 있어 카카오톡 공유 대상에서 뺀다.
+  if(selectedAiCategory === 'ask'){ const sb = $('#aiResultShareBtn'); if(sb) sb.remove(); }
 }
 // 비회원은 결제 기록이 DB에 남지 않으므로(내 결제내역 접근 불가), 방금 받은 해석 결과를
 // 기존 downloadPurchasePdf()가 기대하는 형태(row 객체)로 감싸서 그대로 재사용한다.
@@ -7830,7 +8466,7 @@ const ATTRIBUTION = captureAttribution();
 // 출처 컬럼이 아직 DB에 없으면(SQL 미실행) 거부될 수 있어, 그때는 출처 없이 한 번 더 기록해
 // 기존 퍼널 집계가 끊기지 않게 한다.
 function logFunnelEvent(eventType){
-  if(!sb) return;
+  if(!sb || IS_PREVIEW_HOST) return;
   try{
     const base = {
       event_type: eventType,
@@ -7869,8 +8505,8 @@ function escapeHtml(str){
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
-const CATEGORY_LABEL = { comprehensive:'종합 사주 해석', love:'연애·재회운', compatibility:'궁합&결혼', newyear:'2027 신년운세', wealth:'재물운', career:'취업·사업·이동운', pet:'반려동물궁합', lifetime:'평생운 프리미엄' };
-const CATEGORY_FILE_LABEL = { comprehensive:'종합사주', love:'연애운', compatibility:'궁합', newyear:'신년운세', wealth:'재물운', career:'취업사업운', pet:'반려동물궁합', lifetime:'평생운프리미엄' };
+const CATEGORY_LABEL = { comprehensive:'종합 사주 해석', love:'연애·재회운', compatibility:'궁합&결혼', newyear:'2027 신년운세', wealth:'재물운', career:'취업·사업·이동운', pet:'반려동물궁합', lifetime:'평생운 프리미엄', ask:'질문형 상담', ask_pack:'질문 이용권' };
+const CATEGORY_FILE_LABEL = { comprehensive:'종합사주', love:'연애운', compatibility:'궁합', newyear:'신년운세', wealth:'재물운', career:'취업사업운', pet:'반려동물궁합', lifetime:'평생운프리미엄', ask:'질문상담', ask_pack:'질문이용권' };
 const PURCHASE_STATUS_LABEL = { paid:'결제완료', pending:'대기중', failed:'실패', refunded:'환불됨' };
 // 결제한 리포트를 "내 결제내역"에서 다시 볼 수 있는 기간(일). 이 기간이 지나면 화면에서는
 // 더 이상 다시 열어볼 수 없지만(서버 데이터는 그대로 남아있음), 그 안에 PDF로 받아두면
@@ -8446,7 +9082,7 @@ if($('#exportPurchaseCsvBtn')){
       (r.profiles && r.profiles.nickname) || '알 수 없음',
       r.id,
       (r.payload && r.payload.paymentId) || '',
-      r.pg_provider === 'admin_bypass' ? '관리자 무료' : '실결제',
+      r.pg_provider === 'admin_bypass' ? '관리자 무료' : (r.pg_provider === 'qa_credit' ? '이용권 사용' : '실결제'),
     ]);
     downloadCSV('결제내역', headers, rows);
   });
@@ -8495,7 +9131,8 @@ async function refreshPurchaseList(startISO, endISO){
 function filterPurchasesByProvider(rows, filter){
   if(filter === 'admin') return rows.filter(r=>r.pg_provider === 'admin_bypass');
   if(filter === 'all') return rows;
-  return rows.filter(r=>r.pg_provider !== 'admin_bypass');
+  // 이용권으로 질문한 건(qa_credit, 0원)은 이용권 구매 때 이미 매출로 잡혔으므로 실결제 목록에서는 뺀다.
+  return rows.filter(r=>r.pg_provider !== 'admin_bypass' && r.pg_provider !== 'qa_credit');
 }
 // 기간 재조회 없이 이미 받아온 lastPurchasesRaw만 다시 필터링해서 그리므로 필터 탭 전환은
 // Supabase 재조회 없이 즉시 반영된다. lastPurchasesData는 CSV 내보내기가 그대로 읽는 값이므로
@@ -8906,6 +9543,9 @@ function savePaymentResumeSnapshot(paymentId){
       jobStatus: selectedJobStatus,
       partnerData: partnerData,
       petData: petData,
+      askPack: selectedAiCategory === 'ask' ? selectedAskPack : null,
+      askQuestion: selectedAiCategory === 'ask' ? askQuestionText : '',
+      askPreviewText: selectedAiCategory === 'ask' ? askPreviewText : '',
       paymentId: paymentId,
     };
     localStorage.setItem(PAYMENT_SNAPSHOT_KEY, JSON.stringify(snapshot));
@@ -8960,6 +9600,7 @@ function restorePaymentResumeSnapshotIfAny(){
   pendingRestoreJobStatus = snap.jobStatus || null;
   pendingRestorePartnerData = snap.partnerData || null;
   pendingRestorePetData = snap.petData || null;
+  pendingRestoreAsk = (snap.aiCategory === 'ask' && snap.askQuestion) ? { question: String(snap.askQuestion), preview: String(snap.askPreviewText || ''), pack: ASK_PACK_INFO[snap.askPack] ? snap.askPack : null } : null;
   setTimeout(()=>{ $('#submitBtn').click(); }, 50);
 }
 // ---- 새로고침 시 무료 결과 복구 (2026-09-20 QA 대응) ----
@@ -9086,6 +9727,7 @@ async function initAuth(){
     currentSession = session || null;
     currentProfile = currentSession ? await loadProfile(currentSession.user.id) : null;
     updateAccountBtn();
+    refreshAskWallet(true); // 로그인/로그아웃이 바뀌면 이용권 잔액을 다시 가져온다(비회원 코드는 계정으로 합쳐진다)
     if($('#loginModal') && !$('#loginModal').hidden){ renderLoginModal(); }
     if(event === 'SIGNED_IN'){ closeLoginModal(); }
   });
