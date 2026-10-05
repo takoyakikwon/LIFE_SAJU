@@ -1237,12 +1237,13 @@ window.SajuAnalytics = (function(){
   .ask-pack-q{font-family:"Noto Serif KR"; font-weight:700; font-size:14px; line-height:1.6; color:var(--ink); word-break:keep-all;}
   .ask-pack-sub{font-size:11.5px; color:var(--ink-soft); margin-top:6px; line-height:1.55;}
   .ask-pack-list{display:flex; flex-direction:column; gap:9px;}
-  .ask-pack{position:relative; display:grid; grid-template-columns:1fr auto; grid-template-areas:"name price" "unit price"; align-items:center; text-align:left; width:100%; padding:14px 16px; cursor:pointer; border:1.5px solid var(--gold-line); border-radius:var(--radius-sm); background:var(--paper-card); font-family:"Noto Sans KR";}
+  .ask-pack{position:relative; display:grid; grid-template-columns:1fr auto; grid-template-areas:"name price"; align-items:center; text-align:left; width:100%; padding:14px 16px; cursor:pointer; border:1.5px solid var(--gold-line); border-radius:var(--radius-sm); background:var(--paper-card); font-family:"Noto Sans KR";}
   .ask-pack:active{transform:translateY(1px);}
   .ask-pack-hot{border-color:var(--gold); background:linear-gradient(160deg, rgba(244,196,99,.16), rgba(244,196,99,.04));}
   .ask-pack-name{grid-area:name; font-family:"Noto Serif KR"; font-weight:900; font-size:15px; color:var(--ink);}
-  .ask-pack-unit{grid-area:unit; font-size:11.5px; color:var(--ink-soft); margin-top:2px;}
-  .ask-pack-price{grid-area:price; font-family:"Noto Serif KR"; font-weight:900; font-size:16px; color:var(--seal);}
+  .ask-pack-price{grid-area:price; font-family:"Noto Serif KR"; font-weight:900; font-size:16px; color:var(--seal); text-align:right; line-height:1.25;}
+  .ask-pack-price s{display:block; font-family:"Noto Sans KR"; font-weight:500; font-size:11px; color:var(--ink-faint); text-decoration:line-through;}
+  .ask-pack-off{display:inline-block; margin-right:6px; padding:1px 6px; border-radius:6px; background:#c0392b; color:#fff; font-family:"Noto Sans KR"; font-size:11px; font-weight:800; vertical-align:middle;}
   .ask-pack-badge{position:absolute; top:-8px; right:12px; padding:1px 8px; border-radius:999px; background:linear-gradient(160deg, var(--gold), #b8912f); color:#241d13; font-size:10px; font-weight:800;}
   .ask-pack-guest{margin-top:12px; padding:11px 12px; font-size:11.5px; line-height:1.65; color:var(--ink); border-radius:var(--radius-sm); border:1px dashed var(--gold); background:rgba(244,196,99,.07);}
   .ask-pack-admin{margin-top:10px; font-size:11.5px; color:var(--gold); font-weight:700;}
@@ -2146,9 +2147,9 @@ window.SajuAnalytics = (function(){
               <div class="ask-pack-sub">질문 이용권을 고르면 이 질문에 바로 답해드리고, 남은 횟수는 언제든 이어서 쓸 수 있어요.</div>
             </div>
             <div class="ask-pack-list">
-              <button type="button" class="ask-pack" data-pack="2"><span class="ask-pack-name">질문 2회권</span><span class="ask-pack-unit">질문당 1,950원</span><span class="ask-pack-price">3,900원</span></button>
-              <button type="button" class="ask-pack ask-pack-hot" data-pack="5"><span class="ask-pack-badge">인기</span><span class="ask-pack-name">질문 5회권</span><span class="ask-pack-unit">질문당 1,580원</span><span class="ask-pack-price">7,900원</span></button>
-              <button type="button" class="ask-pack" data-pack="10"><span class="ask-pack-name">질문 10회권</span><span class="ask-pack-unit">질문당 1,390원</span><span class="ask-pack-price">13,900원</span></button>
+              <button type="button" class="ask-pack" data-pack="2"><span class="ask-pack-name">질문 2회권</span><span class="ask-pack-price"><s>6,000원</s><span class="ask-pack-off">35%</span>3,900원</span></button>
+              <button type="button" class="ask-pack ask-pack-hot" data-pack="5"><span class="ask-pack-badge">인기</span><span class="ask-pack-name">질문 5회권</span><span class="ask-pack-price"><s>15,000원</s><span class="ask-pack-off">47%</span>7,900원</span></button>
+              <button type="button" class="ask-pack" data-pack="10"><span class="ask-pack-name">질문 10회권</span><span class="ask-pack-price"><s>30,000원</s><span class="ask-pack-off">54%</span>13,900원</span></button>
             </div>
             <div class="ask-pack-admin" id="askPackAdmin" hidden>관리자 테스트: 결제 없이 충전되고, 바로 1회 사용돼요.</div>
             <div class="ask-pack-guest" id="askPackGuest" hidden>
