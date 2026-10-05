@@ -1815,7 +1815,40 @@ async function releaseAskPreview(id) {
   } catch (e) { console.error('releaseAskPreview error:', e); }
 }
 
-async function handleAskPreview({ req, res, payload, isAdmin, apiKey, question, level }) {
+// ---- 질문 기록(서비스 개선용, 2026-10-05) ----
+// 답변까지 만든 질문만 qa_question_log에 남긴다(무료 맛보기 + 이용권 사용). 위기(A)·운명단정(C) 질문은
+// 위쪽에서 고정 안내만 하고 끝나므로 아예 기록하지 않는다. 관리자 테스트도 기록하지 않는다.
+// 이메일·전화번호·주민번호 모양은 가려서 저장하고, 90일이 지나면 삭제된다(SQL의 예약 작업 +
+// 아래 가끔 실행되는 정리). 기록 실패는 사용자 응답에 절대 영향을 주지 않는다.
+const ASK_LOG_RETENTION_DAYS = 90;
+function maskAskQuestionForLog(raw) {
+  return String(raw == null ? '' : raw)
+    .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[이메일]')
+    .replace(/\b\d{6}\s*-?\s*[1-4]\d{6}\b/g, '[번호]')
+    .replace(/\b0\d{1,2}\s*-?\s*\d{3,4}\s*-?\s*\d{4}\b/g, '[번호]')
+    .slice(0, ASK_QUESTION_MAX_LEN);
+}
+async function logAskQuestion({ visitorId, userId, kind, level, question }) {
+  try {
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return;
+    const q = maskAskQuestionForLog(question);
+    if (q.length < 2) return;
+    const vid = typeof visitorId === 'string' ? visitorId.trim().slice(0, 80) : '';
+    const expires = new Date(Date.now() + ASK_LOG_RETENTION_DAYS * 24 * 3600 * 1000).toISOString();
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/qa_question_log`, {
+      method: 'POST',
+      headers: askStoreHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
+      body: JSON.stringify({ visitor_id: vid || null, user_id: userId || null, kind, level: level || null, question: q, expires_at: expires }),
+    });
+    if (!r.ok) console.error('logAskQuestion failed:', r.status);
+    // 만료분 정리: 예약 작업(pg_cron)이 없는 환경에서도 쌓이지 않도록 가끔만 실행한다.
+    if (Math.random() < 0.02) {
+      await fetch(`${SUPABASE_URL}/rest/v1/qa_question_log?expires_at=lt.${encodeURIComponent(new Date().toISOString())}`, { method: 'DELETE', headers: askStoreHeaders() });
+    }
+  } catch (e) { console.error('logAskQuestion error:', e); }
+}
+
+async function handleAskPreview({ req, res, payload, user, isAdmin, apiKey, question, level }) {
   let reservedId = null;
   if (!isAdmin) { // 관리자(서버가 토큰으로 재검증)는 테스트를 위해 한도를 적용하지 않는다.
     const gate = await reserveAskPreview(req, payload.visitorId);
@@ -1834,6 +1867,7 @@ async function handleAskPreview({ req, res, payload, isAdmin, apiKey, question, 
       return;
     }
     console.log('[ask:preview]', JSON.stringify({ model, level, usage: r.usage || null }));
+    if (!isAdmin) await logAskQuestion({ visitorId: payload.visitorId, userId: user ? user.id : null, kind: 'preview', level, question });
     res.status(200).json({ kind: 'preview', level, text: trimAskPreview(scrubAskText(r.text)), usage: r.usage || null });
   } catch (e) {
     console.error('handleAskPreview error:', e);
@@ -2090,7 +2124,7 @@ module.exports = async (req, res) => {
       return;
     }
     if (payload.askMode === 'preview') {
-      await handleAskPreview({ req, res, payload, isAdmin, apiKey, question: askQuestion, level: askLevel });
+      await handleAskPreview({ req, res, payload, user, isAdmin, apiKey, question: askQuestion, level: askLevel });
       return;
     }
   }
@@ -2388,6 +2422,9 @@ module.exports = async (req, res) => {
       pgProvider: recordPgProvider,
       paymentId: payload.paymentId || null,
     });
+    if (payload.category === 'ask' && !isAdmin && text) {
+      await logAskQuestion({ visitorId: payload.visitorId, userId: user ? user.id : null, kind: 'paid', level: askLevel, question: askQuestion });
+    }
 
     const extra = {};
     walletDelivered = true;
