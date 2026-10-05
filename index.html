@@ -1107,6 +1107,15 @@ window.SajuAnalytics = (function(){
   .history-status.pending{ background:rgba(244,196,99,.16); color:#f4c463; }
   .history-status.failed, .history-status.refunded{ background:rgba(251,113,133,.16); color:#fb7185; }
   .history-result{ margin-top:9px; padding-top:9px; border-top:1px dashed var(--line); font-size:11.5px; line-height:1.7; white-space:pre-wrap; color:var(--ink-soft); }
+  /* 관리자: 질문 기록 */
+  .qalog-filters{ display:flex; gap:6px; align-items:center; margin:2px 0 8px; flex-wrap:wrap; }
+  .qalog-filters input[type=search]{ flex:1 1 140px; min-width:0; padding:7px 10px; border:1.5px solid var(--line); border-radius:var(--radius-sm); background:var(--paper-card); color:var(--ink); font-size:12px; }
+  .qalog-item{ border:1.5px solid var(--line); border-radius:var(--radius-sm); background:var(--paper-card); padding:11px 12px; }
+  .qalog-q{ font-size:12.5px; line-height:1.6; word-break:break-all; white-space:pre-wrap; margin-bottom:6px; }
+  .qalog-badge{ padding:1px 7px; border-radius:20px; font-size:9.5px; font-weight:700; }
+  .qalog-badge.free{ background:rgba(244,196,99,.16); color:#f4c463; }
+  .qalog-badge.paid{ background:rgba(52,211,153,.16); color:#34d399; }
+  .qalog-badge.lv{ background:rgba(251,113,133,.16); color:#fb7185; }
   .history-empty{ text-align:center; padding:26px 10px; color:var(--ink-faint); font-size:12px; }
   .campaign-table-wrap{ margin:2px 0 14px; overflow-x:auto; -webkit-overflow-scrolling:touch; }
   .campaign-table{ width:100%; border-collapse:collapse; font-size:10.5px; }
@@ -2292,6 +2301,31 @@ window.SajuAnalytics = (function(){
     <div id="campaignSummary" class="campaign-table-wrap"></div>
     <p class="modal-desc" style="margin-top:6px;">처음 들어온 광고 기준이에요. 꼬리표(UTM)가 없는 방문은 "직접/기타"로 보여요. 관리자 무료 열람은 매출에서 제외돼요.</p>
     <button class="modal-cancel" id="adModalCancel">닫기</button>
+  </div>
+</div>
+<div id="qaLogModal" class="modal-overlay" hidden>
+  <div class="modal-card modal-card-wide">
+    <div class="modal-title">질문 기록 — 누가 어떤 질문을 했나</div>
+    <div class="admin-period-bar">
+      <div class="funnel-period-tabs" id="qaLogPeriodTabs">
+        <button type="button" data-period="today">오늘</button>
+        <button type="button" data-period="week">이번 주</button>
+        <button type="button" data-period="month">이번 달</button>
+        <button type="button" class="active" data-period="all">전체</button>
+      </div>
+    </div>
+    <div class="admin-summary" id="qaLogSummary"></div>
+    <div class="qalog-filters">
+      <div class="funnel-period-tabs" id="qaLogKindTabs">
+        <button type="button" class="active" data-kind="all">전체</button>
+        <button type="button" data-kind="preview">무료</button>
+        <button type="button" data-kind="paid">유료</button>
+      </div>
+      <input type="search" id="qaLogSearch" placeholder="질문 내용 검색" aria-label="질문 내용 검색">
+    </div>
+    <div class="history-list" id="qaLogList"></div>
+    <p class="modal-desc" style="margin-top:6px;">답변까지 만든 질문만 기록돼요(관리자 테스트·위기/운명단정 질문 제외). 90일 뒤 자동 삭제되고, 이메일·전화번호 모양의 숫자는 가려져요. 질문에 개인적인 내용이 있을 수 있으니 화면 공유·캡처에 주의하세요.</p>
+    <button class="modal-cancel" id="qaLogModalCancel">닫기</button>
   </div>
 </div>
 <div id="adminModal" class="modal-overlay" hidden>
@@ -7525,7 +7559,7 @@ function refreshAskButton(){
   const bal = askWallet.balance || 0;
   btn.textContent = bal > 0
     ? `질문하고 답변 받기 · 남은 ${bal}개 사용`
-    : ((askPreviewUsed() && !isAdmin) ? '질문하고 답변 받기 · 이용권 3,900원~' : '무료로 한 줄 답 받기');
+    : ((askPreviewUsed() && !isAdmin) ? '질문하고 답변 받기' : '무료로 한 줄 답 받기');
 }
 function renderAskPreviewText(text){
   const body = $('#askPreviewBody');
@@ -9013,6 +9047,87 @@ function openAdModal(){
 }
 function closeAdModal(){ $('#adModal').hidden = true; }
 $('#adModalCancel').addEventListener('click', closeAdModal);
+// 2026-10-05: 질문 기록(관리자 전용). 브라우저는 qa_question_log 테이블을 직접 읽을 수 없고(RLS),
+// 관리자만 통과하는 admin_qa_question_log RPC로만 조회한다.
+const QALOG_LIMIT = 300;
+let qaLogRows = [], qaLogTotal = 0, qaLogPeriod = 'all', qaLogKind = 'all', qaLogSeq = 0;
+function qaLogFmtKst(iso){
+  const d = new Date(new Date(iso).getTime() + 9*3600*1000);
+  const p = n=>String(n).padStart(2,'0');
+  return `${p(d.getUTCMonth()+1)}/${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`;
+}
+function renderQaLog(){
+  const sumEl = $('#qaLogSummary'), listEl = $('#qaLogList');
+  const rows = qaLogRows;
+  const free = rows.filter(r=>r.kind==='preview').length, paid = rows.length - free;
+  const visitors = new Set(rows.map(r=>r.visitor||'')).size;
+  const members = rows.filter(r=>r.member).length;
+  const stat = (n,l)=>`<div class="stat" style="flex:1 1 22%; min-width:70px;"><div class="n">${n}</div><div class="l">${l}</div></div>`;
+  sumEl.style.flexWrap = 'wrap';
+  sumEl.innerHTML = stat(qaLogTotal,'전체 질문') + stat(free,'무료') + stat(paid,'유료') + stat(visitors,'질문한 사람(방문자)') + stat(members,'회원 질문');
+  const kw = String($('#qaLogSearch').value||'').trim().toLowerCase();
+  const view = rows.filter(r=> (qaLogKind==='all' || r.kind===qaLogKind) && (!kw || String(r.question||'').toLowerCase().includes(kw)));
+  if(!view.length){ listEl.innerHTML = '<div class="history-empty">조건에 맞는 질문이 없어요</div>'; return; }
+  const note = (qaLogTotal > rows.length) ? `<div class="history-empty" style="padding:8px;">최근 ${rows.length}건만 보여줘요 (전체 ${qaLogTotal}건)</div>` : '';
+  listEl.innerHTML = view.map(r=>{
+    const src = r.source ? (SOURCE_LABELS[r.source] || r.source) : '';
+    const camp = r.campaign ? ' / ' + r.campaign : '';
+    return `<div class="qalog-item"><div class="qalog-q">${escapeHtml(r.question||'')}</div><div class="history-meta">` +
+      `<span class="qalog-badge ${r.kind==='preview'?'free':'paid'}">${r.kind==='preview'?'무료':'유료'}</span>` +
+      (r.level ? `<span class="qalog-badge lv">전문영역</span>` : '') +
+      `<span>${r.member?'회원':'비회원'}</span><span>${escapeHtml(r.visitor||'-')}</span>` +
+      `<span>${escapeHtml(qaLogFmtKst(r.created_at))}</span>` +
+      (src ? `<span>${escapeHtml(src + camp)}</span>` : '') +
+      `</div></div>`;
+  }).join('') + note;
+}
+async function refreshQaLog(){
+  const listEl = $('#qaLogList');
+  if(!sb) return;
+  listEl.innerHTML = '<div class="history-empty">불러오는 중...</div>';
+  const mySeq = ++qaLogSeq;
+  const { data, error } = await sb.rpc('admin_qa_question_log', { p_start: computeFunnelPeriodStart(qaLogPeriod), p_end: null, p_limit: QALOG_LIMIT });
+  if(mySeq !== qaLogSeq) return;
+  if(error){
+    listEl.innerHTML = '<div class="history-empty">불러오지 못했어요 (' + escapeHtml(error.message) + ')<br>질문 기록 조회용 SQL을 아직 실행하지 않았다면 먼저 실행해 주세요.</div>';
+    $('#qaLogSummary').innerHTML = '';
+    return;
+  }
+  qaLogRows = data || [];
+  qaLogTotal = qaLogRows.length ? Number(qaLogRows[0].total_count) || qaLogRows.length : 0;
+  renderQaLog();
+}
+function openQaLogModal(){
+  $('#qaLogModal').hidden = false;
+  if(!sb || !currentSession){
+    $('#qaLogList').innerHTML = '<div class="history-empty">로그인이 필요해요.</div>';
+    $('#qaLogSummary').innerHTML = '';
+    return;
+  }
+  qaLogPeriod = 'all'; qaLogKind = 'all'; $('#qaLogSearch').value = '';
+  $$('#qaLogPeriodTabs button').forEach(b=>b.classList.toggle('active', b.dataset.period === 'all'));
+  $$('#qaLogKindTabs button').forEach(b=>b.classList.toggle('active', b.dataset.kind === 'all'));
+  refreshQaLog();
+}
+function closeQaLogModal(){ $('#qaLogModal').hidden = true; }
+$('#qaLogModalCancel').addEventListener('click', closeQaLogModal);
+$$('#qaLogPeriodTabs button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    $$('#qaLogPeriodTabs button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    qaLogPeriod = btn.dataset.period;
+    refreshQaLog();
+  });
+});
+$$('#qaLogKindTabs button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    $$('#qaLogKindTabs button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    qaLogKind = btn.dataset.kind;
+    renderQaLog();
+  });
+});
+$('#qaLogSearch').addEventListener('input', renderQaLog);
 async function refreshFunnelSteps(startISO, endISO){
   const el = $('#funnelStepsSummary');
   if(!el || !sb) return;
@@ -9418,12 +9533,14 @@ function renderLoginModal(){
       '<button class="menu-btn" id="inquiryMenuBtn">📮 문의하기</button>' +
       (isAdmin ? '<button class="menu-btn" id="adminMenuBtn">🛠 관리자 페이지</button>' : '') +
       (isAdmin ? '<button class="menu-btn" id="adMenuBtn">📈 광고 분석</button>' : '') +
+      (isAdmin ? '<button class="menu-btn" id="qaLogMenuBtn">💬 질문 기록</button>' : '') +
       '<button class="logout-btn" id="logoutBtn">로그아웃</button>' +
       '<button class="modal-cancel" id="loginModalCancel">닫기</button>';
     $('#historyMenuBtn').addEventListener('click', ()=>{ closeLoginModal(); openHistoryModal(); });
     $('#inquiryMenuBtn').addEventListener('click', ()=>{ closeLoginModal(); openInquiryModal(); });
     if(isAdmin){ $('#adminMenuBtn').addEventListener('click', ()=>{ closeLoginModal(); openAdminModal(); }); }
     if(isAdmin){ $('#adMenuBtn').addEventListener('click', ()=>{ closeLoginModal(); openAdModal(); }); }
+    if(isAdmin){ $('#qaLogMenuBtn').addEventListener('click', ()=>{ closeLoginModal(); openQaLogModal(); }); }
     $('#logoutBtn').addEventListener('click', async ()=>{
       if(sb){ await sb.auth.signOut(); }
       closeLoginModal();
