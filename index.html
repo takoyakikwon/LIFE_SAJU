@@ -1504,6 +1504,8 @@ window.SajuAnalytics = (function(){
     display:flex; position:absolute; inset:0; z-index:5;
     align-items:flex-start; justify-content:center; padding-top:64px; pointer-events:none;
   }
+  /* 심층풀이(AI) 화면은 그 자체가 결제 화면이라 잠금 안내 배지가 헤더 위에 겹쳐 보임 → 숨김 */
+  #view-result.ai-mode .locked-zone-overlay{ display:none !important; }
   .locked-zone-badge{
     background:rgba(20,16,12,.82); color:#f4e9d8; font-size:13px; font-weight:700;
     padding:10px 18px; border-radius:999px; border:1px solid rgba(244,196,99,.38);
