@@ -2008,7 +2008,7 @@ window.SajuAnalytics = (function(){
                 <div class="ask-preview-label" id="askPreviewLabel">✦ 무료 맛보기</div>
                 <div class="ask-preview-text" id="askPreviewBody"></div>
                 <div class="ask-preview-fade" id="askPreviewFade">이 근거가 왜 나오는지, 지금 무엇을 하면 좋은지는 전체 답변에서 확인하세요.</div>
-                <button type="button" class="submit-btn" id="askFullBtn">전체 답변 보기 · 2,900원</button>
+                <button type="button" class="submit-btn" id="askFullBtn">전체 답변 보기</button>
               </div>
               <div class="ask-note">사주·자미두수를 근거로 당신의 고민을 상담해드립니다.</div>
               <div class="ask-restore-row"><button type="button" class="ask-link" id="askRestoreToggle">질문 이용권 코드가 있어요</button></div>
@@ -2242,7 +2242,7 @@ window.SajuAnalytics = (function(){
             </div>
             <div class="ask-again-sub">답을 읽고 나서 생긴 궁금증, 질문 하나씩 바로 풀어드려요.</div>
             <div class="ask-chips" id="askAgainChips"></div>
-            <button type="button" class="submit-btn" id="askAgainBtn">다른 질문하기 · 2,900원</button>
+            <button type="button" class="submit-btn" id="askAgainBtn">다른 질문하기</button>
           </div>
           <div class="ai-result-note" id="aiResultNote"></div>
         </div>
@@ -7913,7 +7913,7 @@ $('#askFullBtn').addEventListener('click', ()=>{
   askPackViaFull = true;
   goToAskPay();
 });
-// 질문 답변 아래 "이어서 더 물어보세요": 답을 읽고 생긴 다음 궁금증을 바로 다음 질문(2,900원)으로 잇는다.
+// 질문 답변 아래 "이어서 더 물어보세요": 답을 읽고 생긴 다음 궁금증을 바로 다음 질문으로 잇는다.
 // 이어지는 질문 칩은 방금 질문에 들어 있는 주제어로 고른 고정 문구다(AI 호출 없음, 비용 0).
 const ASK_FOLLOWUPS = [
   { re: /돈|재물|수입|월급|투자|부업|저축|재테크|부자/, qs: ['그럼 어떤 방식으로 수입을 늘리는 게 잘 맞을까요?', '올해 돈이 새는 걸 막으려면 뭘 조심해야 하나요?', '부업을 시작한다면 언제가 좋을까요?'] },
