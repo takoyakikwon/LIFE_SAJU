@@ -1108,6 +1108,8 @@ window.SajuAnalytics = (function(){
   .history-status.failed, .history-status.refunded{ background:rgba(251,113,133,.16); color:#fb7185; }
   .history-result{ margin-top:9px; padding-top:9px; border-top:1px dashed var(--line); font-size:11.5px; line-height:1.7; white-space:pre-wrap; color:var(--ink-soft); }
   /* 관리자: 질문 기록 */
+  .ask-used-note{ font-size:11.5px; line-height:1.55; color:var(--gold); margin:0 2px 8px; text-align:center; }
+  .ask-pack-used{ font-size:11.5px; line-height:1.6; color:var(--gold); margin:0 2px 10px; padding:9px 11px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--paper-card); }
   .qalog-filters{ display:flex; gap:6px; align-items:center; margin:2px 0 8px; flex-wrap:wrap; }
   .qalog-filters input[type=search]{ flex:1 1 140px; min-width:0; padding:7px 10px; border:1.5px solid var(--line); border-radius:var(--radius-sm); background:var(--paper-card); color:var(--ink); font-size:12px; }
   .qalog-item{ border:1.5px solid var(--line); border-radius:var(--radius-sm); background:var(--paper-card); padding:11px 12px; }
@@ -1993,6 +1995,7 @@ window.SajuAnalytics = (function(){
               <textarea id="askInput" class="ask-input" maxlength="200" rows="3" placeholder="예) 올해 안에 이직하는 게 나을까요?"></textarea>
               <div class="ask-meta"><span id="askCount">0/200</span></div>
               <div class="ask-error" id="askError" hidden></div>
+              <div class="ask-used-note" id="askUsedNote" hidden>무료 한 줄 답은 이미 사용하셨어요. 추가 질문은 이용권으로 답해드려요.</div>
               <button type="button" class="submit-btn" id="askSubmitBtn">무료로 한 줄 답 받기</button>
               <div class="ask-preview" id="askPreview" hidden>
                 <div class="ask-preview-label" id="askPreviewLabel">✦ 무료 맛보기</div>
@@ -2179,6 +2182,7 @@ window.SajuAnalytics = (function(){
 
           <div id="aiStepAskPack" hidden>
             <button type="button" class="cat-back" id="askPackBackBtn">← 돌아가기</button>
+            <div class="ask-pack-used" id="askPackUsed" hidden>무료 한 줄 답은 이미 사용하셨어요. 이 질문은 이용권으로 바로 답해드려요.</div>
             <div class="ask-pack-head">
               <div class="ask-pack-qlabel">내 질문</div>
               <div class="ask-pack-q" id="askPackQuestion"></div>
@@ -5817,6 +5821,8 @@ let selectedAiCategory = null;
 // 질문형 상담 상태(2026-10-05). resetAiPanel()/resetAskCard()가 새 분석 때 비운다.
 let askQuestionText = '';
 let askPreviewText = '';
+// 화면에 떠 있는 무료 맛보기 박스가 어느 질문의 것인지(질문 입력칸을 고쳐도 맛보기 박스는 그대로 남겨 둔다)
+let askShownQ = '', askShownText = '', askPackViaFull = false;
 let askRequestMode = null; // 'preview' | 'check' — buildAiPayload가 payload.askMode로 싣는 일회성 값
 let askBusy = false;
 let pendingRestoreAsk = null;
@@ -7557,9 +7563,12 @@ function refreshAskButton(){
   if(!btn || askBusy) return;
   // 2026-10-05: 답변 미리보기 박스가 떠 있는 동안에는 위쪽 제출 버튼을 숨긴다(바로 아래 '전체 답변 보기' 버튼과 겹쳐 결제 유도처럼 보임).
   // 질문 문장을 고치면 미리보기를 닫고 다시 보인다.
-  btn.style.display = ($('#askPreview') && !$('#askPreview').hidden) ? 'none' : '';
+  btn.style.display = ($('#askPreview') && !$('#askPreview').hidden && cleanAskInput() === askShownQ) ? 'none' : '';
   const isAdmin = !!(currentProfile && currentProfile.is_admin);
   const bal = askWallet.balance || 0;
+  // 무료를 이미 쓴 방문자가 버튼을 누르면 곧바로 이용권 화면으로 가므로, 눌러보기 전에 이유를 먼저 알려준다.
+  const usedNote = $('#askUsedNote');
+  if(usedNote) usedNote.hidden = !(bal <= 0 && askPreviewUsed() && !isAdmin) || btn.style.display === 'none';
   btn.textContent = bal > 0
     ? `질문하고 답변 받기 · 남은 ${bal}개 사용`
     : ((askPreviewUsed() && !isAdmin) ? '질문하고 답변 받기' : '무료로 한 줄 답 받기');
@@ -7588,18 +7597,19 @@ function showAskPreviewBox(opts){
   $('#askPreviewFade').textContent = opts.note || '';
   $('#askPreviewFade').hidden = !opts.note;
   $('#askFullBtn').hidden = !opts.showFull;
+  askShownQ = askQuestionText; askShownText = askPreviewText;
   $('#askPreview').hidden = false;
   refreshAskButton();
 }
 function askInputChanged(){
   $('#askCount').textContent = `${$('#askInput').value.length}/200`;
   showAskError('');
-  const pv = $('#askPreview');
-  if(pv && !pv.hidden && !askBusy && cleanAskInput() !== askQuestionText){ pv.hidden = true; refreshAskButton(); }
+  if(!askBusy) refreshAskButton();   // 맛보기 박스는 닫지 않는다 — 질문을 고치면 제출 버튼만 다시 보인다
 }
 function resetAskCard(){
   askQuestionText = '';
   askPreviewText = '';
+  askShownQ = ''; askShownText = ''; askPackViaFull = false;
   askRequestMode = null;
   askBusy = false;
   const preview = $('#askPreview');
@@ -7631,6 +7641,8 @@ function showAskPackStep(){
   $('#askPackQuestion').textContent = `"${q}"`;
   $('#askPackGuest').hidden = !!currentSession;
   $('#askPackAdmin').hidden = !(currentProfile && currentProfile.is_admin);
+  // 맛보기 답변을 보지 않고(=이미 무료를 쓴 상태로) 바로 온 경우에만 이유를 안내
+  $('#askPackUsed').hidden = !(askPreviewUsed() && !askPackViaFull && !(currentProfile && currentProfile.is_admin));
   showAiStep('aiStepAskPack');
 }
 function chooseAskPack(n){
@@ -7834,7 +7846,7 @@ async function submitAskQuestion(){
   showAskError('');
   askQuestionText = q;
   askPreviewText = '';
-  $('#askPreview').hidden = true;
+  askPackViaFull = false;
   askBusy = true;
   const btn = $('#askSubmitBtn');
   btn.style.display = '';
@@ -7845,6 +7857,7 @@ async function submitAskQuestion(){
   try{
     const hasCredit = (askWallet.balance || 0) > 0;
     const mode = (hasCredit || (askPreviewUsed() && !isAdmin)) ? 'check' : 'preview';
+    if(mode === 'preview') $('#askPreview').hidden = true;   // 이미 떠 있는 맛보기(이전 질문)는 새 맛보기를 만들 때만 지운다
     const r = await askRequest(mode);
     if(!r.ok){
       const code = r.data && r.data.code;
@@ -7887,7 +7900,12 @@ $$('#askChips .ask-chip').forEach(chip=>{
   });
 });
 $('#askSubmitBtn').addEventListener('click', submitAskQuestion);
-$('#askFullBtn').addEventListener('click', goToAskPay);
+$('#askFullBtn').addEventListener('click', ()=>{
+  // 맛보기 박스의 '전체 답변 보기'는 그 박스에 보이는 질문의 것이다(입력칸에 다른 질문을 적었어도)
+  if(askShownQ){ askQuestionText = askShownQ; askPreviewText = askShownText; }
+  askPackViaFull = true;
+  goToAskPay();
+});
 // 질문 답변 아래 "이어서 더 물어보세요": 답을 읽고 생긴 다음 궁금증을 바로 다음 질문(2,900원)으로 잇는다.
 // 이어지는 질문 칩은 방금 질문에 들어 있는 주제어로 고른 고정 문구다(AI 호출 없음, 비용 0).
 const ASK_FOLLOWUPS = [
