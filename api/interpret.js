@@ -1828,7 +1828,8 @@ function maskAskQuestionForLog(raw) {
     .replace(/\b0\d{1,2}\s*-?\s*\d{3,4}\s*-?\s*\d{4}\b/g, '[번호]')
     .slice(0, ASK_QUESTION_MAX_LEN);
 }
-async function logAskQuestion({ visitorId, userId, kind, level, question }) {
+const ASK_LOG_ANSWER_MAX_LEN = 4000;
+async function logAskQuestion({ visitorId, userId, kind, level, question, answer }) {
   try {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return;
     const q = maskAskQuestionForLog(question);
@@ -1838,7 +1839,8 @@ async function logAskQuestion({ visitorId, userId, kind, level, question }) {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/qa_question_log`, {
       method: 'POST',
       headers: askStoreHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
-      body: JSON.stringify({ visitor_id: vid || null, user_id: userId || null, kind, level: level || null, question: q, expires_at: expires }),
+      body: JSON.stringify({ visitor_id: vid || null, user_id: userId || null, kind, level: level || null, question: q,
+        answer: answer ? String(answer).slice(0, ASK_LOG_ANSWER_MAX_LEN) : null, expires_at: expires }),
     });
     if (!r.ok) console.error('logAskQuestion failed:', r.status);
     // 만료분 정리: 예약 작업(pg_cron)이 없는 환경에서도 쌓이지 않도록 가끔만 실행한다.
@@ -1867,8 +1869,9 @@ async function handleAskPreview({ req, res, payload, user, isAdmin, apiKey, ques
       return;
     }
     console.log('[ask:preview]', JSON.stringify({ model, level, usage: r.usage || null }));
-    if (!isAdmin) await logAskQuestion({ visitorId: payload.visitorId, userId: user ? user.id : null, kind: 'preview', level, question });
-    res.status(200).json({ kind: 'preview', level, text: trimAskPreview(scrubAskText(r.text)), usage: r.usage || null });
+    const previewText = trimAskPreview(scrubAskText(r.text));
+    if (!isAdmin) await logAskQuestion({ visitorId: payload.visitorId, userId: user ? user.id : null, kind: 'preview', level, question, answer: previewText });
+    res.status(200).json({ kind: 'preview', level, text: previewText, usage: r.usage || null });
   } catch (e) {
     console.error('handleAskPreview error:', e);
     await releaseAskPreview(reservedId);
@@ -2423,7 +2426,7 @@ module.exports = async (req, res) => {
       paymentId: payload.paymentId || null,
     });
     if (payload.category === 'ask' && !isAdmin && text) {
-      await logAskQuestion({ visitorId: payload.visitorId, userId: user ? user.id : null, kind: 'paid', level: askLevel, question: askQuestion });
+      await logAskQuestion({ visitorId: payload.visitorId, userId: user ? user.id : null, kind: 'paid', level: askLevel, question: askQuestion, answer: text });
     }
 
     const extra = {};
