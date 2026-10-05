@@ -1114,6 +1114,13 @@ window.SajuAnalytics = (function(){
   .qalog-filters input[type=search]{ flex:1 1 140px; min-width:0; padding:7px 10px; border:1.5px solid var(--line); border-radius:var(--radius-sm); background:var(--paper-card); color:var(--ink); font-size:12px; }
   .qalog-item{ border:1.5px solid var(--line); border-radius:var(--radius-sm); background:var(--paper-card); padding:11px 12px; }
   .qalog-q{ font-size:12.5px; line-height:1.6; word-break:break-all; white-space:pre-wrap; margin-bottom:6px; }
+  .qalog-ans{ margin:2px 0 7px; }
+  .qalog-ans summary{ cursor:pointer; font-size:11px; font-weight:700; color:var(--gold); list-style:none; padding:2px 0; }
+  .qalog-ans summary::-webkit-details-marker{ display:none; }
+  .qalog-ans summary::before{ content:'▸ '; }
+  .qalog-ans[open] summary::before{ content:'▾ '; }
+  .qalog-ans-body{ margin-top:5px; padding:9px 10px; border-left:2px solid var(--line); background:rgba(255,255,255,.03); font-size:12px; line-height:1.7; white-space:pre-wrap; word-break:break-all; color:var(--ink-soft); }
+  .qalog-noans{ font-size:10.5px; color:var(--ink-faint); margin:0 0 6px; }
   .qalog-badge{ padding:1px 7px; border-radius:20px; font-size:9.5px; font-weight:700; }
   .qalog-badge.free{ background:rgba(244,196,99,.16); color:#f4c463; }
   .qalog-badge.paid{ background:rgba(52,211,153,.16); color:#34d399; }
@@ -2325,10 +2332,10 @@ window.SajuAnalytics = (function(){
         <button type="button" data-kind="preview">무료</button>
         <button type="button" data-kind="paid">유료</button>
       </div>
-      <input type="search" id="qaLogSearch" placeholder="질문 내용 검색" aria-label="질문 내용 검색">
+      <input type="search" id="qaLogSearch" placeholder="질문·답변 내용 검색" aria-label="질문·답변 내용 검색">
     </div>
     <div class="history-list" id="qaLogList"></div>
-    <p class="modal-desc" style="margin-top:6px;">답변까지 만든 질문만 기록돼요(관리자 테스트·위기/운명단정 질문 제외). 90일 뒤 자동 삭제되고, 이메일·전화번호 모양의 숫자는 가려져요. 질문에 개인적인 내용이 있을 수 있으니 화면 공유·캡처에 주의하세요.</p>
+    <p class="modal-desc" style="margin-top:6px;">답변까지 만든 질문과 AI 답변이 기록돼요(관리자 테스트·위기/운명단정 질문 제외). 90일 뒤 자동 삭제되고, 이메일·전화번호 모양의 숫자는 가려져요. 질문에 개인적인 내용이 있을 수 있으니 화면 공유·캡처에 주의하세요.</p>
     <button class="modal-cancel" id="qaLogModalCancel">닫기</button>
   </div>
 </div>
@@ -9091,13 +9098,15 @@ function renderQaLog(){
   sumEl.style.flexWrap = 'wrap';
   sumEl.innerHTML = stat(qaLogTotal,'전체 질문') + stat(free,'무료') + stat(paid,'유료') + stat(visitors,'질문한 사람(방문자)') + stat(members,'회원 질문');
   const kw = String($('#qaLogSearch').value||'').trim().toLowerCase();
-  const view = rows.filter(r=> (qaLogKind==='all' || r.kind===qaLogKind) && (!kw || String(r.question||'').toLowerCase().includes(kw)));
+  const view = rows.filter(r=> (qaLogKind==='all' || r.kind===qaLogKind) && (!kw || String(r.question||'').toLowerCase().includes(kw) || String(r.answer||'').toLowerCase().includes(kw)));
   if(!view.length){ listEl.innerHTML = '<div class="history-empty">조건에 맞는 질문이 없어요</div>'; return; }
   const note = (qaLogTotal > rows.length) ? `<div class="history-empty" style="padding:8px;">최근 ${rows.length}건만 보여줘요 (전체 ${qaLogTotal}건)</div>` : '';
   listEl.innerHTML = view.map(r=>{
     const src = r.source ? (SOURCE_LABELS[r.source] || r.source) : '';
     const camp = r.campaign ? ' / ' + r.campaign : '';
-    return `<div class="qalog-item"><div class="qalog-q">${escapeHtml(r.question||'')}</div><div class="history-meta">` +
+    return `<div class="qalog-item"><div class="qalog-q">${escapeHtml(r.question||'')}</div>` +
+      (r.answer ? `<details class="qalog-ans"><summary>AI 답변 보기</summary><div class="qalog-ans-body">${escapeHtml(r.answer)}</div></details>` : `<div class="qalog-noans">AI 답변 기록 없음 (답변 저장 기능 추가 이전 질문)</div>`) +
+      `<div class="history-meta">` +
       `<span class="qalog-badge ${r.kind==='preview'?'free':'paid'}">${r.kind==='preview'?'무료':'유료'}</span>` +
       (r.level ? `<span class="qalog-badge lv">전문영역</span>` : '') +
       `<span>${r.member?'회원':'비회원'}</span><span>${escapeHtml(r.visitor||'-')}</span>` +
