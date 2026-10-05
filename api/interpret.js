@@ -83,7 +83,7 @@ const CATEGORY_AMOUNT_KRW = {
   career: 7900,
   lifetime: 24900,
   // 질문형 상담(2026-10-05 설계안): 질문 1개 = 2,900원. 프론트 AI_CATEGORY_META.ask.price와 반드시 일치.
-  ask: 2900,
+  ask: 3900, // 질문은 이용권(ASK_PACKS)으로만 판다 — 이 값은 폴백 방지용(가장 싼 이용권 가격)일 뿐 직접 결제에는 쓰지 않는다.
 };
 
 // 클라이언트가 보낸 Supabase 액세스 토큰으로 실제 로그인한 사용자인지 서버에서 직접 확인한다.
@@ -1842,6 +1842,186 @@ async function handleAskPreview({ req, res, payload, isAdmin, apiKey, question, 
   }
 }
 
+// ============================================================
+// 질문 이용권(지갑) — 2026-10-05. 질문은 "이용권 N회"로 판다: 2회 3,900원 / 5회 7,900원 / 10회 13,900원.
+// 평생운 프리미엄을 사면 질문 2회를 증정한다. 이용권은 돈과 같은 자산이라 모두 서버가 관리한다.
+//  - 로그인 사용자: user_id로 지갑을 찾는다(다른 기기에서도 사용 가능).
+//  - 비회원: 구매 때 발급한 복구 코드(해시만 저장)로 지갑을 찾는다. 브라우저를 바꿔도 코드를 입력하면 복구.
+//  - 비회원이 나중에 로그인하면 코드를 같이 보내 계정 지갑으로 합친다(qa_wallet_merge, 원자적).
+//  - 충전은 qa_credit_events.payment_id 유니크로 같은 결제가 두 번 충전되지 않게 하고,
+//    차감/충전은 DB 함수(qa_wallet_use/add)로 원자적으로 처리한다(동시 요청에도 잔액이 음수가 되지 않음).
+//  - AI 답변 생성이 실패하면 차감한 1회를 돌려준다.
+// ============================================================
+const ASK_PACKS = { 2: { price: 3900 }, 5: { price: 7900 }, 10: { price: 13900 } };
+const ASK_BONUS_LIFETIME = 2;
+const ASK_WALLET_VALID_DAYS = 365;
+const WALLET_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 헷갈리는 0/O/1/I 제외
+
+function normalizeWalletCode(code) {
+  return String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32);
+}
+function hashWalletCode(code) {
+  const n = normalizeWalletCode(code);
+  if (n.length < 12) return null;
+  return crypto.createHash('sha256').update(n + '|' + (process.env.QA_WALLET_SALT || 'saju-wallet')).digest('hex');
+}
+function generateWalletCode() {
+  const bytes = crypto.randomBytes(16);
+  let raw = '';
+  for (let i = 0; i < 16; i++) raw += WALLET_CODE_ALPHABET[bytes[i] % WALLET_CODE_ALPHABET.length];
+  return raw.match(/.{4}/g).join('-');
+}
+function walletEffectiveBalance(w) {
+  if (!w) return 0;
+  return (w.expires_at && new Date(w.expires_at).getTime() > Date.now()) ? (w.balance || 0) : 0;
+}
+async function walletRest(method, pathQuery, body, prefer) {
+  const headers = askStoreHeaders(body ? { 'Content-Type': 'application/json' } : {});
+  if (prefer) headers['Prefer'] = prefer;
+  return fetch(`${SUPABASE_URL}/rest/v1/${pathQuery}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
+}
+async function walletRpc(fn, args) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, { method: 'POST', headers: askStoreHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(args) });
+  if (!r.ok) { console.error('walletRpc failed', fn, r.status, await r.text()); return null; }
+  const v = await r.json();
+  return typeof v === 'number' ? v : (Array.isArray(v) && typeof v[0] === 'number' ? v[0] : null);
+}
+async function findWalletByUser(userId) {
+  const r = await walletRest('GET', `qa_wallets?user_id=eq.${encodeURIComponent(userId)}&select=id,user_id,balance,expires_at&limit=1`);
+  if (!r.ok) { console.error('findWalletByUser failed', r.status, await r.text()); throw new Error('wallet_lookup_failed'); }
+  const rows = await r.json();
+  return rows && rows[0] || null;
+}
+async function findWalletByCode(code) {
+  const h = hashWalletCode(code);
+  if (!h) return null;
+  const r = await walletRest('GET', `qa_wallets?recovery_hash=eq.${h}&select=id,user_id,balance,expires_at&limit=1`);
+  if (!r.ok) { console.error('findWalletByCode failed', r.status, await r.text()); throw new Error('wallet_lookup_failed'); }
+  const rows = await r.json();
+  return rows && rows[0] || null;
+}
+async function createWallet({ userId, codeHash }) {
+  const expires = new Date(Date.now() + ASK_WALLET_VALID_DAYS * 86400000).toISOString();
+  const r = await walletRest('POST', 'qa_wallets', { user_id: userId || null, recovery_hash: codeHash || null, balance: 0, expires_at: expires }, 'return=representation');
+  if (r.status === 409 && userId) return findWalletByUser(userId); // 동시에 두 번 만들어진 경우
+  if (!r.ok) { console.error('createWallet failed', r.status, await r.text()); throw new Error('wallet_create_failed'); }
+  const rows = await r.json();
+  return rows && rows[0] || null;
+}
+// 지갑 찾기(+ 필요하면 만들기). 비회원이 로그인한 상태로 복구 코드를 같이 보내면 계정 지갑으로 합친다.
+async function resolveWallet({ user, walletCode, create }) {
+  if (user) {
+    let w = await findWalletByUser(user.id);
+    let linked = false;
+    if (walletCode) {
+      const g = await findWalletByCode(walletCode);
+      if (g && !g.user_id && (!w || g.id !== w.id)) {
+        if (!w) w = await createWallet({ userId: user.id });
+        if (w) {
+          const merged = await walletRpc('qa_wallet_merge', { p_from: g.id, p_to: w.id });
+          if (merged !== null && merged >= 0) { linked = true; w = await findWalletByUser(user.id); }
+        }
+      }
+    }
+    if (!w && create) w = await createWallet({ userId: user.id });
+    return { wallet: w, newCode: null, linked };
+  }
+  if (walletCode) {
+    const w = await findWalletByCode(walletCode);
+    if (w) return { wallet: w, newCode: null, linked: false };
+  }
+  if (create) {
+    const code = generateWalletCode();
+    const w = await createWallet({ codeHash: hashWalletCode(code) });
+    return { wallet: w, newCode: code, linked: false };
+  }
+  return { wallet: null, newCode: null, linked: false };
+}
+async function walletAddCredits(walletId, amount, reason, paymentId) {
+  const ev = await walletRest('POST', 'qa_credit_events', { wallet_id: walletId, delta: amount, reason, payment_id: paymentId || null }, 'return=minimal');
+  if (ev.status === 409) return { ok: false, duplicate: true };
+  if (!ev.ok) { console.error('walletAddCredits event failed', ev.status, await ev.text()); return { ok: false }; }
+  const expires = new Date(Date.now() + ASK_WALLET_VALID_DAYS * 86400000).toISOString();
+  const balance = await walletRpc('qa_wallet_add', { p_wallet: walletId, p_amount: amount, p_expires: expires });
+  if (balance === null || balance < 0) {
+    if (paymentId) { try { await walletRest('DELETE', `qa_credit_events?payment_id=eq.${encodeURIComponent(paymentId)}`); } catch (e) {} }
+    return { ok: false };
+  }
+  return { ok: true, balance, expiresAt: expires };
+}
+async function walletSpendOne(walletId) {
+  const balance = await walletRpc('qa_wallet_use', { p_wallet: walletId });
+  if (balance === null || balance < 0) return null;
+  try { await walletRest('POST', 'qa_credit_events', { wallet_id: walletId, delta: -1, reason: 'use' }, 'return=minimal'); } catch (e) {}
+  return balance;
+}
+async function walletRefundOne(walletId) {
+  try {
+    const expires = new Date(Date.now() + ASK_WALLET_VALID_DAYS * 86400000).toISOString();
+    await walletRpc('qa_wallet_add', { p_wallet: walletId, p_amount: 1, p_expires: expires });
+    await walletRest('POST', 'qa_credit_events', { wallet_id: walletId, delta: 1, reason: 'refund_fail' }, 'return=minimal');
+  } catch (e) { console.error('walletRefundOne error:', e); }
+}
+async function walletSnapshot(walletId) {
+  const r = await walletRest('GET', `qa_wallets?id=eq.${encodeURIComponent(walletId)}&select=balance,expires_at&limit=1`);
+  if (!r.ok) return null;
+  const rows = await r.json();
+  const w = rows && rows[0];
+  return w ? { balance: walletEffectiveBalance(w), expiresAt: w.expires_at } : null;
+}
+
+// 잔액 조회 + (비회원 코드 + 로그인 상태면) 계정 지갑으로 자동 합치기. AI·결제와 무관해 사주 데이터가 없어도 된다.
+async function handleWalletQuery(res, payload) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) { res.status(200).json({ kind: 'wallet', balance: 0, unavailable: true }); return; }
+  try {
+    const user = payload.access_token ? await verifySupabaseUser(payload.access_token) : null;
+    const { wallet, linked } = await resolveWallet({ user, walletCode: payload.walletCode, create: false });
+    res.status(200).json({
+      kind: 'wallet', balance: walletEffectiveBalance(wallet), expiresAt: wallet ? wallet.expires_at : null,
+      linked, loggedIn: !!user, codeNotFound: !!(payload.walletCode && !user && !wallet),
+    });
+  } catch (e) {
+    console.error('handleWalletQuery error:', e);
+    res.status(200).json({ kind: 'wallet', balance: 0, error: true });
+  }
+}
+
+// 이용권 구매: 포트원 결제 검증 → 같은 결제 재사용 차단 → 지갑 충전 → 구매 기록. 관리자는 결제 없이 충전(테스트용).
+async function handleAskPackPurchase({ res, payload, user, isAdmin }) {
+  const n = parseInt(payload.pack, 10);
+  const pack = ASK_PACKS[n];
+  if (!pack) { res.status(400).json({ error: '알 수 없는 이용권입니다.', code: 'bad_pack' }); return; }
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) { res.status(503).json({ error: '이용권을 잠시 쓸 수 없어요. 잠시 후 다시 시도해주세요.', code: 'store_unavailable' }); return; }
+  if (!isAdmin) {
+    const pc = await verifyPortOnePayment(payload.paymentId, pack.price);
+    if (!pc.ok) { res.status(402).json({ error: `결제 확인에 실패했습니다. (${pc.reason})` }); return; }
+    if (await isPaymentAlreadyUsed(payload.paymentId)) { res.status(409).json({ error: '이미 사용된 결제입니다. 같은 결제로 다시 요청할 수 없습니다.' }); return; }
+  }
+  const recordBase = {
+    userId: user ? user.id : null, category: 'ask_pack', visitorId: payload.visitorId || null,
+    pgProvider: isAdmin ? 'admin_bypass' : 'portone_inicis', paymentId: payload.paymentId || null,
+    payload: { pack: n },
+  };
+  try {
+    const wr = await resolveWallet({ user, walletCode: payload.walletCode, create: true });
+    if (!wr.wallet) throw new Error('no wallet');
+    const add = await walletAddCredits(wr.wallet.id, n, isAdmin ? 'admin_pack' : 'purchase', isAdmin ? null : payload.paymentId);
+    if (!add.ok) {
+      if (add.duplicate) { res.status(409).json({ error: '이미 처리된 결제입니다.', code: 'duplicate_payment' }); return; }
+      throw new Error('add failed');
+    }
+    await recordPurchase(Object.assign({}, recordBase, { amount: isAdmin ? 0 : pack.price, resultText: `질문 이용권 ${n}회` }));
+    res.status(200).json({ kind: 'pack', pack: n, balance: add.balance, expiresAt: add.expiresAt, walletCode: wr.newCode || null, linked: wr.linked });
+  } catch (e) {
+    console.error('handleAskPackPurchase error:', e);
+    // 결제는 이미 검증을 통과한 상태 — 충전에 실패했더라도 추적할 수 있게 실패 기록을 남긴다.
+    try {
+      await recordPurchase(Object.assign({}, recordBase, { amount: isAdmin ? 0 : pack.price, status: 'failed', resultText: `[이용권 충전 실패 — 결제는 완료됨] 질문 이용권 ${n}회` }));
+    } catch (e2) {}
+    res.status(500).json({ error: '이용권 충전에 실패했어요. 결제는 확인되었으니 고객센터로 문의해 주세요.', code: 'pack_failed' });
+  }
+}
+
 module.exports = async (req, res) => {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'POST 요청만 지원합니다.' });
@@ -1862,6 +2042,12 @@ module.exports = async (req, res) => {
     return;
   }
 
+  // 이용권 잔액 조회는 사주 데이터 없이도 가능(AI·결제와 무관).
+  if (payload && payload.category === 'ask' && payload.askMode === 'wallet') {
+    await handleWalletQuery(res, payload);
+    return;
+  }
+
   if (!payload || !payload.saju) {
     res.status(400).json({ error: '사주 데이터가 없습니다.' });
     return;
@@ -1876,6 +2062,12 @@ module.exports = async (req, res) => {
   // 계정일 때만 profiles.is_admin을 다시 조회하므로, 로그인하지 않았거나 access_token이
   // 유효하지 않은 요청은 절대 이 분기를 탈 수 없다.
   const isAdmin = user ? await checkIsAdmin(user.id) : false;
+
+  // 질문 이용권 구매(ask_pack): 질문 분류와 무관하게 결제 검증 후 지갑 충전만 한다.
+  if (payload.category === 'ask_pack') {
+    await handleAskPackPurchase({ res, payload, user, isAdmin });
+    return;
+  }
 
   // 질문형 상담(ask): 질문 정리 → 민감 질문 분류 → (맛보기면 여기서 끝) → 아래 결제 게이트.
   // 위기(A)·운명단정(C) 질문은 AI도 결제 검증도 거치지 않고 고정 안내만 돌려준다(과금 없음).
@@ -1962,13 +2154,37 @@ module.exports = async (req, res) => {
   const amount = CATEGORY_AMOUNT_KRW[payload.category] || CATEGORY_AMOUNT_KRW.comprehensive;
   // 관리자 무료 열람 기록용 금액. 실제 매출 통계(결제 요약 합계 등)를 왜곡하지 않도록
   // 0원으로 남긴다 — 아래 두 recordPurchase 호출부에서 amount 대신 이 값을 쓴다.
-  const recordAmount = isAdmin ? 0 : amount;
+  // 질문 이용권 사용: 결제 대신 지갑에서 1회 차감한다(원자적). 이용권을 쓰겠다고 한 요청(useWallet)은 관리자여도
+  // 지갑을 실제로 차감한다(관리자도 이용권 흐름을 그대로 테스트할 수 있게). 질문은 지갑 또는 관리자 권한 없이는 답하지 않는다.
+  let walletUse = null;
+  if (payload.category === 'ask' && payload.useWallet) {
+    try {
+      const wr = await resolveWallet({ user, walletCode: payload.walletCode, create: false });
+      const left = wr.wallet ? await walletSpendOne(wr.wallet.id) : null;
+      if (left === null) {
+        res.status(402).json({ error: '남은 질문이 없어요. 이용권을 먼저 충전해주세요.', code: 'no_credit' });
+        return;
+      }
+      walletUse = { walletId: wr.wallet.id, balance: left };
+    } catch (e) {
+      console.error('wallet use failed:', e);
+      res.status(503).json({ error: '이용권을 확인하지 못했어요. 잠시 후 다시 시도해주세요.', code: 'wallet_unavailable' });
+      return;
+    }
+  }
+  const recordAmount = (isAdmin || walletUse) ? 0 : amount;
+  const recordPgProvider = walletUse ? 'qa_credit' : (isAdmin ? 'admin_bypass' : 'portone_inicis');
+  let walletDelivered = false;
 
   // 2026-08-30: 결제 검증 게이트. OpenAI를 호출(=과금)하기 전에 먼저 포트원에서 실제 결제
   // 완료 여부를 확인한다. paymentId가 없거나 검증에 실패하면 AI 해석을 아예 생성하지 않는다.
   // 2026-09-24: 단, 관리자 계정(위 checkIsAdmin으로 서버가 직접 재검증한 값만 신뢰)은 이
   // 게이트를 건너뛰어 결제 없이 바로 심층풀이를 볼 수 있게 한다.
-  const paymentCheck = isAdmin ? { ok: true } : await verifyPortOnePayment(payload.paymentId, amount);
+  if (payload.category === 'ask' && !isAdmin && !walletUse) {
+    res.status(402).json({ error: '질문 이용권이 필요해요.', code: 'no_credit' });
+    return;
+  }
+  const paymentCheck = (isAdmin || walletUse) ? { ok: true } : await verifyPortOnePayment(payload.paymentId, amount);
   if (!paymentCheck.ok) {
     res.status(402).json({ error: `결제 확인에 실패했습니다. (${paymentCheck.reason})` });
     return;
@@ -1977,7 +2193,7 @@ module.exports = async (req, res) => {
   // 2026-09-25: 보안 조치 — 결제 자체는 유효해도 이미 다른 요청에 한 번 쓰인 paymentId라면
   // 차단한다(관리자 무료열람은 실제 paymentId가 없으므로 제외). 배경은 위
   // isPaymentAlreadyUsed() 주석 참고.
-  if (!isAdmin && await isPaymentAlreadyUsed(payload.paymentId)) {
+  if (!isAdmin && !walletUse && await isPaymentAlreadyUsed(payload.paymentId)) {
     res.status(409).json({ error: '이미 사용된 결제입니다. 같은 결제로 다시 요청할 수 없습니다.' });
     return;
   }
@@ -2014,12 +2230,13 @@ module.exports = async (req, res) => {
             : `[AI 생성 실패 — 결제는 완료됨] OpenAI 응답 오류 (status ${first.status})`,
           visitorId: payload.visitorId || null,
           status: 'failed',
-          pgProvider: isAdmin ? 'admin_bypass' : 'portone_inicis',
+          pgProvider: recordPgProvider,
           paymentId: payload.paymentId || null,
         });
       } catch (recordErr) {
         console.error('failed-purchase 기록 중 오류(원래 502 응답에는 영향 없음):', recordErr);
       }
+      if (walletUse) await walletRefundOne(walletUse.walletId); // AI 실패 — 차감한 질문 1회를 돌려준다
       res.status(502).json({ error: `AI 서버 응답 오류 (${first.status})` });
       return;
     }
@@ -2168,13 +2385,31 @@ module.exports = async (req, res) => {
       payload: payloadWithoutToken,
       resultText: finalText,
       visitorId: payload.visitorId || null,
-      pgProvider: isAdmin ? 'admin_bypass' : 'portone_inicis',
+      pgProvider: recordPgProvider,
       paymentId: payload.paymentId || null,
     });
 
-    res.status(200).json({ interpretation: finalText });
+    const extra = {};
+    walletDelivered = true;
+    if (walletUse) {
+      try { extra.askWallet = (await walletSnapshot(walletUse.walletId)) || { balance: walletUse.balance }; } catch (e) { extra.askWallet = { balance: walletUse.balance }; }
+    }
+    // 평생운 프리미엄 구매 선물: 질문 이용권 2회(관리자는 테스트용으로 결제 없이 지급). 실패해도 해석 응답은 막지 않는다.
+    if (payload.category === 'lifetime' && (isAdmin || payload.paymentId)) {
+      try {
+        const wr = await resolveWallet({ user, walletCode: payload.walletCode, create: true });
+        if (wr.wallet) {
+          const add = await walletAddCredits(wr.wallet.id, ASK_BONUS_LIFETIME, 'bonus_lifetime', isAdmin ? null : payload.paymentId + ':bonus');
+          if (add.ok) extra.askBonus = { amount: ASK_BONUS_LIFETIME, balance: add.balance, expiresAt: add.expiresAt, walletCode: wr.newCode || null };
+          else if (add.duplicate) extra.askBonus = { amount: 0, duplicate: true };
+        }
+      } catch (e) { console.error('lifetime ask bonus failed:', e); }
+    }
+
+    res.status(200).json(Object.assign({ interpretation: finalText }, extra));
   } catch (err) {
     console.error('interpret.js error:', err);
+    if (walletUse && !walletDelivered) await walletRefundOne(walletUse.walletId);
     res.status(500).json({ error: '서버 내부 오류가 발생했습니다.' });
   }
 };
