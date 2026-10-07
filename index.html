@@ -8528,7 +8528,11 @@ function handlePendingInvite(d){
   showInviteNotice(n);
   inviteApi({ askMode: 'invite_ack', visitorId: VISITOR_ID, ids: p.ids, access_token: currentSession ? currentSession.access_token : undefined })
     .then(()=>{}, ()=>{})
-    .then(()=>{ inviteAckBusy = false; });
+    .then(()=>{
+      inviteAckBusy = false;
+      // 적립 직전 잔액을 읽은 경우가 있어, 알림을 처리한 뒤 잔액을 한 번 더 맞춘다(알림은 이미 확인 처리돼 다시 뜨지 않는다)
+      refreshAskWallet(true);
+    });
 }
 function refreshInviteBonusLine(){
   const el = $('#sharePreviewBonus');
