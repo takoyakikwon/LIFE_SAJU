@@ -1492,6 +1492,21 @@ window.SajuAnalytics = (function(){
   .share-preview-cta{
     font-size:11.5px; color:var(--ink-faint); margin:0; text-align:center; font-weight:700;
   }
+  /* 2026-10-07: 친구 초대 카드 결과(친구와 나의 궁합 / 내 별명) */
+  .friend-card{
+    margin:0 0 16px; padding:18px 16px 14px; background:var(--paper-card);
+    border:1.5px solid var(--gold); border-radius:var(--radius-sm); text-align:center;
+    animation:dmPreviewIn .45s cubic-bezier(.34,1.56,.64,1);
+  }
+  .friend-card-label{ display:block; font-size:10.5px; font-weight:700; color:var(--gold); margin-bottom:10px; }
+  .friend-card-score{ font-size:44px; font-weight:800; line-height:1.1; color:var(--gold); letter-spacing:-1px; }
+  .friend-card-score small{ font-size:16px; font-weight:700; margin-left:2px; }
+  .friend-card-head{ font-size:16px; font-weight:800; color:var(--ink); margin:8px 0 6px; line-height:1.5; }
+  .friend-card-sub{ font-size:12.5px; line-height:1.7; color:var(--ink); margin:0 0 10px; }
+  .friend-card-note{ font-size:11.5px; line-height:1.65; color:var(--ink-faint); margin:0 0 6px; text-align:left; }
+  .friend-card-foot{ font-size:10.5px; color:var(--ink-faint); margin:8px 0 0; }
+  .friend-card-nick{ font-size:17px; font-weight:800; color:var(--ink); margin:6px 0 4px; line-height:1.55; }
+  .friend-card-vs{ font-size:12px; color:var(--ink-faint); margin:0 0 6px; }
   /* 제출 직후 사주가 도장처럼 찍히며 드러나는 리빌 연출 오버레이 */
   .reveal-overlay{
     position:absolute; inset:0; z-index:200;
@@ -1816,6 +1831,7 @@ window.SajuAnalytics = (function(){
     <!-- RESULT VIEW -->
     <section id="view-result" hidden>
       <div class="summary" id="summaryBox"></div>
+      <div class="friend-card" id="friendCardBox" hidden></div>
       <div class="hook-teaser" id="hookTeaserBox">
         <div class="hook-teaser-type-row">
           <span class="hook-teaser-type" id="hookTeaserType"></span>
@@ -6721,6 +6737,7 @@ $('#submitBtn').addEventListener('click', ()=>{
     lastSajuResult = result;
     lastZiweiResult = ziweiResult;
     lastName = ($('#inpName').value||"").trim();
+    renderFriendCard(result);   // 친구 초대 링크로 왔다면 결과 맨 위에 '친구와 나의 궁합/별명' 카드
     logFunnelEvent('form_submit');
     tryInviteClaim();   // 초대 링크로 들어온 새 방문자가 기본운세를 확인했으니, 초대한 친구의 보상을 서버에 청구한다
     renderTodayPanel(result, y, m, d);
@@ -8405,33 +8422,106 @@ function updateInviteLabels(enabled){
   const a = $('#askShareLink'); if(a) setAskShareLookup(a, !!enabled);
   const b = $('#aiResultShareBtn'); if(b && selectedAiCategory === 'ask') b.textContent = enabled ? '🎟️ ' + inviteShareLabel(true, 'result').replace('💬 ', '') : inviteShareLabel(false, 'result');
 }
-// 공유 카드에 실리는 건 '한 줄 결론'뿐이다 — 질문·이름·근거·행동 조언은 넣지 않는다(맛보기·전체 답변 모두 첫 문단이 "한 줄 결론 — …").
-// AI가 소제목을 "한 줄 결론" 대신 "결론"·"한줄 결론"으로 쓰기도 해서 둘 다 받는다. "내 질문 — …" 같은 줄은 절대 고르지 않는다(질문은 공유 금지).
-// 순서: ① "결론 —"/"한 줄 결론 —" 줄 ② 없으면 질문 줄("내 질문 —")을 뺀 첫 문단(맛보기·전체 답변 모두 첫 문단이 결론이다 — AI가 소제목을 빼먹어도 동작).
-function findAskConclusionLine(text){
-  const lines = String(text || '').split(/\n+/).map(x=>x.trim()).filter(Boolean);
-  const isQuestionLine = (l)=>/^[^—]{0,12}질문[^—]{0,6}[—:]/.test(l);
-  return lines.find(l=>/^(한\s*줄\s*)?결론\s*[—:-]/.test(l))
-    || lines.find(l=>!isQuestionLine(l))
-    || '';
+// ==== FRIEND_CARD_BEGIN ====
+// 2026-10-07: 친구 초대 공유 카드 — 질문·답을 쓰지 않고 '일주(일간+일지)'만으로 만든다.
+//  A) 궁합 도전장: 친구가 입력하면 "친구와 나의 궁합 N점" + 구간별 멘트 + 근거 한두 줄
+//  B) 일주 별명: 60일주마다 붙인 별명(친구도 입력하면 자기 별명이 나온다)
+// 카드에 실리는 정보는 일주 두 글자(간·지 번호)뿐 — 생년월일·이름·질문·답은 어디에도 담기지 않는다.
+const FC_NICKNAMES = [
+  '한밤중 겨울을 견디는 큰 나무', '언 땅을 뚫고 핀 들꽃', '봄 숲 위로 떠오르는 아침 해', '봄꽃밭을 비추는 촛불', '구름을 품은 든든한 산',
+  '햇살 좋은 오후의 텃밭', '한낮 대장간에서 달궈진 쇠', '늦여름 햇살에 반짝이는 보석', '가을 산골짜기의 맑은 시냇물', '가을 새벽에 맺힌 이슬',
+  '노을 지는 언덕 위 소나무', '초겨울 물가에 흔들리는 갈대', '한겨울 밤을 밝히는 모닥불', '겨울 아궁이 속 따뜻한 불씨', '호랑이가 사는 봄 산',
+  '봄꽃이 만발한 정원', '비 갠 뒤 더 단단해진 바위', '초여름 햇살에 빛나는 은반지', '한낮 햇빛을 품은 강물', '늦여름 마른 땅을 적시는 소나기',
+  '가을바람에 단풍 드는 큰 나무', '가을 들판에 핀 코스모스', '언덕 너머로 지는 붉은 노을', '겨울 바다를 비추는 등대', '눈 덮인 고요한 겨울 산',
+  '겨울잠 든 단단한 논밭', '봄 숲을 개척하는 든든한 도끼', '꽃잎 위에 앉은 작은 보석', '봄비 머금은 깊은 호수', '초여름 아침의 보슬비',
+  '한여름 정오에 빛나는 푸른 나무', '늦여름 푸른 목장의 풀잎', '가을 오후의 따사로운 햇살', '가을 저녁을 밝히는 등불', '단풍 든 높은 가을 산',
+  '초겨울 연못가의 촉촉한 흙', '한겨울 얼음 위에 울리는 맑은 종', '겨울 땅속에서 기다리는 원석', '봄 숲을 가로지르는 시원한 강', '봄 아침 꽃잎에 맺힌 이슬',
+  '봄비 맞고 쑥쑥 자라는 대나무', '초여름 햇살 따라 뻗는 덩굴', '한여름 하늘의 이글거리는 태양', '늦여름 밤의 따뜻한 장작불', '가을바람이 지나가는 바위 언덕',
+  '황금빛으로 익어가는 가을 논', '노을빛에 물든 큰 바위', '맑은 물에 씻긴 작은 진주', '한밤의 깊고 넓은 바다', '겨울 새벽에 내린 고요한 서리',
+  '봄 숲을 이끄는 우뚝한 큰 나무', '봄바람에 살랑이는 들꽃', '비 갠 하늘에 뜬 환한 해', '여름밤을 수놓는 반딧불', '한여름 햇볕을 받은 뜨거운 산',
+  '늦여름 해바라기 핀 정원', '가을 서리처럼 날카로운 검', '가을 햇살에 빛나는 금빛 보석', '저녁노을을 품은 넓은 강', '초겨울 밤에 내리는 고요한 비',
+];
+// 60갑자 번호: 천간 g(0~9)·지지 z(0~11)가 같은 홀짝일 때만 존재한다. 번호 n은 n%10===g, n%12===z 인 0~59.
+function fcDayIndex(g, z){
+  if(!Number.isInteger(g) || !Number.isInteger(z) || g < 0 || g > 9 || z < 0 || z > 11 || (g % 2) !== (z % 2)) return -1;
+  for(let n = g; n < 60; n += 10){ if(n % 12 === z) return n; }
+  return -1;
 }
-function extractAskConclusion(text){
-  let line = findAskConclusionLine(text);
-  if(!line) return '';
-  const m = line.match(/^[^—:.]{1,12}[—:]\s*/);   // 앞의 짧은 소제목("결론 —")만 떼어낸다
-  if(m) line = line.slice(m[0].length);
-  line = line.replace(/[*#]/g, '').trim();
-  const nm = (lastName || '').trim();
-  if(nm){   // 이름은 카드에 남기지 않는다("홍길동님은 올해…" → "올해…")
-    const esc = nm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    line = line.replace(new RegExp(esc + '님(께서|은|는|이|가|을|를|의|께|도|만)?\\s*', 'g'), '').replace(/\s{2,}/g, ' ').trim();
+function fcNickname(g, z){ const n = fcDayIndex(g, z); return n < 0 ? '' : FC_NICKNAMES[n]; }
+// 궁합 점수 — 일간(천간) 관계 + 일지(지지) 관계의 가감점. 재미용이라 55~98점 안에서만 움직인다.
+function fcCompat(a, b){
+  let s = 64; const notes = [];
+  const ga = a.g, gb = b.g, za = a.z, zb = b.z;
+  const ea = GAN_ELEMENT[ga], eb = GAN_ELEMENT[gb];
+  if(GAN_HAP[ga] === gb){ s += 14; notes.push('두 사람의 일간이 하늘에서 서로 맺어지는 ‘합(合)’이에요. 만나면 자연스럽게 하나로 어울리는 사이예요.'); }
+  else if(GAN_CHUNG[ga] === gb){ s -= 6; notes.push('일간이 정면으로 부딪히는 ‘충(沖)’이에요. 대신 서로를 가장 크게 자극하고 키워 주는 사이예요.'); }
+  else {
+    const rel = relationLabel(ea, eb);
+    if(rel === 'a-gen-b' || rel === 'b-gen-a'){ s += 10; notes.push('한쪽이 다른 쪽에게 힘을 보태 주는 ‘생(生)’의 관계예요. 같이 있으면 서로 든든해져요.'); }
+    else if(rel === 'same'){ s += 7; notes.push('일간이 같은 오행이라 말하지 않아도 통하는 부분이 많아요.'); }
+    else { s -= 3; notes.push('한쪽이 다른 쪽을 누르는 ‘극(剋)’의 관계예요. 의견이 부딪힐 때 한 걸음씩 양보하면 오히려 단단해져요.'); }
   }
-  if(line.length > 120){   // 문장 끝에서 자르고, 마땅한 끝이 없으면 말줄임
-    const cut = line.slice(0, 120);
-    const k = Math.max(cut.lastIndexOf('다.'), cut.lastIndexOf('요.'), cut.lastIndexOf('다!'), cut.lastIndexOf('요!'));
-    line = k > 20 ? cut.slice(0, k + 2) : line.slice(0, 119) + '…';
+  if(ZHI_YUKHAP[za] === zb){ s += 16; notes.push('마음 깊은 곳(일지)이 서로 끌어당기는 ‘육합(六合)’이에요. 오래 볼수록 정이 깊어지는 조합이에요.'); }
+  else if(ZHI_CHUNG[za] === zb){ s -= 8; notes.push('마음 깊은 곳(일지)이 정반대예요. 처음엔 낯설어도 서로의 시야를 넓혀 주는 사이예요.'); }
+  else if(za === zb){ s += 5; notes.push('일지가 같아서 생활 리듬과 취향이 닮았어요.'); }
+  else if(za % 4 === zb % 4){ s += 8; notes.push('일지가 같은 삼합 무리(반합)예요. 큰 그림에서 같은 방향을 보는 사이예요.'); }
+  else {
+    const rz = relationLabel(ZHI_ELEMENT[za], ZHI_ELEMENT[zb]);
+    if(rz === 'a-gen-b' || rz === 'b-gen-a') s += 5;
+    else if(rz === 'same') s += 3;
+    else s -= 2;
   }
-  return line;
+  s = Math.max(55, Math.min(98, s));
+  return { score: s, notes: notes.slice(0, 2) };
+}
+// 점수 구간별 멘트(친구에게 보여주는 결과 카드)
+function fcTier(score){
+  if(score >= 90) return { key: 'destiny', head: '우린 정말 천생연분! 💞', sub: '하늘이 맺어준 사이라는 말이 딱 어울려요. 이 인연, 소중히 해요.' };
+  if(score >= 80) return { key: 'great',   head: '찰떡 궁합이에요! 🍡', sub: '같이 있으면 편하고 즐거운, 서로에게 복이 되는 사이예요.' };
+  if(score >= 70) return { key: 'good',    head: '꽤 잘 맞는 사이예요 😊', sub: '큰 문제 없이 오래 가는 조합이에요. 작은 배려가 더해지면 더 좋아져요.' };
+  if(score >= 62) return { key: 'grow',    head: '맞춰가는 재미가 있는 사이 🌱', sub: '다른 점이 있는 만큼 서로에게 배울 것도 많아요.' };
+  return { key: 'effort', head: '내가 좀 더 노력할게! 🙇', sub: '정반대라 더 신선한 사이예요. 노력한 만큼 가까워지는 인연이에요.' };
+}
+// 공유 토큰에 실리는 카드 정보: "A:간:지" / "B:간:지" (일주 두 글자뿐)
+function fcEncode(card, g, z){ return (card === 'B' ? 'B' : 'A') + ':' + g + ':' + z; }
+function fcDecode(s){
+  const m = /^([AB]):(\d):(\d{1,2})$/.exec(String(s || '').trim());
+  if(!m) return null;
+  const g = +m[2], z = +m[3];
+  return fcDayIndex(g, z) < 0 ? null : { card: m[1], g, z };
+}
+// ==== FRIEND_CARD_END ====
+
+// 친구가 보낸 카드 정보(공유 링크의 ?share= 토큰에서 읽음) — 기본운세를 보면 결과 맨 위에 궁합/별명 카드를 보여준다.
+let incomingFriendCard = null;
+// 공유할 카드 종류: A(궁합)·B(별명)를 절반씩 번갈아(무작위) 쓰고, 링크의 utm_content 로 어느 카드가 잘 먹히는지 기록한다.
+function pickFriendCardType(){ return Math.random() < 0.5 ? 'A' : 'B'; }
+function renderFriendCard(myResult){
+  const box = $('#friendCardBox');
+  if(!box) return;
+  const c = incomingFriendCard;
+  const me = myResult && myResult.pillars && myResult.pillars.day;
+  if(!c || !me || fcDayIndex(me.g, me.z) < 0){ box.hidden = true; box.innerHTML = ''; return; }
+  const friend = { g: c.g, z: c.z };
+  if(c.card === 'A'){
+    const r = fcCompat(friend, { g: me.g, z: me.z });
+    const t = fcTier(r.score);
+    box.innerHTML =
+      '<span class="friend-card-label">💞 친구와 나의 사주 궁합</span>' +
+      `<div class="friend-card-score">${r.score}<small>점</small></div>` +
+      `<div class="friend-card-head">${escapeHtml(t.head)}</div>` +
+      `<p class="friend-card-sub">${escapeHtml(t.sub)}</p>` +
+      r.notes.map(n=>`<p class="friend-card-note">· ${escapeHtml(n)}</p>`).join('') +
+      '<p class="friend-card-foot">두 사람의 일주(일간·일지)를 비교한 재미용 궁합이에요.</p>';
+  } else {
+    const mine = fcNickname(me.g, me.z), theirs = fcNickname(friend.g, friend.z);
+    box.innerHTML =
+      '<span class="friend-card-label">✨ 나의 사주 별명</span>' +
+      `<div class="friend-card-nick">‘${escapeHtml(mine)}’</div>` +
+      `<p class="friend-card-vs">친구는 ‘${escapeHtml(theirs)}’ 이래요</p>` +
+      '<p class="friend-card-foot">일주(일간·일지)로 붙인 재미용 별명이에요.</p>';
+  }
+  box.hidden = false;
 }
 async function ensureInviteCode(){
   const cached = lsGet(INVITE_CODE_KEY);
@@ -8447,19 +8537,21 @@ async function ensureInviteCode(){
   if(d.walletCode){ setStoredWalletCode(d.walletCode); renderAskWallet(); }
   return d.code;
 }
-async function createAskShareUrl(excerpt, code){
+async function createAskShareUrl(card, g, z, code){
   let token = '';
   try{
     const res = await fetch('/api/share', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ category: 'ask', name: '', excerpt }),
+      body: JSON.stringify({ category: 'ask', card, g, z }),
     });
     if(res.ok){ const d = await res.json(); token = (d && d.token) || ''; }
   } catch(e){}
   const qs = [];
   if(token) qs.push('share=' + token);
   if(code) qs.push('inv=' + code);
-  return 'https://sajugyeol.co.kr/' + (qs.length ? '?' + qs.join('&') : '?ref=kakao_share');
+  // 어느 카드가 친구를 더 많이 불러오는지 퍼널 기록(utm_*)으로 비교한다
+  qs.push('utm_source=invite', 'utm_medium=kakao', 'utm_campaign=friend_card', 'utm_content=card_' + card.toLowerCase());
+  return 'https://sajugyeol.co.kr/?' + qs.join('&');
 }
 // 입력 완료 토스트(1초)보다 길게 — 보상 안내는 놓치면 안 되기 때문
 function showRewardToast(msg, ms){
@@ -8473,12 +8565,12 @@ function showRewardToast(msg, ms){
 }
 async function shareInvite(where){
   if(inviteShareBusy) return;
-  const text = where === 'result' ? lastAiResultText : (askShownText || askPreviewText);
-  const excerpt = extractAskConclusion(text);
-  if(!excerpt){ showRewardToast('공유할 답을 찾지 못했어요. 새로고침 후 다시 시도해 주세요.'); return; }
+  const day = lastSajuResult && lastSajuResult.pillars && lastSajuResult.pillars.day;
+  if(!day || fcDayIndex(day.g, day.z) < 0){ showRewardToast('공유할 정보를 찾지 못했어요. 새로고침 후 다시 시도해 주세요.'); return; }
+  const card = pickFriendCardType();
   inviteShareBusy = true;
   try{
-    logFunnelEvent('invite_share_click');
+    logFunnelEvent('invite_share_click');   // 카드 종류는 링크의 utm_content(card_a/card_b)로 구분된다
     const enabled = await getInviteConfig();
     const code = enabled ? await ensureInviteCode() : '';
     const noteEl = $(where === 'result' ? '#askShareNoteResult' : '#askShareNote');
@@ -8490,18 +8582,18 @@ async function shareInvite(where){
       noteEl.hidden = !(enabled && code);
     }
     updateInviteLabels(enabled);
-    const url = await createAskShareUrl(excerpt, code);
+    const url = await createAskShareUrl(card, day.g, day.z, code);
     initKakaoIfNeeded();
     if(window.Kakao && Kakao.isInitialized()){
       Kakao.Share.sendDefault({
         objectType: 'feed',
         content: {
-          title: '사주에 물어봤더니 이런 답이 나왔어요. 너도 물어볼래?',
-          description: `👉 ${url}`,
+          title: card === 'A' ? '나랑 너, 사주 궁합은 몇 점일까? 🔥' : `나는 ‘${fcNickname(day.g, day.z)}’ 래 ✨ 너는 어떤 사람일까?`,
+          description: (card === 'A' ? '생년월일만 넣으면 우리 궁합이 바로 나와요 👉 ' : '생년월일만 넣으면 너의 사주 별명이 바로 나와요 👉 ') + url,
           imageUrl: 'https://sajugyeol.co.kr/kakao-share.jpg',
           link: { mobileWebUrl: url, webUrl: url },
         },
-        buttons: [ { title: '나도 물어보기', link: { mobileWebUrl: url, webUrl: url } } ],
+        buttons: [ { title: card === 'A' ? '우리 궁합 보기' : '내 별명 보기', link: { mobileWebUrl: url, webUrl: url } } ],
       });
     } else {
       const ok = await copyTextToClipboard(url);
@@ -8566,7 +8658,7 @@ async function initInviteLanding(){
     const card = $('#sharePreviewCard');
     if(card && card.hidden){
       $('#sharePreviewLabel').textContent = '✦ 친구의 초대';
-      $('#sharePreviewExcerpt').textContent = '친구가 사주결에서 질문의 답을 받았어요. 나는 어떤 답이 나올까요?';
+      $('#sharePreviewExcerpt').textContent = '친구가 사주결에서 사주를 봤어요. 나는 어떤 결과가 나올까요?';
       $('#sharePreviewCta').textContent = '아래에 생년월일을 입력하면 무료로 확인해요 👇';
       card.hidden = false;
     }
@@ -8612,9 +8704,22 @@ async function showSharePreviewIfAny(){
     const catLabel = AI_CATEGORY_DISPLAY_NAME[data.category] || '심층풀이';
     const name = String(data.sender_name || '').trim();
     if(data.category === 'ask'){
-      // 친구 초대 카드: 보낸 사람의 이름·질문 없이 '결론 한 줄'만 온다.
-      $('#sharePreviewLabel').textContent = '✦ 친구가 사주로 받은 한 줄 답';
-      $('#sharePreviewCta').textContent = '나는 어떤 답이 나올까요? 아래에 생년월일을 입력하면 무료로 확인해요 👇';
+      // 친구 초대 카드: 보낸 사람의 일주(두 글자)만 온다 — 이름·질문·답은 없다.
+      const fc = fcDecode(data.excerpt);
+      if(!fc){ return; }   // 예전 형식(답 한 줄)의 링크는 카드 없이 기본 화면으로 둔다
+      incomingFriendCard = fc;
+      if(fc.card === 'A'){
+        $('#sharePreviewLabel').textContent = '💞 친구의 궁합 도전장';
+        $('#sharePreviewExcerpt').textContent = '친구가 나와의 사주 궁합이 궁금하대요. 우리 궁합은 몇 점일까요?';
+        $('#sharePreviewCta').textContent = '아래에 생년월일을 입력하면 바로 궁합 점수가 나와요 👇';
+      } else {
+        $('#sharePreviewLabel').textContent = '✨ 친구의 사주 별명';
+        $('#sharePreviewExcerpt').textContent = '‘' + fcNickname(fc.g, fc.z) + '’';
+        $('#sharePreviewCta').textContent = '나는 어떤 별명일까요? 아래에 생년월일을 입력하면 바로 나와요 👇';
+      }
+      card.hidden = false;
+      refreshInviteBonusLine();
+      return;
     } else {
       $('#sharePreviewLabel').textContent = `${name ? name + '님의 ' : ''}${catLabel} 미리보기`;
     }
@@ -8642,11 +8747,11 @@ function renderAiResultNote(){
     $('#aiResultPdfBtn').addEventListener('click', (e)=>{ downloadCurrentResultPdf(e.currentTarget); });
   }
   // 질문형 상담은 개인적인 질문이 담겨 있어 일반 공유(총평 미리보기) 대상에서 뺀다.
-  // 대신 '친구 초대' 공유(질문·이름 없이 결론 한 줄만)를 같은 자리에 둔다. 한 줄 결론이 없는 답(차단 안내 등)에는 두지 않는다.
+  // 대신 '친구 초대' 공유(답·질문과 무관한 궁합/별명 카드)를 같은 자리에 둔다. 차단 안내 답에는 두지 않는다.
   if(selectedAiCategory === 'ask'){
     const sb = $('#aiResultShareBtn');
     if(sb){
-      if(lastAiBlocked || !findAskConclusionLine(lastAiResultText || '')){ sb.remove(); }
+      if(lastAiBlocked){ sb.remove(); }
       else {
         sb.textContent = inviteShareLabel(inviteRewardEnabled === true, 'result');
         const n = document.createElement('div');
