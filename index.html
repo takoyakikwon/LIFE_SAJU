@@ -2373,6 +2373,22 @@ window.SajuAnalytics = (function(){
     <button class="modal-cancel" id="qaLogModalCancel">닫기</button>
   </div>
 </div>
+<div id="inviteAdModal" class="modal-overlay" hidden>
+  <div class="modal-card modal-card-wide">
+    <div class="modal-title">친구 초대 현황 — 공유 · 유입 · 보상</div>
+    <div class="admin-period-bar">
+      <div class="funnel-period-tabs" id="inviteAdPeriodTabs">
+        <button type="button" class="active" data-period="today">오늘</button>
+        <button type="button" data-period="week">이번 주</button>
+        <button type="button" data-period="month">이번 달</button>
+        <button type="button" data-period="all">전체</button>
+      </div>
+    </div>
+    <div id="inviteAdBody"></div>
+    <p class="modal-desc" style="margin-top:6px;">"공유 버튼 누름"은 카카오 공유창을 연 횟수예요(창을 열고 실제로 보내지 않은 경우도 포함돼요). 친구 방문자는 같은 사람이 여러 번 열어도 1명으로 세고, 카드별 친구 수는 공유 링크에 붙은 꼬리표(card_a/card_b) 기준이에요.</p>
+    <button class="modal-cancel" id="inviteAdModalCancel">닫기</button>
+  </div>
+</div>
 <div id="adminModal" class="modal-overlay" hidden>
   <div class="modal-card modal-card-wide">
     <div class="modal-title">관리자 — 결제/문의 현황</div>
@@ -9497,6 +9513,70 @@ function openAdModal(){
 }
 function closeAdModal(){ $('#adModal').hidden = true; }
 $('#adModalCancel').addEventListener('click', closeAdModal);
+// 2026-10-07: 친구 초대 현황(관리자 전용). 브라우저는 관련 테이블을 직접 읽을 수 없고(RLS),
+// 관리자만 통과하는 admin_invite_overview RPC(invite_admin_stats.sql)로만 조회한다.
+let inviteAdPeriod = 'today', inviteAdSeq = 0;
+function renderInviteAdmin(d){
+  const n = (v)=>Number(v) || 0;
+  const pct = (a,b)=> b ? Math.round(a / b * 100) + '%' : '-';
+  const st = d.invitee_status || {};
+  const cards = {}; (d.cards || []).forEach(c=>{ cards[c.card] = c; });
+  const stat = (num, label)=>`<div class="stat"><div class="n">${num}</div><div class="l">${label}</div></div>`;
+  const invitees = Object.keys(st).reduce((a,k)=>a + n(st[k]), 0);
+  const eligible = n(st.visited) + n(st.granted);
+  const limited = n(st.blocked_ip) + n(st.blocked_daily_cap) + n(st.blocked_inviter_cap);
+  const row = (name, links, key)=>{
+    const c = cards[key] || {}; const v = n(c.visitors), f = n(c.submitters);
+    return `<tr><td class="src">${name}</td><td>${links}</td><td>${v}</td><td>${f}</td><td>${pct(f, v)}</td></tr>`;
+  };
+  let h = '';
+  h += '<div class="admin-section-title">공유</div>';
+  h += `<div class="admin-summary">${stat(n(d.share_clicks), '공유 버튼 누름(회)')}${stat(n(d.sharers), '공유한 사람(명)')}${stat(n(d.codes), '새 초대 코드(명)')}</div>`;
+  h += '<div class="admin-section-title">친구 유입</div>';
+  h += `<div class="admin-summary">${stat(n(d.landings), '초대 링크로 방문(명)')}${stat(invitees, '방문 기록(명)')}${stat(eligible, '보상 대상(새 방문자)')}</div>`;
+  h += `<div class="admin-summary">${stat(n(st.blocked_existing), '제외: 기존 방문자')}${stat(limited, '제외: 한도 초과')}${stat(n(st.expired), '기간 만료')}</div>`;
+  h += '<div class="admin-section-title">보상</div>';
+  h += `<div class="admin-summary">${stat(n(d.granted), '질문권 지급(건)')}${stat(n(d.notified), '초대자가 확인(건)')}${stat(pct(n(d.notified), n(d.granted)), '확인률')}</div>`;
+  h += `<div class="admin-summary">${stat(n(st.visited), '기본운세 확인 대기(명)')}${stat(pct(n(d.granted), eligible), '지급률(대상 중)')}${stat(pct(n(d.granted), n(d.share_clicks)), '공유 대비 지급')}</div>`;
+  h += '<div class="admin-section-title">카드 종류별 비교</div>';
+  h += '<div class="campaign-table-wrap"><table class="campaign-table"><thead><tr><th>카드</th><th>공유 링크</th><th>친구 방문</th><th>운세확인</th><th>확인률</th></tr></thead><tbody>'
+     + row('A 궁합 도전장', n(d.links_a), 'card_a') + row('B 일주 별명', n(d.links_b), 'card_b') + '</tbody></table></div>';
+  $('#inviteAdBody').innerHTML = h;
+}
+async function refreshInviteAdmin(){
+  const body = $('#inviteAdBody');
+  if(!sb) return;
+  body.innerHTML = '<div class="history-empty">불러오는 중...</div>';
+  const mySeq = ++inviteAdSeq;
+  const { data, error } = await sb.rpc('admin_invite_overview', { p_start: computeFunnelPeriodStart(inviteAdPeriod), p_end: null });
+  if(mySeq !== inviteAdSeq) return;
+  if(error){
+    body.innerHTML = '<div class="history-empty">불러오지 못했어요 (' + escapeHtml(error.message) + ')<br>친구 초대 현황 조회용 SQL(invite_admin_stats.sql)을 아직 실행하지 않았다면 먼저 실행해 주세요.</div>';
+    return;
+  }
+  if(!data){ body.innerHTML = '<div class="history-empty">관리자 계정에서만 볼 수 있어요.</div>'; return; }
+  renderInviteAdmin(data);
+}
+function openInviteAdModal(){
+  $('#inviteAdModal').hidden = false;
+  if(!sb || !currentSession){
+    $('#inviteAdBody').innerHTML = '<div class="history-empty">로그인이 필요해요.</div>';
+    return;
+  }
+  inviteAdPeriod = 'today';   // 열 때마다 기준은 항상 "오늘"
+  $$('#inviteAdPeriodTabs button').forEach(b=>b.classList.toggle('active', b.dataset.period === 'today'));
+  refreshInviteAdmin();
+}
+function closeInviteAdModal(){ $('#inviteAdModal').hidden = true; }
+$('#inviteAdModalCancel').addEventListener('click', closeInviteAdModal);
+$$('#inviteAdPeriodTabs button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    $$('#inviteAdPeriodTabs button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    inviteAdPeriod = btn.dataset.period;
+    refreshInviteAdmin();
+  });
+});
 // 2026-10-05: 질문 기록(관리자 전용). 브라우저는 qa_question_log 테이블을 직접 읽을 수 없고(RLS),
 // 관리자만 통과하는 admin_qa_question_log RPC로만 조회한다.
 const QALOG_LIMIT = 300;
@@ -9986,6 +10066,7 @@ function renderLoginModal(){
       (isAdmin ? '<button class="menu-btn" id="adminMenuBtn">🛠 관리자 페이지</button>' : '') +
       (isAdmin ? '<button class="menu-btn" id="adMenuBtn">📈 광고 분석</button>' : '') +
       (isAdmin ? '<button class="menu-btn" id="qaLogMenuBtn">💬 질문 기록</button>' : '') +
+      (isAdmin ? '<button class="menu-btn" id="inviteAdMenuBtn">🎁 친구 초대 현황</button>' : '') +
       '<button class="logout-btn" id="logoutBtn">로그아웃</button>' +
       '<button class="modal-cancel" id="loginModalCancel">닫기</button>';
     $('#historyMenuBtn').addEventListener('click', ()=>{ closeLoginModal(); openHistoryModal(); });
@@ -9993,6 +10074,7 @@ function renderLoginModal(){
     if(isAdmin){ $('#adminMenuBtn').addEventListener('click', ()=>{ closeLoginModal(); openAdminModal(); }); }
     if(isAdmin){ $('#adMenuBtn').addEventListener('click', ()=>{ closeLoginModal(); openAdModal(); }); }
     if(isAdmin){ $('#qaLogMenuBtn').addEventListener('click', ()=>{ closeLoginModal(); openQaLogModal(); }); }
+    if(isAdmin){ $('#inviteAdMenuBtn').addEventListener('click', ()=>{ closeLoginModal(); openInviteAdModal(); }); }
     $('#logoutBtn').addEventListener('click', async ()=>{
       if(sb){ await sb.auth.signOut(); }
       closeLoginModal();
