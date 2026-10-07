@@ -5842,6 +5842,7 @@ let aiLoadingEtaTimer = null;
 // 비회원 구매 시 재열람이 안 되므로(내 결제내역에 안 남음), 결과 화면에서 바로 PDF로 저장할 수
 // 있도록 마지막으로 받은 해석 텍스트를 잠깐 들고 있는다. 로그인 사용자도 이 버튼으로 즉시 저장 가능.
 let lastAiResultText = '';
+let lastAiBlocked = false;   // 위기·운명단정 등으로 AI가 답하지 않고 안내 문구만 돌려준 경우(공유 대상에서 제외)
 let selectedAiCategory = null;
 // 질문형 상담 상태(2026-10-05). resetAiPanel()/resetAskCard()가 새 분석 때 비운다.
 let askQuestionText = '';
@@ -8233,6 +8234,7 @@ async function runAiInterpretation(){
     const data = await res.json();
     $('#aiLoading').hidden = true;
     stopAiLoadingEta();
+    lastAiBlocked = !data.interpretation;
     lastAiResultText = data.interpretation || (data.kind === 'blocked' && data.text) || '해석 결과를 받아오지 못했어요.';
     // Meta Pixel: 서버(api/interpret.js)가 포트원 결제를 실제로 재조회·검증한 뒤에만
     // 도달하는 이 지점에서만 Purchase를 발생시킨다 (2026-09-23). 결제 실패/취소/중단이면
@@ -8405,15 +8407,18 @@ function updateInviteLabels(enabled){
 }
 // 공유 카드에 실리는 건 '한 줄 결론'뿐이다 — 질문·이름·근거·행동 조언은 넣지 않는다(맛보기·전체 답변 모두 첫 문단이 "한 줄 결론 — …").
 // AI가 소제목을 "한 줄 결론" 대신 "결론"·"한줄 결론"으로 쓰기도 해서 둘 다 받는다. "내 질문 — …" 같은 줄은 절대 고르지 않는다(질문은 공유 금지).
+// 순서: ① "결론 —"/"한 줄 결론 —" 줄 ② 없으면 질문 줄("내 질문 —")을 뺀 첫 문단(맛보기·전체 답변 모두 첫 문단이 결론이다 — AI가 소제목을 빼먹어도 동작).
 function findAskConclusionLine(text){
   const lines = String(text || '').split(/\n+/).map(x=>x.trim()).filter(Boolean);
+  const isQuestionLine = (l)=>/^[^—]{0,12}질문[^—]{0,6}[—:]/.test(l);
   return lines.find(l=>/^(한\s*줄\s*)?결론\s*[—:-]/.test(l))
-    || (lines[0] && /^[^—]{1,12}—/.test(lines[0]) && lines[0].split('—')[0].indexOf('질문') < 0 ? lines[0] : '');
+    || lines.find(l=>!isQuestionLine(l))
+    || '';
 }
 function extractAskConclusion(text){
   let line = findAskConclusionLine(text);
   if(!line) return '';
-  const m = line.match(/^[^—:]{1,12}[—:]\s*/);
+  const m = line.match(/^[^—:.]{1,12}[—:]\s*/);   // 앞의 짧은 소제목("결론 —")만 떼어낸다
   if(m) line = line.slice(m[0].length);
   line = line.replace(/[*#]/g, '').trim();
   const nm = (lastName || '').trim();
@@ -8421,7 +8426,11 @@ function extractAskConclusion(text){
     const esc = nm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     line = line.replace(new RegExp(esc + '님(께서|은|는|이|가|을|를|의|께|도|만)?\\s*', 'g'), '').replace(/\s{2,}/g, ' ').trim();
   }
-  if(line.length > 120) line = line.slice(0, 119) + '…';
+  if(line.length > 120){   // 문장 끝에서 자르고, 마땅한 끝이 없으면 말줄임
+    const cut = line.slice(0, 120);
+    const k = Math.max(cut.lastIndexOf('다.'), cut.lastIndexOf('요.'), cut.lastIndexOf('다!'), cut.lastIndexOf('요!'));
+    line = k > 20 ? cut.slice(0, k + 2) : line.slice(0, 119) + '…';
+  }
   return line;
 }
 async function ensureInviteCode(){
@@ -8633,7 +8642,7 @@ function renderAiResultNote(){
   if(selectedAiCategory === 'ask'){
     const sb = $('#aiResultShareBtn');
     if(sb){
-      if(!findAskConclusionLine(lastAiResultText || '')){ sb.remove(); }
+      if(lastAiBlocked || !findAskConclusionLine(lastAiResultText || '')){ sb.remove(); }
       else {
         sb.textContent = inviteShareLabel(inviteRewardEnabled === true, 'result');
         const n = document.createElement('div');
