@@ -2116,7 +2116,9 @@ async function inviteRows(pathQuery) {
   return (await r.json()) || [];
 }
 async function inviteCount(table, filter) {
-  const r = await walletRest('GET', `${table}?select=id&${filter}&limit=1`, null, 'count=exact');
+  // qa_invites 에는 id 컬럼이 없고(code가 기본키) qa_invite_rewards 에는 id가 있다 — 존재하지 않는 컬럼을 select 하면 400이 난다
+  const col = table === 'qa_invites' ? 'code' : 'id';
+  const r = await walletRest('GET', `${table}?select=${col}&${filter}&limit=1`, null, 'count=exact');
   if (!r.ok) { console.error('inviteCount failed', r.status, await r.text()); throw new Error('invite_store_error'); }
   const total = parseInt((r.headers.get('content-range') || '').split('/')[1], 10);
   if (!Number.isFinite(total)) throw new Error('invite_store_error');
