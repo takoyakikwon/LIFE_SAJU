@@ -424,6 +424,14 @@ window.SajuAnalytics = (function(){
   /* 2026-10-07: 친구 초대 보상("질문권을 획득했어요!")은 놓치기 쉬워서 입력 완료 토스트(1초)보다 길게(약 5초) 띄운다. */
   .reward-toast{ bottom:calc(84px + env(safe-area-inset-bottom)); border-color:var(--gold); color:var(--gold); }
   .ask-share-row{ margin:12px 0 0; text-align:center; }
+  /* 보상이 켜져 있을 때만: 작은 링크 대신 질문권 아이콘이 있는 보조 버튼(메인 '전체 답변 보기'보다 한 단계 낮게 — 테두리만, 높이도 작게) */
+  .ask-share-btn{
+    display:flex; align-items:center; justify-content:center; gap:7px; width:100%; box-sizing:border-box;
+    padding:11px 14px; border-radius:100px; border:1.5px solid var(--gold); background:rgba(212,175,99,.10);
+    color:var(--gold); font-size:13.5px; font-weight:700; font-family:"Noto Sans KR"; cursor:pointer; text-decoration:none;
+  }
+  .ask-share-btn:active{ background:rgba(212,175,99,.22); }
+  .ask-share-btn .ask-share-ico{ font-size:16px; line-height:1; }
   .ask-share-note{ font-size:11.5px; line-height:1.6; color:var(--gold); margin:8px 2px 0; text-align:center; }
   .ask-invite-notice{ font-size:12px; line-height:1.6; color:var(--gold); background:var(--paper-deep); border:1px solid var(--gold-line); border-radius:var(--radius-sm); padding:9px 12px; margin:0 0 12px; font-weight:700; }
   .share-preview-bonus{ font-size:12px; color:var(--gold); margin:0 0 8px; text-align:center; font-weight:700; }
@@ -8378,9 +8386,22 @@ function inviteShareLabel(enabled, where){
   const base = enabled ? '친구에게 공유하고 질문 1회 받기' : (where === 'result' ? '친구에게 공유하기' : '친구에게도 공유하기');
   return where === 'result' ? '💬 ' + base : base;
 }
+// 보상이 켜져 있으면 눈에 띄는 보조 버튼(🎟 아이콘 + 문구), 꺼져 있으면 지금처럼 작은 글씨 링크.
+function setAskShareLookup(el, enabled){
+  el.textContent = '';
+  if(enabled){
+    el.className = 'ask-share-btn';
+    const ico = document.createElement('span'); ico.className = 'ask-share-ico'; ico.textContent = '🎟️';
+    el.appendChild(ico);
+    el.appendChild(document.createTextNode(inviteShareLabel(true, 'preview')));
+  } else {
+    el.className = 'ask-link';
+    el.textContent = inviteShareLabel(false, 'preview');
+  }
+}
 function updateInviteLabels(enabled){
-  const a = $('#askShareLink'); if(a) a.textContent = inviteShareLabel(!!enabled, 'preview');
-  const b = $('#aiResultShareBtn'); if(b && selectedAiCategory === 'ask') b.textContent = inviteShareLabel(!!enabled, 'result');
+  const a = $('#askShareLink'); if(a) setAskShareLookup(a, !!enabled);
+  const b = $('#aiResultShareBtn'); if(b && selectedAiCategory === 'ask') b.textContent = enabled ? '🎟️ ' + inviteShareLabel(true, 'result').replace('💬 ', '') : inviteShareLabel(false, 'result');
 }
 // 공유 카드에 실리는 건 '한 줄 결론'뿐이다 — 질문·이름·근거·행동 조언은 넣지 않는다(맛보기·전체 답변 모두 첫 문단이 "한 줄 결론 — …").
 function extractAskConclusion(text){
