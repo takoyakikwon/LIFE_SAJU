@@ -25,7 +25,7 @@
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// 'ask'(질문형 상담, 2026-10-07): 친구 초대용 공유 카드 — 저장하는 것은 결론 한 줄(excerpt)뿐이고 질문·이름은 넣지 않는다.
+// 'ask'(질문형 상담, 2026-10-07): 친구 초대용 공유 카드 — 카드 종류와 일주 번호("A:간:지")만 저장하고 질문·답·이름은 넣지 않는다.
 const VALID_CATEGORIES = ['comprehensive', 'love', 'compatibility', 'newyear', 'wealth', 'pet', 'career', 'lifetime', 'ask'];
 const MAX_EXCERPT_LEN = 220;
 const MAX_NAME_LEN = 20;
@@ -54,8 +54,21 @@ module.exports = async (req, res) => {
       return;
     }
     const category = VALID_CATEGORIES.includes(payload && payload.category) ? payload.category : 'comprehensive';
-    const name = String((payload && payload.name) || '').trim().slice(0, MAX_NAME_LEN);
-    const excerpt = String((payload && payload.excerpt) || '').trim().slice(0, MAX_EXCERPT_LEN);
+    let name = String((payload && payload.name) || '').trim().slice(0, MAX_NAME_LEN);
+    let excerpt = String((payload && payload.excerpt) || '').trim().slice(0, MAX_EXCERPT_LEN);
+    if (category === 'ask') {
+      // 친구 초대 카드는 자유 문장을 받지 않는다 — 카드 종류(A 궁합/B 별명)와 일주(천간·지지 번호)만 받아 "A:간:지" 로 저장한다.
+      // 이름·질문·답이 섞여 들어오지 못하게 서버가 막는다.
+      const card = payload && payload.card;
+      const g = Number(payload && payload.g), z = Number(payload && payload.z);
+      const okPillar = Number.isInteger(g) && Number.isInteger(z) && g >= 0 && g <= 9 && z >= 0 && z <= 11 && (g % 2) === (z % 2);
+      if ((card !== 'A' && card !== 'B') || !okPillar) {
+        res.status(400).json({ error: '공유할 내용이 올바르지 않습니다.' });
+        return;
+      }
+      name = '';
+      excerpt = `${card}:${g}:${z}`;
+    }
     if (!excerpt) {
       res.status(400).json({ error: '공유할 내용이 없습니다.' });
       return;
