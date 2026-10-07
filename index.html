@@ -8404,12 +8404,18 @@ function updateInviteLabels(enabled){
   const b = $('#aiResultShareBtn'); if(b && selectedAiCategory === 'ask') b.textContent = enabled ? '🎟️ ' + inviteShareLabel(true, 'result').replace('💬 ', '') : inviteShareLabel(false, 'result');
 }
 // 공유 카드에 실리는 건 '한 줄 결론'뿐이다 — 질문·이름·근거·행동 조언은 넣지 않는다(맛보기·전체 답변 모두 첫 문단이 "한 줄 결론 — …").
-function extractAskConclusion(text){
+// AI가 소제목을 "한 줄 결론" 대신 "결론"·"한줄 결론"으로 쓰기도 해서 둘 다 받는다. "내 질문 — …" 같은 줄은 절대 고르지 않는다(질문은 공유 금지).
+function findAskConclusionLine(text){
   const lines = String(text || '').split(/\n+/).map(x=>x.trim()).filter(Boolean);
-  let line = lines.find(l=>/^한 줄 결론\s*—/.test(l)) || '';
+  return lines.find(l=>/^(한\s*줄\s*)?결론\s*[—:-]/.test(l))
+    || (lines[0] && /^[^—]{1,12}—/.test(lines[0]) && lines[0].split('—')[0].indexOf('질문') < 0 ? lines[0] : '');
+}
+function extractAskConclusion(text){
+  let line = findAskConclusionLine(text);
   if(!line) return '';
-  const idx = line.indexOf('—');
-  line = line.slice(idx + 1).replace(/[*#]/g, '').trim();
+  const m = line.match(/^[^—:]{1,12}[—:]\s*/);
+  if(m) line = line.slice(m[0].length);
+  line = line.replace(/[*#]/g, '').trim();
   const nm = (lastName || '').trim();
   if(nm){   // 이름은 카드에 남기지 않는다("홍길동님은 올해…" → "올해…")
     const esc = nm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -8460,7 +8466,7 @@ async function shareInvite(where){
   if(inviteShareBusy) return;
   const text = where === 'result' ? lastAiResultText : (askShownText || askPreviewText);
   const excerpt = extractAskConclusion(text);
-  if(!excerpt) return;
+  if(!excerpt){ showRewardToast('공유할 답을 찾지 못했어요. 새로고침 후 다시 시도해 주세요.'); return; }
   inviteShareBusy = true;
   try{
     logFunnelEvent('invite_share_click');
@@ -8627,7 +8633,7 @@ function renderAiResultNote(){
   if(selectedAiCategory === 'ask'){
     const sb = $('#aiResultShareBtn');
     if(sb){
-      if(!/한 줄 결론\s*—/.test(lastAiResultText || '')){ sb.remove(); }
+      if(!findAskConclusionLine(lastAiResultText || '')){ sb.remove(); }
       else {
         sb.textContent = inviteShareLabel(inviteRewardEnabled === true, 'result');
         const n = document.createElement('div');
