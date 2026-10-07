@@ -25,7 +25,8 @@
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const VALID_CATEGORIES = ['comprehensive', 'love', 'compatibility', 'newyear', 'wealth', 'pet', 'career', 'lifetime'];
+// 'ask'(질문형 상담, 2026-10-07): 친구 초대용 공유 카드 — 저장하는 것은 결론 한 줄(excerpt)뿐이고 질문·이름은 넣지 않는다.
+const VALID_CATEGORIES = ['comprehensive', 'love', 'compatibility', 'newyear', 'wealth', 'pet', 'career', 'lifetime', 'ask'];
 const MAX_EXCERPT_LEN = 220;
 const MAX_NAME_LEN = 20;
 

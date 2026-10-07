@@ -1659,9 +1659,9 @@ const ASK_FORMAT_PREVIEW = `
 
 한 줄 결론 — (질문에 대한 직접적인 답. 1~2문장, 120자 이내.)
 
-근거 하나 — (그 결론을 뒷받침하는 이 사람의 데이터 근거 한 가지를 사람 이야기로. 1~2문장, 150자 이내. 전문용어는 쓰지 않거나 많아야 하나만 쓰고, 영어 단어와 영문 항목 이름은 절대 쓰지 않습니다.)
+근거 하나 — (그 결론을 뒷받침하는 이 사람의 데이터 근거 한 가지를 사람 이야기로 풀어서 2~3문장, 260자 이내. 첫 문장은 근거가 되는 이 사람의 특징, 다음 문장은 그 특징이 이 사람의 실제 생활·성향에서 어떻게 드러나는지 구체적인 장면 하나. 전문용어는 쓰지 않거나 많아야 하나만 쓰고, 영어 단어와 영문 항목 이름은 절대 쓰지 않습니다. 지금 해볼 행동·대처법은 이 문단에 쓰지 않습니다.)
 
-전체 300자 이내. 이 뒤에 더 이어질 내용을 예고하거나 "더 알고 싶다면" 같은 문장은 쓰지 않습니다.`;
+전체 420자 이내. 이 뒤에 더 이어질 내용을 예고하거나 "더 알고 싶다면" 같은 문장은 쓰지 않습니다.`;
 
 const ASK_EXPERT_NOTE = `
 
@@ -1793,11 +1793,15 @@ async function reserveAskPreview(req, visitorId) {
       if (ipCount === null) return fail(503, 'store_error', '맛보기를 잠시 쓸 수 없어요. 잠시 후 다시 시도해주세요.');
       if (ipCount >= ASK_PREVIEW_IP_DAILY_LIMIT) return fail(429, 'ip_limit', '무료 맛보기를 오늘 여러 번 사용하셨어요. 전체 답변은 바로 확인하실 수 있어요.');
     }
-    const ins = await fetch(`${SUPABASE_URL}/rest/v1/qa_free_usage`, {
+    const insertUsage = (key) => fetch(`${SUPABASE_URL}/rest/v1/qa_free_usage`, {
       method: 'POST',
       headers: askStoreHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=representation' }),
-      body: JSON.stringify({ visitor_id: vid, ip_hash: ipHash }),
+      body: JSON.stringify({ visitor_id: key, ip_hash: ipHash }),
     });
+    let ins = await insertUsage(vid);
+    // 친구 초대로 들어온 새 방문자는 맛보기를 한 번 더(총 2회) 쓸 수 있다. 두 번째 기록은 '#inv'를 붙인 별도 행이라
+    // 방문자당 유니크 규칙을 그대로 지키면서, 같은 방문자의 세 번째 시도는 막힌다. IP·하루 총량 한도는 위에서 이미 적용됐다.
+    if (ins.status === 409 && !vid.endsWith('#inv') && await inviteBonusPreviewEligible(vid)) ins = await insertUsage(vid + '#inv');
     if (ins.status === 409) return fail(429, 'visitor_used', '무료 맛보기는 한 번만 드려요. 전체 답변은 바로 확인하실 수 있어요.');
     if (!ins.ok) { console.error('reserveAskPreview insert failed:', ins.status, await ins.text()); return fail(503, 'store_error', '맛보기를 잠시 쓸 수 없어요. 잠시 후 다시 시도해주세요.'); }
     const rows = await ins.json();
@@ -1815,7 +1819,42 @@ async function releaseAskPreview(id) {
   } catch (e) { console.error('releaseAskPreview error:', e); }
 }
 
-async function handleAskPreview({ req, res, payload, isAdmin, apiKey, question, level }) {
+// ---- 질문 기록(서비스 개선용, 2026-10-05) ----
+// 답변까지 만든 질문만 qa_question_log에 남긴다(무료 맛보기 + 이용권 사용). 위기(A)·운명단정(C) 질문은
+// 위쪽에서 고정 안내만 하고 끝나므로 아예 기록하지 않는다. 관리자 테스트도 기록하지 않는다.
+// 이메일·전화번호·주민번호 모양은 가려서 저장하고, 90일이 지나면 삭제된다(SQL의 예약 작업 +
+// 아래 가끔 실행되는 정리). 기록 실패는 사용자 응답에 절대 영향을 주지 않는다.
+const ASK_LOG_RETENTION_DAYS = 90;
+function maskAskQuestionForLog(raw) {
+  return String(raw == null ? '' : raw)
+    .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[이메일]')
+    .replace(/\b\d{6}\s*-?\s*[1-4]\d{6}\b/g, '[번호]')
+    .replace(/\b0\d{1,2}\s*-?\s*\d{3,4}\s*-?\s*\d{4}\b/g, '[번호]')
+    .slice(0, ASK_QUESTION_MAX_LEN);
+}
+const ASK_LOG_ANSWER_MAX_LEN = 4000;
+async function logAskQuestion({ visitorId, userId, kind, level, question, answer }) {
+  try {
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return;
+    const q = maskAskQuestionForLog(question);
+    if (q.length < 2) return;
+    const vid = typeof visitorId === 'string' ? visitorId.trim().slice(0, 80) : '';
+    const expires = new Date(Date.now() + ASK_LOG_RETENTION_DAYS * 24 * 3600 * 1000).toISOString();
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/qa_question_log`, {
+      method: 'POST',
+      headers: askStoreHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
+      body: JSON.stringify({ visitor_id: vid || null, user_id: userId || null, kind, level: level || null, question: q,
+        answer: answer ? String(answer).slice(0, ASK_LOG_ANSWER_MAX_LEN) : null, expires_at: expires }),
+    });
+    if (!r.ok) console.error('logAskQuestion failed:', r.status);
+    // 만료분 정리: 예약 작업(pg_cron)이 없는 환경에서도 쌓이지 않도록 가끔만 실행한다.
+    if (Math.random() < 0.02) {
+      await fetch(`${SUPABASE_URL}/rest/v1/qa_question_log?expires_at=lt.${encodeURIComponent(new Date().toISOString())}`, { method: 'DELETE', headers: askStoreHeaders() });
+    }
+  } catch (e) { console.error('logAskQuestion error:', e); }
+}
+
+async function handleAskPreview({ req, res, payload, user, isAdmin, apiKey, question, level }) {
   let reservedId = null;
   if (!isAdmin) { // 관리자(서버가 토큰으로 재검증)는 테스트를 위해 한도를 적용하지 않는다.
     const gate = await reserveAskPreview(req, payload.visitorId);
@@ -1834,7 +1873,9 @@ async function handleAskPreview({ req, res, payload, isAdmin, apiKey, question, 
       return;
     }
     console.log('[ask:preview]', JSON.stringify({ model, level, usage: r.usage || null }));
-    res.status(200).json({ kind: 'preview', level, text: trimAskPreview(scrubAskText(r.text)), usage: r.usage || null });
+    const previewText = trimAskPreview(scrubAskText(r.text));
+    if (!isAdmin) await logAskQuestion({ visitorId: payload.visitorId, userId: user ? user.id : null, kind: 'preview', level, question, answer: previewText });
+    res.status(200).json({ kind: 'preview', level, text: previewText, usage: r.usage || null });
   } catch (e) {
     console.error('handleAskPreview error:', e);
     await releaseAskPreview(reservedId);
@@ -1976,9 +2017,13 @@ async function handleWalletQuery(res, payload) {
   try {
     const user = payload.access_token ? await verifySupabaseUser(payload.access_token) : null;
     const { wallet, linked } = await resolveWallet({ user, walletCode: payload.walletCode, create: false });
+    // 친구 초대 보상 알림(토스트)용: 아직 보여주지 않은 보상 수. 실패해도 잔액 조회에는 영향 없음.
+    let pendingInvite = { count: 0, ids: [] };
+    const inviteVid = cleanInviteVisitorId(payload.visitorId);
+    if (inviteVid || user) { try { pendingInvite = await pendingInviteRewards(inviteVid, user); } catch (e) { console.error('pendingInviteRewards error:', e); } }
     res.status(200).json({
       kind: 'wallet', balance: walletEffectiveBalance(wallet), expiresAt: wallet ? wallet.expires_at : null,
-      linked, loggedIn: !!user, codeNotFound: !!(payload.walletCode && !user && !wallet),
+      linked, loggedIn: !!user, codeNotFound: !!(payload.walletCode && !user && !wallet), pendingInvite,
     });
   } catch (e) {
     console.error('handleWalletQuery error:', e);
@@ -2022,6 +2067,263 @@ async function handleAskPackPurchase({ res, payload, user, isAdmin }) {
   }
 }
 
+// ============================================================
+// 친구 초대 보상 (2026-10-07 설계서: "사주결 친구 초대 보상(질문권) 설계서")
+//  - 초대자가 공유하면 방문자별 초대 코드(qa_invites)를 만들고, 친구가 ?inv=코드 링크로 들어와
+//    기본운세를 확인하면 초대자 지갑에 질문권 +1회를 적립한다. 초대 횟수는 무제한, 보상은 초대자당 하루 3회.
+//  - 보상 스위치 INVITE_REWARD_ENABLED=1 일 때만 지급한다(꺼져 있으면 기록만 하고 지급·맛보기 추가 없음).
+//  - 지급 여부는 브라우저가 보낸 값을 믿지 않고 서버가 다시 판단한다(새 방문자·기간·IP·하루 상한·중복).
+//  - 중복 방지: qa_invite_rewards.invitee_visitor_id 유니크 + qa_credit_events.payment_id('inv:코드:방문자') 유니크.
+//  - 초대받은 새 방문자는 무료 맛보기를 한 번 더(총 2회) 쓸 수 있다(reserveAskPreview의 '#inv' 행).
+// ============================================================
+const INVITE_CODE_LEN = 8;
+const INVITE_CODE_RE = /^[A-HJ-NP-Z2-9]{8}$/;
+const INVITE_VISITOR_RE = /^[A-Za-z0-9._-]{1,80}$/;
+function inviteIntEnv(name, def) {
+  const v = parseInt(process.env[name], 10);
+  return Number.isFinite(v) && v >= 0 ? v : def;
+}
+function inviteEnabled() { return process.env.INVITE_REWARD_ENABLED === '1'; }
+function inviteLimits() {
+  return {
+    inviterDaily: inviteIntEnv('INVITE_INVITER_DAILY_LIMIT', 3),   // 초대자당 하루 보상 상한
+    ipDaily: inviteIntEnv('INVITE_IP_DAILY_LIMIT', 2),             // 같은 인터넷(IP)당 하루 보상 상한
+    dailyCap: inviteIntEnv('INVITE_DAILY_CAP', 50),                // 하루 전체 보상 상한
+    createIpDaily: inviteIntEnv('INVITE_CREATE_IP_DAILY_LIMIT', 10), // 같은 IP에서 하루에 새로 만들 수 있는 초대 코드 수
+    visitIpDaily: inviteIntEnv('INVITE_VISIT_IP_DAILY_LIMIT', 30),   // 같은 IP에서 하루에 새로 기록되는 초대 방문 수(표 부풀리기 방지)
+    windowDays: inviteIntEnv('INVITE_WINDOW_DAYS', 7),             // 링크를 연 뒤 보상 인정 기간
+    newVisitorMinutes: inviteIntEnv('INVITE_NEW_VISITOR_MINUTES', 30), // 이 시간보다 오래된 방문 기록이 있으면 새 방문자가 아님
+  };
+}
+function cleanInviteVisitorId(v) {
+  const s = typeof v === 'string' ? v.trim() : '';
+  return INVITE_VISITOR_RE.test(s) ? s : '';
+}
+function normalizeInviteCode(c) {
+  const s = String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return INVITE_CODE_RE.test(s) ? s : '';
+}
+function generateInviteCode() {
+  const bytes = crypto.randomBytes(INVITE_CODE_LEN);
+  let out = '';
+  for (let i = 0; i < INVITE_CODE_LEN; i++) out += WALLET_CODE_ALPHABET[bytes[i] % WALLET_CODE_ALPHABET.length];
+  return out;
+}
+const sinceIso = (ms) => new Date(Date.now() - ms).toISOString();
+async function inviteRows(pathQuery) {
+  const r = await walletRest('GET', pathQuery);
+  if (!r.ok) { console.error('inviteRows failed', r.status, await r.text()); throw new Error('invite_store_error'); }
+  return (await r.json()) || [];
+}
+async function inviteCount(table, filter) {
+  const r = await walletRest('GET', `${table}?select=id&${filter}&limit=1`, null, 'count=exact');
+  if (!r.ok) { console.error('inviteCount failed', r.status, await r.text()); throw new Error('invite_store_error'); }
+  const total = parseInt((r.headers.get('content-range') || '').split('/')[1], 10);
+  if (!Number.isFinite(total)) throw new Error('invite_store_error');
+  return total;
+}
+async function findInviteByVisitor(vid) {
+  const rows = await inviteRows(`qa_invites?inviter_visitor_id=eq.${encodeURIComponent(vid)}&select=code,inviter_visitor_id,inviter_user_id,inviter_wallet_id&limit=1`);
+  return rows[0] || null;
+}
+async function findInviteByCode(code) {
+  const rows = await inviteRows(`qa_invites?code=eq.${encodeURIComponent(code)}&select=code,inviter_visitor_id,inviter_user_id,inviter_wallet_id&limit=1`);
+  return rows[0] || null;
+}
+async function findInviteReward(inviteeVid) {
+  const rows = await inviteRows(`qa_invite_rewards?invitee_visitor_id=eq.${encodeURIComponent(inviteeVid)}&select=id,code,status,created_at,ip_hash&limit=1`);
+  return rows[0] || null;
+}
+async function patchInviteReward(id, onlyIfStatus, body) {
+  const r = await walletRest('PATCH', `qa_invite_rewards?id=eq.${id}${onlyIfStatus ? `&status=eq.${onlyIfStatus}` : ''}`, body, 'return=representation');
+  if (!r.ok) { console.error('patchInviteReward failed', r.status, await r.text()); throw new Error('invite_store_error'); }
+  return (await r.json()) || [];
+}
+// 초대받은 방문자가 "유효한 초대 방문"이고 아직 인정 기간 안인지(맛보기 추가 판단용)
+async function inviteBonusPreviewEligible(vid) {
+  try {
+    if (!inviteEnabled()) return false;
+    const v = cleanInviteVisitorId(vid);
+    if (!v) return false;
+    const row = await findInviteReward(v);
+    if (!row || (row.status !== 'visited' && row.status !== 'granted')) return false;
+    return Date.now() - new Date(row.created_at).getTime() <= inviteLimits().windowDays * 86400000;
+  } catch (e) { console.error('inviteBonusPreviewEligible error:', e); return false; }
+}
+
+// 초대자가 공유 버튼을 눌렀을 때: 초대 코드(없으면 새로 발급)와 보상을 받을 지갑을 준비한다.
+async function handleInviteCreate(req, res, payload) {
+  const vid = cleanInviteVisitorId(payload.visitorId);
+  if (!vid) { res.status(400).json({ error: '방문자 정보를 확인하지 못했어요.', code: 'no_visitor' }); return; }
+  try {
+    const user = payload.access_token ? await verifySupabaseUser(payload.access_token) : null;
+    let inv = await findInviteByVisitor(vid);
+    let newWalletCode = null;
+    // 지갑 찾기: 로그인 계정 > 가지고 있는 복구 코드 > (코드가 새로 만들어질 때만) 새 비회원 지갑
+    let wr = await resolveWallet({ user, walletCode: payload.walletCode, create: false });
+    if (!inv) {
+      const ipHash = hashRequestIp(req);
+      if (ipHash) {
+        const made = await inviteCount('qa_invites', `ip_hash=eq.${ipHash}&created_at=gte.${encodeURIComponent(sinceIso(86400000))}`);
+        if (made >= inviteLimits().createIpDaily) { res.status(429).json({ error: '잠시 후 다시 시도해주세요.', code: 'rate_limited' }); return; }
+      }
+      if (!wr.wallet) wr = await resolveWallet({ user, walletCode: null, create: true });
+      newWalletCode = wr.newCode || null;
+      for (let attempt = 0; attempt < 4 && !inv; attempt++) {
+        const code = generateInviteCode();
+        const ins = await walletRest('POST', 'qa_invites', {
+          code, inviter_visitor_id: vid, inviter_user_id: user ? user.id : null,
+          inviter_wallet_id: wr.wallet ? wr.wallet.id : null, ip_hash: ipHash,
+        }, 'return=representation');
+        if (ins.status === 409) { inv = await findInviteByVisitor(vid); continue; } // 같은 방문자가 동시에 만들었거나 코드 충돌
+        if (!ins.ok) { console.error('invite insert failed', ins.status, await ins.text()); throw new Error('invite_store_error'); }
+        const rows = await ins.json();
+        inv = rows && rows[0] || { code };
+      }
+      if (!inv) throw new Error('invite_store_error');
+    } else if (wr.wallet || user) {
+      // 이미 코드가 있으면 로그인·지갑 정보가 늘어난 경우에만 갱신(보상이 올바른 지갑으로 가도록)
+      const patch = {};
+      if (user && inv.inviter_user_id !== user.id) patch.inviter_user_id = user.id;
+      if (wr.wallet && inv.inviter_wallet_id !== wr.wallet.id) patch.inviter_wallet_id = wr.wallet.id;
+      if (Object.keys(patch).length) {
+        const pr = await walletRest('PATCH', `qa_invites?code=eq.${encodeURIComponent(inv.code)}`, patch, 'return=minimal');
+        if (!pr.ok) console.error('invite patch failed', pr.status);
+      }
+    }
+    res.status(200).json({ kind: 'invite', code: inv.code, rewardEnabled: inviteEnabled(), walletCode: newWalletCode, loggedIn: !!user });
+  } catch (e) {
+    console.error('handleInviteCreate error:', e);
+    res.status(503).json({ error: '초대 링크를 잠시 만들 수 없어요. 잠시 후 다시 시도해주세요.', code: 'store_error' });
+  }
+}
+
+// 친구가 ?inv=코드 링크로 열었을 때: 새 방문자인지 확인해 기록한다(맛보기 추가·보상 대상 표시). 보상은 여기서 지급하지 않는다.
+async function handleInviteVisit(req, res, payload) {
+  const code = normalizeInviteCode(payload.code);
+  const vid = cleanInviteVisitorId(payload.visitorId);
+  const out = (o) => res.status(200).json(Object.assign({ kind: 'invite_visit', rewardEnabled: inviteEnabled() }, o));
+  if (!code || !vid) { out({ ok: false, eligible: false, reason: 'bad_request' }); return; }
+  try {
+    const inv = await findInviteByCode(code);
+    if (!inv) { out({ ok: false, eligible: false, reason: 'bad_code' }); return; }
+    if (inv.inviter_visitor_id === vid) { out({ ok: true, eligible: false, reason: 'self' }); return; }
+    const done = (row) => {
+      const eligible = row.status === 'visited' || row.status === 'granted';
+      out({ ok: true, eligible, reason: eligible ? null : row.status, bonusPreview: eligible && inviteEnabled() });
+    };
+    const existing = await findInviteReward(vid);
+    if (existing) { done(existing); return; }
+    // 새 방문자 판단: 이 방문자의 방문 기록 중 일정 시간 이전 것이 하나라도 있으면 기존 방문자(보상 제외).
+    const lim = inviteLimits();
+    const older = await inviteRows(`funnel_events?visitor_id=eq.${encodeURIComponent(vid)}&created_at=lt.${encodeURIComponent(sinceIso(lim.newVisitorMinutes * 60000))}&select=id&limit=1`);
+    const status = older.length ? 'blocked_existing' : 'visited';
+    const ipHash = hashRequestIp(req);
+    if (ipHash && await inviteCount('qa_invite_rewards', `ip_hash=eq.${ipHash}&created_at=gte.${encodeURIComponent(sinceIso(86400000))}`) >= lim.visitIpDaily) {
+      out({ ok: true, eligible: false, reason: 'rate_limited' });
+      return;
+    }
+    const ins = await walletRest('POST', 'qa_invite_rewards', { code, invitee_visitor_id: vid, ip_hash: ipHash, status }, 'return=representation');
+    if (ins.status === 409) { const again = await findInviteReward(vid); if (again) { done(again); return; } }
+    if (!ins.ok) { console.error('invite visit insert failed', ins.status, await ins.text()); throw new Error('invite_store_error'); }
+    done({ status });
+  } catch (e) {
+    console.error('handleInviteVisit error:', e);
+    out({ ok: false, eligible: false, reason: 'store_error' });
+  }
+}
+
+// 친구가 기본운세 확인을 마쳤을 때: 조건·상한을 서버가 모두 다시 검사하고 통과하면 초대자 지갑에 질문권 +1.
+async function handleInviteClaim(req, res, payload) {
+  const out = (o) => res.status(200).json(Object.assign({ kind: 'invite_claim' }, o));
+  if (!inviteEnabled()) { out({ granted: false, reason: 'disabled' }); return; }
+  const vid = cleanInviteVisitorId(payload.visitorId);
+  if (!vid) { out({ granted: false, reason: 'bad_request' }); return; }
+  try {
+    const row = await findInviteReward(vid);
+    if (!row) { out({ granted: false, reason: 'no_invite' }); return; }
+    if (row.status === 'granted') { out({ granted: false, reason: 'already' }); return; }
+    if (row.status !== 'visited') { out({ granted: false, reason: row.status }); return; }
+    const lim = inviteLimits();
+    if (Date.now() - new Date(row.created_at).getTime() > lim.windowDays * 86400000) {
+      await patchInviteReward(row.id, 'visited', { status: 'expired' });
+      out({ granted: false, reason: 'expired' });
+      return;
+    }
+    const submitted = await inviteRows(`funnel_events?visitor_id=eq.${encodeURIComponent(vid)}&event_type=eq.form_submit&select=id&limit=1`);
+    if (!submitted.length) { out({ granted: false, reason: 'pending' }); return; } // 이벤트 기록이 아직 도착하지 않았을 수 있음 — 다시 시도 가능
+    const ipHash = hashRequestIp(req) || row.ip_hash || null;
+    // 먼저 "지급됨"으로 선점(같은 친구의 동시 요청 중 하나만 통과) → 상한 확인 → 적립. 상한을 넘으면 되돌린다(경합 시 적게 주는 쪽으로만 틀어짐).
+    const claimed = await patchInviteReward(row.id, 'visited', { status: 'granted', granted_at: new Date().toISOString(), ip_hash: ipHash });
+    if (!claimed.length) { out({ granted: false, reason: 'already' }); return; }
+    const since = encodeURIComponent(sinceIso(86400000));
+    const block = async (status) => { await patchInviteReward(row.id, 'granted', { status, granted_at: null }); out({ granted: false, reason: status }); };
+    if (await inviteCount('qa_invite_rewards', `code=eq.${encodeURIComponent(row.code)}&status=eq.granted&granted_at=gte.${since}`) > lim.inviterDaily) { await block('blocked_inviter_cap'); return; }
+    if (ipHash && await inviteCount('qa_invite_rewards', `ip_hash=eq.${ipHash}&status=eq.granted&granted_at=gte.${since}`) > lim.ipDaily) { await block('blocked_ip'); return; }
+    if (await inviteCount('qa_invite_rewards', `status=eq.granted&granted_at=gte.${since}`) > lim.dailyCap) { await block('blocked_daily_cap'); return; }
+    const revert = async (reason) => { try { await patchInviteReward(row.id, 'granted', { status: 'visited', granted_at: null }); } catch (e2) {} out({ granted: false, reason }); };
+    const inv = await findInviteByCode(row.code);
+    let walletId = inv && inv.inviter_wallet_id || null;
+    if (inv && inv.inviter_user_id) { const uw = await findWalletByUser(inv.inviter_user_id); if (uw) walletId = uw.id; }
+    if (!walletId) { await revert('no_wallet'); return; }
+    const add = await walletAddCredits(walletId, 1, 'invite_reward', `inv:${row.code}:${vid}`);
+    if (!add.ok && !add.duplicate) { await revert('credit_failed'); return; }
+    try { // 관리자 퍼널용 기록(실패해도 무시)
+      await walletRest('POST', 'funnel_events', { event_type: 'invite_reward', visitor_id: inv.inviter_visitor_id }, 'return=minimal');
+    } catch (e3) {}
+    out({ granted: true });
+  } catch (e) {
+    console.error('handleInviteClaim error:', e);
+    out({ granted: false, reason: 'store_error' });
+  }
+}
+
+// 초대자 본인의 초대 코드 목록(방문자 ID 또는 로그인 계정 기준)
+async function inviterCodes(vid, user) {
+  const parts = [];
+  if (vid) parts.push(`inviter_visitor_id.eq.${vid}`);
+  if (user) parts.push(`inviter_user_id.eq.${user.id}`);
+  if (!parts.length) return [];
+  const rows = await inviteRows(`qa_invites?or=(${parts.join(',')})&select=code&limit=20`);
+  return rows.map(r => r.code);
+}
+// 아직 알림을 보여주지 않은 보상(토스트용)
+async function pendingInviteRewards(vid, user) {
+  const codes = await inviterCodes(vid, user);
+  if (!codes.length) return { count: 0, ids: [] };
+  const rows = await inviteRows(`qa_invite_rewards?code=in.(${codes.join(',')})&status=eq.granted&notified_at=is.null&select=id&limit=50`);
+  return { count: rows.length, ids: rows.map(r => r.id) };
+}
+// 토스트를 띄운 뒤 호출: 해당 보상들을 "알림 완료"로 기록(같은 보상 토스트가 두 번 뜨지 않게)
+async function handleInviteAck(res, payload) {
+  const vid = cleanInviteVisitorId(payload.visitorId);
+  try {
+    const user = payload.access_token ? await verifySupabaseUser(payload.access_token) : null;
+    const ids = (Array.isArray(payload.ids) ? payload.ids : []).map(n => parseInt(n, 10)).filter(Number.isFinite).slice(0, 50);
+    const codes = await inviterCodes(vid, user);
+    if (!ids.length || !codes.length) { res.status(200).json({ kind: 'invite_ack', acked: 0 }); return; }
+    const r = await walletRest('PATCH', `qa_invite_rewards?id=in.(${ids.join(',')})&code=in.(${codes.join(',')})&status=eq.granted&notified_at=is.null`, { notified_at: new Date().toISOString() }, 'return=representation');
+    if (!r.ok) throw new Error('invite_store_error');
+    const rows = (await r.json()) || [];
+    res.status(200).json({ kind: 'invite_ack', acked: rows.length });
+  } catch (e) {
+    console.error('handleInviteAck error:', e);
+    res.status(200).json({ kind: 'invite_ack', acked: 0, error: true });
+  }
+}
+async function handleInviteRequest(req, res, payload) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) { res.status(503).json({ error: '초대 기능을 잠시 쓸 수 없어요.', code: 'store_unavailable' }); return; }
+  switch (payload.askMode) {
+    case 'invite_create': return handleInviteCreate(req, res, payload);
+    case 'invite_visit': return handleInviteVisit(req, res, payload);
+    case 'invite_claim': return handleInviteClaim(req, res, payload);
+    case 'invite_ack': return handleInviteAck(res, payload);
+    // 화면이 문구("질문 1회 받기" 등)를 보상 켜짐 여부에 맞추도록 알려준다 — DB를 건드리지 않는다.
+    case 'invite_config': res.status(200).json({ kind: 'invite_config', rewardEnabled: inviteEnabled() }); return;
+    default: res.status(400).json({ error: '알 수 없는 요청입니다.', code: 'bad_mode' });
+  }
+}
+
 module.exports = async (req, res) => {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'POST 요청만 지원합니다.' });
@@ -2045,6 +2347,11 @@ module.exports = async (req, res) => {
   // 이용권 잔액 조회는 사주 데이터 없이도 가능(AI·결제와 무관).
   if (payload && payload.category === 'ask' && payload.askMode === 'wallet') {
     await handleWalletQuery(res, payload);
+    return;
+  }
+  // 친구 초대(코드 발급·방문 기록·보상 청구·알림 완료): AI·결제와 무관해 사주 데이터가 필요 없다.
+  if (payload && payload.category === 'ask' && typeof payload.askMode === 'string' && payload.askMode.indexOf('invite_') === 0) {
+    await handleInviteRequest(req, res, payload);
     return;
   }
 
@@ -2090,7 +2397,7 @@ module.exports = async (req, res) => {
       return;
     }
     if (payload.askMode === 'preview') {
-      await handleAskPreview({ req, res, payload, isAdmin, apiKey, question: askQuestion, level: askLevel });
+      await handleAskPreview({ req, res, payload, user, isAdmin, apiKey, question: askQuestion, level: askLevel });
       return;
     }
   }
@@ -2388,6 +2695,9 @@ module.exports = async (req, res) => {
       pgProvider: recordPgProvider,
       paymentId: payload.paymentId || null,
     });
+    if (payload.category === 'ask' && !isAdmin && text) {
+      await logAskQuestion({ visitorId: payload.visitorId, userId: user ? user.id : null, kind: 'paid', level: askLevel, question: askQuestion, answer: text });
+    }
 
     const extra = {};
     walletDelivered = true;
