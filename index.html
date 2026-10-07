@@ -1122,6 +1122,7 @@ window.SajuAnalytics = (function(){
   .history-status.failed, .history-status.refunded{ background:rgba(251,113,133,.16); color:#fb7185; }
   .history-result{ margin-top:9px; padding-top:9px; border-top:1px dashed var(--line); font-size:11.5px; line-height:1.7; white-space:pre-wrap; color:var(--ink-soft); }
   /* 관리자: 질문 기록 */
+  .ask-used-invite{ margin:10px 0 0; text-align:center; }
   .ask-used-note{ font-size:11.5px; line-height:1.55; color:var(--gold); margin:0 2px 8px; text-align:center; }
   .ask-pack-used{ font-size:11.5px; line-height:1.6; color:var(--gold); margin:0 2px 10px; padding:9px 11px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--paper-card); }
   .qalog-filters{ display:flex; gap:6px; align-items:center; margin:2px 0 8px; flex-wrap:wrap; }
@@ -2036,12 +2037,16 @@ window.SajuAnalytics = (function(){
               <div class="ask-error" id="askError" hidden></div>
               <div class="ask-used-note" id="askUsedNote" hidden>무료 한 줄 답은 이미 사용하셨어요. 추가 질문은 이용권으로 답해드려요.</div>
               <button type="button" class="submit-btn" id="askSubmitBtn">무료로 한 줄 답 받기</button>
+              <div class="ask-used-invite" id="askUsedInvite" hidden>
+                <button type="button" class="ask-share-btn" id="askUsedInviteBtn"><span class="ask-share-ico">🎟️</span>친구 초대하고 질문 1회권 쿠폰 받기</button>
+                <div class="ask-share-note" id="askUsedInviteNote" hidden></div>
+              </div>
               <div class="ask-preview" id="askPreview" hidden>
                 <div class="ask-preview-label" id="askPreviewLabel">✦ 무료 맛보기</div>
                 <div class="ask-preview-text" id="askPreviewBody"></div>
                 <div class="ask-preview-fade" id="askPreviewFade">이 근거가 왜 나오는지, 지금 무엇을 하면 좋은지는 전체 답변에서 확인하세요.</div>
                 <button type="button" class="submit-btn" id="askFullBtn">전체 답변 보기</button>
-                <div class="ask-share-row" id="askShareRow" hidden><button type="button" class="ask-link" id="askShareLink">친구에게도 공유하기</button></div>
+                <div class="ask-share-row" id="askShareRow" hidden><button type="button" class="ask-link" id="askShareLink">친구 초대하기</button></div>
                 <div class="ask-share-note" id="askShareNote" hidden></div>
               </div>
               <div class="ask-note">사주·자미두수를 근거로 당신의 고민을 상담해드립니다.</div>
@@ -7619,7 +7624,7 @@ const INVITE_BONUS_KEY = 'sajuInviteBonus_v1';      // 맛보기 추가 1회 대
 const INVITE_CLAIMED_KEY = 'sajuInviteClaimed_v1';  // 보상 청구가 끝났는지
 const INVITE_FORMDONE_KEY = 'sajuInviteFormDone_v1'; // 초대받은 뒤 기본운세 확인까지 마쳤는지(청구가 늦어졌을 때 다시 시도하기 위함)
 const INVITE_CODE_RE = /^[A-HJ-NP-Z2-9]{8}$/;
-let inviteConfigPromise = null, inviteRewardEnabled = null;
+let inviteConfigPromise = null, inviteRewardEnabled = null, askUsedInviteAsked = false;
 let inviteShareBusy = false, inviteAckBusy = false, inviteClaimBusy = false, rewardToastTimer = null;
 function lsGet(k){ try{ return localStorage.getItem(k) || ''; } catch(e){ return ''; } }
 function lsSet(k, v){ try{ localStorage.setItem(k, v); } catch(e){} }
@@ -7645,6 +7650,17 @@ function refreshAskButton(){
   // 무료를 이미 쓴 방문자가 버튼을 누르면 곧바로 이용권 화면으로 가므로, 눌러보기 전에 이유를 먼저 알려준다.
   const usedNote = $('#askUsedNote');
   if(usedNote) usedNote.hidden = !(bal <= 0 && askPreviewUsed() && !isAdmin) || btn.style.display === 'none';
+  // 2026-10-07: 무료를 다 쓴 화면에서도 친구 초대 쿠폰을 안내한다(보상이 켜져 있을 때만 — 꺼져 있으면 약속하는 문구를 쓰지 않는다).
+  const rewardOn = inviteRewardEnabled === true;
+  if(usedNote) usedNote.textContent = '무료 한 줄 답은 이미 사용하셨어요. 추가 질문은 이용권으로 답해드려요.' + (rewardOn ? ' 친구를 초대하면 질문 1회권 쿠폰을 발급해드려요.' : '');
+  const usedInvite = $('#askUsedInvite');
+  if(usedInvite){
+    usedInvite.hidden = !(usedNote && !usedNote.hidden && rewardOn);
+    if(usedNote && !usedNote.hidden && inviteRewardEnabled === null && !askUsedInviteAsked){   // 보상 여부를 아직 모르면 한 번만 물어본 뒤 다시 그린다(실패해도 반복 호출하지 않음)
+      askUsedInviteAsked = true;
+      getInviteConfig().then(()=>refreshAskButton());
+    }
+  }
   btn.textContent = bal > 0
     ? `질문하고 답변 받기 · 남은 ${bal}개 사용`
     : ((askPreviewUsed() && !isAdmin) ? '질문하고 답변 받기' : '무료로 한 줄 답 받기');
@@ -8389,6 +8405,7 @@ document.addEventListener('click', function(e){
   const shareBtn = e.target.closest && e.target.closest('#aiResultShareBtn');
   if(shareBtn){ if(selectedAiCategory === 'ask') shareInvite('result'); else shareAiResultToKakao(); }
   if(e.target.closest && e.target.closest('#askShareLink')) shareInvite('preview');
+  if(e.target.closest && e.target.closest('#askUsedInviteBtn')) shareInvite('used');
 });
 window.addEventListener('load', initKakaoIfNeeded);
 // ---- 친구 초대 (2026-10-07) ----
@@ -8418,7 +8435,8 @@ function getInviteConfig(){
   return inviteConfigPromise;
 }
 function inviteShareLabel(enabled, where){
-  const base = enabled ? '친구에게 공유하고 질문 1회 받기' : (where === 'result' ? '친구에게 공유하기' : '친구에게도 공유하기');
+  // 2026-10-07: 카드가 '내가 받은 답'이 아니라 궁합/별명 초대장이므로 '공유'가 아니라 '초대'로 쓴다.
+  const base = enabled ? '친구 초대하고 질문 1회권 쿠폰 받기' : '친구 초대하기';
   return where === 'result' ? '💬 ' + base : base;
 }
 // 보상이 켜져 있으면 눈에 띄는 보조 버튼(🎟 아이콘 + 문구), 꺼져 있으면 지금처럼 작은 글씨 링크.
@@ -8589,7 +8607,7 @@ async function shareInvite(where){
     logFunnelEvent('invite_share_click');   // 카드 종류는 링크의 utm_content(card_a/card_b)로 구분된다
     const enabled = await getInviteConfig();
     const code = enabled ? await ensureInviteCode() : '';
-    const noteEl = $(where === 'result' ? '#askShareNoteResult' : '#askShareNote');
+    const noteEl = $(where === 'result' ? '#askShareNoteResult' : (where === 'used' ? '#askUsedInviteNote' : '#askShareNote'));
     if(noteEl){
       // 공유를 누른 순간 안내: 앱을 닫아도 보상은 쌓이니, 나중에 다시 들어와서 확인하게 한다.
       noteEl.textContent = (enabled && code)
