@@ -421,6 +421,12 @@ window.SajuAnalytics = (function(){
     overflow:hidden; text-overflow:ellipsis;
   }
   .entry-toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+  /* 2026-10-07: 친구 초대 보상("질문권을 획득했어요!")은 놓치기 쉬워서 입력 완료 토스트(1초)보다 길게(약 5초) 띄운다. */
+  .reward-toast{ bottom:calc(84px + env(safe-area-inset-bottom)); border-color:var(--gold); color:var(--gold); }
+  .ask-share-row{ margin:12px 0 0; text-align:center; }
+  .ask-share-note{ font-size:11.5px; line-height:1.6; color:var(--gold); margin:8px 2px 0; text-align:center; }
+  .ask-invite-notice{ font-size:12px; line-height:1.6; color:var(--gold); background:var(--paper-deep); border:1px solid var(--gold-line); border-radius:var(--radius-sm); padding:9px 12px; margin:0 0 12px; font-weight:700; }
+  .share-preview-bonus{ font-size:12px; color:var(--gold); margin:0 0 8px; text-align:center; font-weight:700; }
   .disclaimer{
     margin-top:16px; font-size:11px; line-height:1.6; color:var(--ink-faint);
     padding:12px 13px; background:var(--paper-deep); border-radius:var(--radius-sm);
@@ -1107,6 +1113,24 @@ window.SajuAnalytics = (function(){
   .history-status.pending{ background:rgba(244,196,99,.16); color:#f4c463; }
   .history-status.failed, .history-status.refunded{ background:rgba(251,113,133,.16); color:#fb7185; }
   .history-result{ margin-top:9px; padding-top:9px; border-top:1px dashed var(--line); font-size:11.5px; line-height:1.7; white-space:pre-wrap; color:var(--ink-soft); }
+  /* 관리자: 질문 기록 */
+  .ask-used-note{ font-size:11.5px; line-height:1.55; color:var(--gold); margin:0 2px 8px; text-align:center; }
+  .ask-pack-used{ font-size:11.5px; line-height:1.6; color:var(--gold); margin:0 2px 10px; padding:9px 11px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--paper-card); }
+  .qalog-filters{ display:flex; gap:6px; align-items:center; margin:2px 0 8px; flex-wrap:wrap; }
+  .qalog-filters input[type=search]{ flex:1 1 140px; min-width:0; padding:7px 10px; border:1.5px solid var(--line); border-radius:var(--radius-sm); background:var(--paper-card); color:var(--ink); font-size:12px; }
+  .qalog-item{ border:1.5px solid var(--line); border-radius:var(--radius-sm); background:var(--paper-card); padding:11px 12px; }
+  .qalog-q{ font-size:12.5px; line-height:1.6; word-break:break-all; white-space:pre-wrap; margin-bottom:6px; }
+  .qalog-ans{ margin:2px 0 7px; }
+  .qalog-ans summary{ cursor:pointer; font-size:11px; font-weight:700; color:var(--gold); list-style:none; padding:2px 0; }
+  .qalog-ans summary::-webkit-details-marker{ display:none; }
+  .qalog-ans summary::before{ content:'▸ '; }
+  .qalog-ans[open] summary::before{ content:'▾ '; }
+  .qalog-ans-body{ margin-top:5px; padding:9px 10px; border-left:2px solid var(--line); background:rgba(255,255,255,.03); font-size:12px; line-height:1.7; white-space:pre-wrap; word-break:break-all; color:var(--ink-soft); }
+  .qalog-noans{ font-size:10.5px; color:var(--ink-faint); margin:0 0 6px; }
+  .qalog-badge{ padding:1px 7px; border-radius:20px; font-size:9.5px; font-weight:700; }
+  .qalog-badge.free{ background:rgba(244,196,99,.16); color:#f4c463; }
+  .qalog-badge.paid{ background:rgba(52,211,153,.16); color:#34d399; }
+  .qalog-badge.lv{ background:rgba(251,113,133,.16); color:#fb7185; }
   .history-empty{ text-align:center; padding:26px 10px; color:var(--ink-faint); font-size:12px; }
   .campaign-table-wrap{ margin:2px 0 14px; overflow-x:auto; -webkit-overflow-scrolling:touch; }
   .campaign-table{ width:100%; border-collapse:collapse; font-size:10.5px; }
@@ -1629,7 +1653,8 @@ window.SajuAnalytics = (function(){
       <div class="share-preview-card" id="sharePreviewCard" hidden>
         <div class="share-preview-label" id="sharePreviewLabel"></div>
         <p class="share-preview-excerpt" id="sharePreviewExcerpt"></p>
-        <p class="share-preview-cta">나의 사주도 무료로 확인해볼까요? 아래에 생년월일을 입력해보세요 👇</p>
+        <p class="share-preview-bonus" id="sharePreviewBonus" hidden>🎁 친구 초대로 오셨어요! 무료 질문을 한 번 더 드려요.</p>
+        <p class="share-preview-cta" id="sharePreviewCta">나의 사주도 무료로 확인해볼까요? 아래에 생년월일을 입력해보세요 👇</p>
       </div>
       <div class="field optional">
         <label for="inpName">이름 (선택)</label>
@@ -1967,6 +1992,7 @@ window.SajuAnalytics = (function(){
               <div class="ask-card-badge">NEW · 질문형 상담</div>
               <div class="ask-card-title">지금 가장 궁금한 한 가지, 직접 물어보세요</div>
               <div class="ask-card-sub">내 사주를 바탕으로 질문 하나에 곧바로 답해드려요.</div>
+              <div class="ask-invite-notice" id="askInviteNotice" hidden></div>
               <div class="ask-wallet" id="askWallet" hidden>
                 <div class="ask-wallet-line"><span class="ask-wallet-count" id="askWalletCount"></span><button type="button" class="ask-link" id="askWalletCodeToggle" hidden>복구 코드 보기</button></div>
                 <div class="ask-wallet-code" id="askWalletCodeBox" hidden>
@@ -1984,12 +2010,15 @@ window.SajuAnalytics = (function(){
               <textarea id="askInput" class="ask-input" maxlength="200" rows="3" placeholder="예) 올해 안에 이직하는 게 나을까요?"></textarea>
               <div class="ask-meta"><span id="askCount">0/200</span></div>
               <div class="ask-error" id="askError" hidden></div>
+              <div class="ask-used-note" id="askUsedNote" hidden>무료 한 줄 답은 이미 사용하셨어요. 추가 질문은 이용권으로 답해드려요.</div>
               <button type="button" class="submit-btn" id="askSubmitBtn">무료로 한 줄 답 받기</button>
               <div class="ask-preview" id="askPreview" hidden>
                 <div class="ask-preview-label" id="askPreviewLabel">✦ 무료 맛보기</div>
                 <div class="ask-preview-text" id="askPreviewBody"></div>
-                <div class="ask-preview-fade" id="askPreviewFade">이어지는 이유와 지금 해볼 행동은 전체 답변에서 확인할 수 있어요.</div>
-                <button type="button" class="submit-btn" id="askFullBtn">전체 답변 보기 · 2,900원</button>
+                <div class="ask-preview-fade" id="askPreviewFade">이 근거가 왜 나오는지, 지금 무엇을 하면 좋은지는 전체 답변에서 확인하세요.</div>
+                <button type="button" class="submit-btn" id="askFullBtn">전체 답변 보기</button>
+                <div class="ask-share-row" id="askShareRow" hidden><button type="button" class="ask-link" id="askShareLink">친구에게도 공유하기</button></div>
+                <div class="ask-share-note" id="askShareNote" hidden></div>
               </div>
               <div class="ask-note">사주·자미두수를 근거로 당신의 고민을 상담해드립니다.</div>
               <div class="ask-restore-row"><button type="button" class="ask-link" id="askRestoreToggle">질문 이용권 코드가 있어요</button></div>
@@ -2170,6 +2199,7 @@ window.SajuAnalytics = (function(){
 
           <div id="aiStepAskPack" hidden>
             <button type="button" class="cat-back" id="askPackBackBtn">← 돌아가기</button>
+            <div class="ask-pack-used" id="askPackUsed" hidden>무료 한 줄 답은 이미 사용하셨어요. 이 질문은 이용권으로 바로 답해드려요.</div>
             <div class="ask-pack-head">
               <div class="ask-pack-qlabel">내 질문</div>
               <div class="ask-pack-q" id="askPackQuestion"></div>
@@ -2222,7 +2252,7 @@ window.SajuAnalytics = (function(){
             </div>
             <div class="ask-again-sub">답을 읽고 나서 생긴 궁금증, 질문 하나씩 바로 풀어드려요.</div>
             <div class="ask-chips" id="askAgainChips"></div>
-            <button type="button" class="submit-btn" id="askAgainBtn">다른 질문하기 · 2,900원</button>
+            <button type="button" class="submit-btn" id="askAgainBtn">다른 질문하기</button>
           </div>
           <div class="ai-result-note" id="aiResultNote"></div>
         </div>
@@ -2292,6 +2322,31 @@ window.SajuAnalytics = (function(){
     <div id="campaignSummary" class="campaign-table-wrap"></div>
     <p class="modal-desc" style="margin-top:6px;">처음 들어온 광고 기준이에요. 꼬리표(UTM)가 없는 방문은 "직접/기타"로 보여요. 관리자 무료 열람은 매출에서 제외돼요.</p>
     <button class="modal-cancel" id="adModalCancel">닫기</button>
+  </div>
+</div>
+<div id="qaLogModal" class="modal-overlay" hidden>
+  <div class="modal-card modal-card-wide">
+    <div class="modal-title">질문 기록 — 누가 어떤 질문을 했나</div>
+    <div class="admin-period-bar">
+      <div class="funnel-period-tabs" id="qaLogPeriodTabs">
+        <button type="button" data-period="today">오늘</button>
+        <button type="button" data-period="week">이번 주</button>
+        <button type="button" data-period="month">이번 달</button>
+        <button type="button" class="active" data-period="all">전체</button>
+      </div>
+    </div>
+    <div class="admin-summary" id="qaLogSummary"></div>
+    <div class="qalog-filters">
+      <div class="funnel-period-tabs" id="qaLogKindTabs">
+        <button type="button" class="active" data-kind="all">전체</button>
+        <button type="button" data-kind="preview">무료</button>
+        <button type="button" data-kind="paid">유료</button>
+      </div>
+      <input type="search" id="qaLogSearch" placeholder="질문·답변 내용 검색" aria-label="질문·답변 내용 검색">
+    </div>
+    <div class="history-list" id="qaLogList"></div>
+    <p class="modal-desc" style="margin-top:6px;">답변까지 만든 질문과 AI 답변이 기록돼요(관리자 테스트·위기/운명단정 질문 제외). 90일 뒤 자동 삭제되고, 이메일·전화번호 모양의 숫자는 가려져요. 질문에 개인적인 내용이 있을 수 있으니 화면 공유·캡처에 주의하세요.</p>
+    <button class="modal-cancel" id="qaLogModalCancel">닫기</button>
   </div>
 </div>
 <div id="adminModal" class="modal-overlay" hidden>
@@ -5783,6 +5838,8 @@ let selectedAiCategory = null;
 // 질문형 상담 상태(2026-10-05). resetAiPanel()/resetAskCard()가 새 분석 때 비운다.
 let askQuestionText = '';
 let askPreviewText = '';
+// 화면에 떠 있는 무료 맛보기 박스가 어느 질문의 것인지(질문 입력칸을 고쳐도 맛보기 박스는 그대로 남겨 둔다)
+let askShownQ = '', askShownText = '', askPackViaFull = false;
 let askRequestMode = null; // 'preview' | 'check' — buildAiPayload가 payload.askMode로 싣는 일회성 값
 let askBusy = false;
 let pendingRestoreAsk = null;
@@ -6656,6 +6713,7 @@ $('#submitBtn').addEventListener('click', ()=>{
     lastZiweiResult = ziweiResult;
     lastName = ($('#inpName').value||"").trim();
     logFunnelEvent('form_submit');
+    tryInviteClaim();   // 초대 링크로 들어온 새 방문자가 기본운세를 확인했으니, 초대한 친구의 보상을 서버에 청구한다
     renderTodayPanel(result, y, m, d);
     // 대운/세운/오늘의 사주 패널이 전부 렌더된 뒤에 호출해야 목차 미리보기 티저가
     // 그 DOM(.current 카드, todayIljinTag)을 정확히 읽을 수 있다.
@@ -7510,8 +7568,24 @@ $('#payBackBtn').addEventListener('click', ()=>{ showAiStep('aiStepCategory'); }
 // — 위기/운명단정 질문은 결제 전에 걸러져 돈이 나가지 않는다. 한도는 서버(qa_free_usage)가 최종 강제하고,
 // 아래 localStorage 표식은 화면 문구를 맞추기 위한 편의일 뿐이다.
 const ASK_PREVIEW_USED_KEY = 'sajuAskPreviewUsed_v1';
-function askPreviewUsed(){ try{ return localStorage.getItem(ASK_PREVIEW_USED_KEY) === '1'; } catch(e){ return false; } }
-function markAskPreviewUsed(){ try{ localStorage.setItem(ASK_PREVIEW_USED_KEY, '1'); } catch(e){} }
+// 2026-10-07 친구 초대: 초대 링크로 들어온 '새 방문자'는 무료 맛보기를 한 번 더 받는다(서버가 최종 판단).
+// 그래서 '사용했는가'를 예/아니오가 아니라 횟수로 센다(예전 값 '1'은 그대로 1회로 읽힌다).
+const INVITE_CODE_KEY = 'sajuInviteCode_v1';        // 내가 발급받은 초대 코드
+const INVITE_IN_KEY = 'sajuInviteIn_v1';            // 내가 받은(들어온) 초대 코드
+const INVITE_VISITED_KEY = 'sajuInviteVisited_v1';  // 방문 기록을 서버에 남긴 초대 코드
+const INVITE_BONUS_KEY = 'sajuInviteBonus_v1';      // 맛보기 추가 1회 대상 여부
+const INVITE_CLAIMED_KEY = 'sajuInviteClaimed_v1';  // 보상 청구가 끝났는지
+const INVITE_FORMDONE_KEY = 'sajuInviteFormDone_v1'; // 초대받은 뒤 기본운세 확인까지 마쳤는지(청구가 늦어졌을 때 다시 시도하기 위함)
+const INVITE_CODE_RE = /^[A-HJ-NP-Z2-9]{8}$/;
+let inviteConfigPromise = null, inviteRewardEnabled = null;
+let inviteShareBusy = false, inviteAckBusy = false, inviteClaimBusy = false, rewardToastTimer = null;
+function lsGet(k){ try{ return localStorage.getItem(k) || ''; } catch(e){ return ''; } }
+function lsSet(k, v){ try{ localStorage.setItem(k, v); } catch(e){} }
+function askPreviewCount(){ const n = parseInt(lsGet(ASK_PREVIEW_USED_KEY) || '0', 10); return n > 0 ? n : 0; }
+function askPreviewAllowed(){ return 1 + (lsGet(INVITE_BONUS_KEY) === '1' ? 1 : 0); }
+function askPreviewUsed(){ return askPreviewCount() >= askPreviewAllowed(); }
+function markAskPreviewUsed(){ lsSet(ASK_PREVIEW_USED_KEY, String(Math.min(askPreviewCount() + 1, 9))); }
+function markAskPreviewExhausted(){ lsSet(ASK_PREVIEW_USED_KEY, '9'); }   // 서버가 '이미 사용'이라고 하면 허용 횟수와 상관없이 끝난 것
 function cleanAskInput(){ return String($('#askInput').value || '').replace(/\s+/g, ' ').trim().slice(0, 200); }
 function showAskError(msg){
   const el = $('#askError');
@@ -7521,11 +7595,17 @@ function showAskError(msg){
 function refreshAskButton(){
   const btn = $('#askSubmitBtn');
   if(!btn || askBusy) return;
+  // 2026-10-05: 답변 미리보기 박스가 떠 있는 동안에는 위쪽 제출 버튼을 숨긴다(바로 아래 '전체 답변 보기' 버튼과 겹쳐 결제 유도처럼 보임).
+  // 질문 문장을 고치면 미리보기를 닫고 다시 보인다.
+  btn.style.display = ($('#askPreview') && !$('#askPreview').hidden && cleanAskInput() === askShownQ) ? 'none' : '';
   const isAdmin = !!(currentProfile && currentProfile.is_admin);
   const bal = askWallet.balance || 0;
+  // 무료를 이미 쓴 방문자가 버튼을 누르면 곧바로 이용권 화면으로 가므로, 눌러보기 전에 이유를 먼저 알려준다.
+  const usedNote = $('#askUsedNote');
+  if(usedNote) usedNote.hidden = !(bal <= 0 && askPreviewUsed() && !isAdmin) || btn.style.display === 'none';
   btn.textContent = bal > 0
     ? `질문하고 답변 받기 · 남은 ${bal}개 사용`
-    : ((askPreviewUsed() && !isAdmin) ? '질문하고 답변 받기 · 이용권 3,900원~' : '무료로 한 줄 답 받기');
+    : ((askPreviewUsed() && !isAdmin) ? '질문하고 답변 받기' : '무료로 한 줄 답 받기');
 }
 function renderAskPreviewText(text){
   const body = $('#askPreviewBody');
@@ -7551,11 +7631,22 @@ function showAskPreviewBox(opts){
   $('#askPreviewFade').textContent = opts.note || '';
   $('#askPreviewFade').hidden = !opts.note;
   $('#askFullBtn').hidden = !opts.showFull;
+  // 친구에게 공유 링크는 실제 답이 있는 맛보기에만 둔다(안내·차단 박스에는 없음). 전체 답변 버튼이 더 눈에 띄게 작은 글자 링크로만.
+  const shareRow = $('#askShareRow');
+  if(shareRow){ shareRow.hidden = !opts.share; const sn = $('#askShareNote'); if(sn) sn.hidden = true; if(opts.share) getInviteConfig().then(updateInviteLabels); }
+  askShownQ = askQuestionText; askShownText = askPreviewText;
   $('#askPreview').hidden = false;
+  refreshAskButton();
+}
+function askInputChanged(){
+  $('#askCount').textContent = `${$('#askInput').value.length}/200`;
+  showAskError('');
+  if(!askBusy) refreshAskButton();   // 맛보기 박스는 닫지 않는다 — 질문을 고치면 제출 버튼만 다시 보인다
 }
 function resetAskCard(){
   askQuestionText = '';
   askPreviewText = '';
+  askShownQ = ''; askShownText = ''; askPackViaFull = false;
   askRequestMode = null;
   askBusy = false;
   const preview = $('#askPreview');
@@ -7587,6 +7678,8 @@ function showAskPackStep(){
   $('#askPackQuestion').textContent = `"${q}"`;
   $('#askPackGuest').hidden = !!currentSession;
   $('#askPackAdmin').hidden = !(currentProfile && currentProfile.is_admin);
+  // 맛보기 답변을 보지 않고(=이미 무료를 쓴 상태로) 바로 온 경우에만 이유를 안내
+  $('#askPackUsed').hidden = !(askPreviewUsed() && !askPackViaFull && !(currentProfile && currentProfile.is_admin));
   showAiStep('aiStepAskPack');
 }
 function chooseAskPack(n){
@@ -7701,6 +7794,7 @@ async function refreshAskWallet(force){
     askWallet = { balance: d.balance || 0, expiresAt: d.expiresAt || null };
     if(d.linked && currentSession) setStoredWalletCode('');
     renderAskWallet();
+    handlePendingInvite(d);   // 친구가 사주를 확인해서 적립된 질문권이 있으면 알려준다
     return d;
   } catch(e){ return null; }
 }
@@ -7732,7 +7826,7 @@ function refreshAskAgainLabel(){
   if(!btn) return;
   const isAdmin = !!(currentProfile && currentProfile.is_admin);
   const bal = askWallet.balance || 0;
-  btn.textContent = bal > 0 ? `다른 질문하기 · 남은 ${bal}개` : (isAdmin ? '다른 질문하기' : '다른 질문하기 · 이용권 3,900원~');
+  btn.textContent = bal > 0 ? `다른 질문하기 · 남은 ${bal}개` : '다른 질문하기';
   const code = getStoredWalletCode();
   const showCode = !currentSession && !!code;
   const box = $('#askAgainCode');
@@ -7790,9 +7884,10 @@ async function submitAskQuestion(){
   showAskError('');
   askQuestionText = q;
   askPreviewText = '';
-  $('#askPreview').hidden = true;
+  askPackViaFull = false;
   askBusy = true;
   const btn = $('#askSubmitBtn');
+  btn.style.display = '';
   btn.disabled = true;
   btn.textContent = '사주를 읽는 중…';
   logFunnelEvent('qa_question_submit');
@@ -7800,11 +7895,12 @@ async function submitAskQuestion(){
   try{
     const hasCredit = (askWallet.balance || 0) > 0;
     const mode = (hasCredit || (askPreviewUsed() && !isAdmin)) ? 'check' : 'preview';
+    if(mode === 'preview') $('#askPreview').hidden = true;   // 이미 떠 있는 맛보기(이전 질문)는 새 맛보기를 만들 때만 지운다
     const r = await askRequest(mode);
     if(!r.ok){
       const code = r.data && r.data.code;
       if(code === 'visitor_used' || code === 'daily_cap' || code === 'ip_limit'){
-        if(code === 'visitor_used') markAskPreviewUsed();
+        if(code === 'visitor_used') markAskPreviewExhausted();
         showAskPreviewBox({ label: '✦ 안내', text: '', note: r.data.error || '', showFull: true });
         return;
       }
@@ -7821,7 +7917,7 @@ async function submitAskQuestion(){
       markAskPreviewUsed();
       askPreviewText = d.text || '';
       logFunnelEvent('qa_preview_shown');
-      showAskPreviewBox({ label: '✦ 무료 맛보기', text: askPreviewText, note: '이어지는 이유와 지금 해볼 행동은 전체 답변에서 확인할 수 있어요.', showFull: true });
+      showAskPreviewBox({ label: '✦ 무료 맛보기', text: askPreviewText, note: '이 근거가 왜 나오는지, 지금 무엇을 하면 좋은지는 전체 답변에서 확인하세요.', showFull: true, share: true });
       return;
     }
     if(d.kind === 'ok'){ goToAskPay(); return; }
@@ -7834,20 +7930,21 @@ async function submitAskQuestion(){
     refreshAskButton();
   }
 }
-$('#askInput').addEventListener('input', ()=>{
-  $('#askCount').textContent = `${$('#askInput').value.length}/200`;
-  showAskError('');
-});
+$('#askInput').addEventListener('input', askInputChanged);
 $$('#askChips .ask-chip').forEach(chip=>{
   chip.addEventListener('click', ()=>{
     $('#askInput').value = chip.textContent.trim();
-    $('#askCount').textContent = `${$('#askInput').value.length}/200`;
-    showAskError('');
+    askInputChanged();
   });
 });
 $('#askSubmitBtn').addEventListener('click', submitAskQuestion);
-$('#askFullBtn').addEventListener('click', goToAskPay);
-// 질문 답변 아래 "이어서 더 물어보세요": 답을 읽고 생긴 다음 궁금증을 바로 다음 질문(2,900원)으로 잇는다.
+$('#askFullBtn').addEventListener('click', ()=>{
+  // 맛보기 박스의 '전체 답변 보기'는 그 박스에 보이는 질문의 것이다(입력칸에 다른 질문을 적었어도)
+  if(askShownQ){ askQuestionText = askShownQ; askPreviewText = askShownText; }
+  askPackViaFull = true;
+  goToAskPay();
+});
+// 질문 답변 아래 "이어서 더 물어보세요": 답을 읽고 생긴 다음 궁금증을 바로 다음 질문으로 잇는다.
 // 이어지는 질문 칩은 방금 질문에 들어 있는 주제어로 고른 고정 문구다(AI 호출 없음, 비용 0).
 const ASK_FOLLOWUPS = [
   { re: /돈|재물|수입|월급|투자|부업|저축|재테크|부자/, qs: ['그럼 어떤 방식으로 수입을 늘리는 게 잘 맞을까요?', '올해 돈이 새는 걸 막으려면 뭘 조심해야 하나요?', '부업을 시작한다면 언제가 좋을까요?'] },
@@ -8247,9 +8344,218 @@ async function shareAiResultToKakao(){
 }
 document.addEventListener('click', function(e){
   const shareBtn = e.target.closest && e.target.closest('#aiResultShareBtn');
-  if(shareBtn) shareAiResultToKakao();
+  if(shareBtn){ if(selectedAiCategory === 'ask') shareInvite('result'); else shareAiResultToKakao(); }
+  if(e.target.closest && e.target.closest('#askShareLink')) shareInvite('preview');
 });
 window.addEventListener('load', initKakaoIfNeeded);
+// ---- 친구 초대 (2026-10-07) ----
+// 초대하는 사람: 맛보기 아래 링크 / 전체 답변 맨 아래 버튼 → 결론 한 줄 카드(?share=토큰) + 초대 코드(?inv=코드)를 카카오톡으로 보낸다.
+// 초대받는 사람: ?inv= 로 들어오면 서버에 방문을 기록(새 방문자면 맛보기 1회 추가) → 기본운세를 확인하면 보상 청구 → 초대한 사람 질문권 +1.
+// 보상 지급 여부·상한은 전부 서버가 판단한다. 이 화면은 서버가 알려준 값을 보여주기만 한다.
+async function inviteApi(extra){
+  try{
+    const res = await fetch('/api/interpret', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Object.assign({ category: 'ask' }, extra)),
+    });
+    const d = await res.json().catch(()=>null);
+    return (d && typeof d === 'object') ? d : null;
+  } catch(e){ return null; }
+}
+// 보상이 켜져 있는지(서버 환경변수 INVITE_REWARD_ENABLED) — 꺼져 있으면 "질문 1회 받기" 같은 약속 문구를 화면에 쓰지 않는다.
+function getInviteConfig(){
+  if(inviteRewardEnabled !== null) return Promise.resolve(inviteRewardEnabled);
+  if(!inviteConfigPromise){
+    inviteConfigPromise = inviteApi({ askMode: 'invite_config' }).then(d=>{
+      inviteConfigPromise = null;
+      if(d && typeof d.rewardEnabled === 'boolean'){ inviteRewardEnabled = d.rewardEnabled; return d.rewardEnabled; }
+      return false;   // 조회 실패: 이번에는 보상 문구 없이 두고, 다음에 다시 물어본다
+    });
+  }
+  return inviteConfigPromise;
+}
+function inviteShareLabel(enabled, where){
+  const base = enabled ? '친구에게 공유하고 질문 1회 받기' : (where === 'result' ? '친구에게 공유하기' : '친구에게도 공유하기');
+  return where === 'result' ? '💬 ' + base : base;
+}
+function updateInviteLabels(enabled){
+  const a = $('#askShareLink'); if(a) a.textContent = inviteShareLabel(!!enabled, 'preview');
+  const b = $('#aiResultShareBtn'); if(b && selectedAiCategory === 'ask') b.textContent = inviteShareLabel(!!enabled, 'result');
+}
+// 공유 카드에 실리는 건 '한 줄 결론'뿐이다 — 질문·이름·근거·행동 조언은 넣지 않는다(맛보기·전체 답변 모두 첫 문단이 "한 줄 결론 — …").
+function extractAskConclusion(text){
+  const lines = String(text || '').split(/\n+/).map(x=>x.trim()).filter(Boolean);
+  let line = lines.find(l=>/^한 줄 결론\s*—/.test(l)) || '';
+  if(!line) return '';
+  const idx = line.indexOf('—');
+  line = line.slice(idx + 1).replace(/[*#]/g, '').trim();
+  const nm = (lastName || '').trim();
+  if(nm){   // 이름은 카드에 남기지 않는다("홍길동님은 올해…" → "올해…")
+    const esc = nm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    line = line.replace(new RegExp(esc + '님(께서|은|는|이|가|을|를|의|께|도|만)?\\s*', 'g'), '').replace(/\s{2,}/g, ' ').trim();
+  }
+  if(line.length > 120) line = line.slice(0, 119) + '…';
+  return line;
+}
+async function ensureInviteCode(){
+  const cached = lsGet(INVITE_CODE_KEY);
+  if(INVITE_CODE_RE.test(cached)) return cached;
+  const d = await inviteApi({
+    askMode: 'invite_create', visitorId: VISITOR_ID,
+    walletCode: getStoredWalletCode() || undefined,
+    access_token: currentSession ? currentSession.access_token : undefined,
+  });
+  if(!d || !d.code || !INVITE_CODE_RE.test(d.code)) return '';
+  lsSet(INVITE_CODE_KEY, d.code);
+  // 비회원 초대자: 보상이 쌓일 지갑과 복구 코드가 이때 만들어진다(코드는 이때 한 번만 내려온다).
+  if(d.walletCode){ setStoredWalletCode(d.walletCode); renderAskWallet(); }
+  return d.code;
+}
+async function createAskShareUrl(excerpt, code){
+  let token = '';
+  try{
+    const res = await fetch('/api/share', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category: 'ask', name: '', excerpt }),
+    });
+    if(res.ok){ const d = await res.json(); token = (d && d.token) || ''; }
+  } catch(e){}
+  const qs = [];
+  if(token) qs.push('share=' + token);
+  if(code) qs.push('inv=' + code);
+  return 'https://sajugyeol.co.kr/' + (qs.length ? '?' + qs.join('&') : '?ref=kakao_share');
+}
+// 입력 완료 토스트(1초)보다 길게 — 보상 안내는 놓치면 안 되기 때문
+function showRewardToast(msg, ms){
+  let el = $('#rewardToast');
+  if(!el){ el = document.createElement('div'); el.id = 'rewardToast'; el.className = 'entry-toast reward-toast'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
+  el.textContent = msg;
+  void el.offsetWidth;
+  el.classList.add('show');
+  clearTimeout(rewardToastTimer);
+  rewardToastTimer = setTimeout(()=>{ el.classList.remove('show'); }, ms || 5000);
+}
+async function shareInvite(where){
+  if(inviteShareBusy) return;
+  const text = where === 'result' ? lastAiResultText : (askShownText || askPreviewText);
+  const excerpt = extractAskConclusion(text);
+  if(!excerpt) return;
+  inviteShareBusy = true;
+  try{
+    logFunnelEvent('invite_share_click');
+    const enabled = await getInviteConfig();
+    const code = enabled ? await ensureInviteCode() : '';
+    const noteEl = $(where === 'result' ? '#askShareNoteResult' : '#askShareNote');
+    if(noteEl){
+      // 공유를 누른 순간 안내: 앱을 닫아도 보상은 쌓이니, 나중에 다시 들어와서 확인하게 한다.
+      noteEl.textContent = (enabled && code)
+        ? `친구가 확인하면 ${currentSession ? '내 계정' : '이 기기'}에 질문 1회가 쌓여요. 다시 들어와서 확인하세요. (보상은 하루 최대 3회)`
+        : '';
+      noteEl.hidden = !(enabled && code);
+    }
+    updateInviteLabels(enabled);
+    const url = await createAskShareUrl(excerpt, code);
+    initKakaoIfNeeded();
+    if(window.Kakao && Kakao.isInitialized()){
+      Kakao.Share.sendDefault({
+        objectType: 'feed',
+        content: {
+          title: '사주에 물어봤더니 이런 답이 나왔어요. 너도 물어볼래?',
+          description: `👉 ${url}`,
+          imageUrl: 'https://sajugyeol.co.kr/kakao-share.jpg',
+          link: { mobileWebUrl: url, webUrl: url },
+        },
+        buttons: [ { title: '나도 물어보기', link: { mobileWebUrl: url, webUrl: url } } ],
+      });
+    } else {
+      const ok = await copyTextToClipboard(url);
+      showRewardToast(ok ? '링크를 복사했어요. 친구에게 붙여넣어 보내주세요' : '카카오톡 공유를 불러오지 못했어요');
+    }
+  } finally {
+    inviteShareBusy = false;
+  }
+}
+// 초대한 사람이 돌아왔을 때: 새로 적립된 질문권을 토스트 + 카드 안내로 알리고, 다시 알리지 않도록 서버에 확인 처리(invite_ack)한다.
+function showInviteNotice(n){
+  const el = $('#askInviteNotice');
+  if(!el) return;
+  const hint = (!currentSession && getStoredWalletCode()) ? ' 복구 코드를 꼭 저장해 두세요.' : '';
+  el.textContent = `친구가 사주를 확인해서 질문 ${n}회가 적립됐어요.${hint}`;
+  el.hidden = false;
+}
+function handlePendingInvite(d){
+  const p = d && d.pendingInvite;
+  if(!p || !(p.count > 0) || !Array.isArray(p.ids) || !p.ids.length || inviteAckBusy) return;
+  inviteAckBusy = true;
+  const n = p.count;
+  showRewardToast(n > 1 ? `질문권 ${n}회를 획득했어요!` : '질문권을 획득했어요!');
+  showInviteNotice(n);
+  inviteApi({ askMode: 'invite_ack', visitorId: VISITOR_ID, ids: p.ids, access_token: currentSession ? currentSession.access_token : undefined })
+    .then(()=>{}, ()=>{})
+    .then(()=>{ inviteAckBusy = false; });
+}
+function refreshInviteBonusLine(){
+  const el = $('#sharePreviewBonus');
+  if(el) el.hidden = !(lsGet(INVITE_BONUS_KEY) === '1' && askPreviewCount() < 2);
+}
+async function inviteVisitOnce(code){
+  if(lsGet(INVITE_VISITED_KEY) === code) return true;
+  const d = await inviteApi({ askMode: 'invite_visit', code, visitorId: VISITOR_ID });
+  if(!d) return false;
+  if(d.ok !== true){
+    if(d.reason === 'bad_code') lsSet(INVITE_IN_KEY, '');   // 없는 코드는 버린다(다른 초대 링크를 받을 수 있게)
+    return false;
+  }
+  lsSet(INVITE_VISITED_KEY, code);
+  if(d.bonusPreview) lsSet(INVITE_BONUS_KEY, '1');
+  return true;
+}
+async function initInviteLanding(){
+  const params = new URLSearchParams(location.search);
+  const code = String(params.get('inv') || '').toUpperCase();
+  const fromLink = INVITE_CODE_RE.test(code) && code !== lsGet(INVITE_CODE_KEY);   // 내 코드 링크를 내가 여는 경우는 제외
+  if(fromLink && !lsGet(INVITE_IN_KEY)) lsSet(INVITE_IN_KEY, code);                // 처음 받은 초대 링크를 기준으로 한다
+  const inCode = lsGet(INVITE_IN_KEY);
+  if(!inCode) return;
+  if(lsGet(INVITE_VISITED_KEY) !== inCode){
+    logFunnelEvent('invite_landing');
+    await inviteVisitOnce(inCode);
+  }
+  // 공유 카드(?share=)가 없는 초대 링크: 같은 자리에 간단한 안내 카드를 띄운다.
+  if(fromLink && !params.get('share')){
+    const card = $('#sharePreviewCard');
+    if(card && card.hidden){
+      $('#sharePreviewLabel').textContent = '✦ 친구의 초대';
+      $('#sharePreviewExcerpt').textContent = '친구가 사주결에서 질문의 답을 받았어요. 나는 어떤 답이 나올까요?';
+      $('#sharePreviewCta').textContent = '아래에 생년월일을 입력하면 무료로 확인해요 👇';
+      card.hidden = false;
+    }
+  }
+  refreshInviteBonusLine();
+  // 예전에 기본운세 확인은 마쳤는데 청구가 끝나지 못했다면(서버 지연 등) 다시 시도한다.
+  if(lsGet(INVITE_FORMDONE_KEY) === '1' && lsGet(INVITE_CLAIMED_KEY) !== '1') tryInviteClaim();
+}
+// 초대받은 새 방문자가 기본운세를 확인했을 때 호출 — 보상이 쌓이는 대상은 '초대한 사람'이다.
+// form_submit 기록이 서버에 도착하기 전에 청구가 먼저 닿으면 서버가 'pending'을 돌려주므로 몇 초 간격으로 다시 시도한다.
+async function tryInviteClaim(){
+  const inCode = lsGet(INVITE_IN_KEY);
+  if(!inCode || lsGet(INVITE_CLAIMED_KEY) === '1' || inviteClaimBusy) return;
+  inviteClaimBusy = true;
+  lsSet(INVITE_FORMDONE_KEY, '1');
+  try{
+    if(!(await inviteVisitOnce(inCode))) return;
+    const FINAL = ['already', 'expired', 'no_invite', 'blocked_existing', 'blocked_ip', 'blocked_daily_cap', 'blocked_inviter_cap'];
+    for(const wait of [1500, 3000, 4000]){
+      await new Promise(r=>setTimeout(r, wait));
+      const d = await inviteApi({ askMode: 'invite_claim', visitorId: VISITOR_ID });
+      if(!d) return;
+      if(d.granted || FINAL.indexOf(d.reason) >= 0){ lsSet(INVITE_CLAIMED_KEY, '1'); return; }
+      if(d.reason !== 'pending') return;   // disabled/store_error 등: 다음 기회에 다시
+    }
+  } finally {
+    inviteClaimBusy = false;
+  }
+}
 // URL에 ?share=토큰이 있으면(카카오톡 공유 링크로 들어온 경우) 입력 화면 상단에
 // 보낸 사람의 총평 미리보기 카드를 띄운다. 토큰이 없거나 조회 실패/만료 시에는 조용히
 // 넘어가고 기존 입력 폼만 그대로 보여준다(에러를 사용자에게 노출하지 않는다).
@@ -8265,9 +8571,16 @@ async function showSharePreviewIfAny(){
     if(!card) return;
     const catLabel = AI_CATEGORY_DISPLAY_NAME[data.category] || '심층풀이';
     const name = String(data.sender_name || '').trim();
-    $('#sharePreviewLabel').textContent = `${name ? name + '님의 ' : ''}${catLabel} 미리보기`;
+    if(data.category === 'ask'){
+      // 친구 초대 카드: 보낸 사람의 이름·질문 없이 '결론 한 줄'만 온다.
+      $('#sharePreviewLabel').textContent = '✦ 친구가 사주로 받은 한 줄 답';
+      $('#sharePreviewCta').textContent = '나는 어떤 답이 나올까요? 아래에 생년월일을 입력하면 무료로 확인해요 👇';
+    } else {
+      $('#sharePreviewLabel').textContent = `${name ? name + '님의 ' : ''}${catLabel} 미리보기`;
+    }
     $('#sharePreviewExcerpt').textContent = data.excerpt;
     card.hidden = false;
+    refreshInviteBonusLine();
   } catch(e){
     // 미리보기 실패는 조용히 무시 — 기존 입력 폼 동작에는 영향을 주지 않는다.
   }
@@ -8288,8 +8601,21 @@ function renderAiResultNote(){
       + '<button class="ai-result-note-btn" id="aiResultPdfBtn">📄 지금 PDF로 저장하기</button>' + '<button class="ai-result-note-btn" id="aiResultShareBtn">💬 카카오톡으로 공유하기</button>';
     $('#aiResultPdfBtn').addEventListener('click', (e)=>{ downloadCurrentResultPdf(e.currentTarget); });
   }
-  // 질문형 상담은 개인적인 질문이 담겨 있어 카카오톡 공유 대상에서 뺀다.
-  if(selectedAiCategory === 'ask'){ const sb = $('#aiResultShareBtn'); if(sb) sb.remove(); }
+  // 질문형 상담은 개인적인 질문이 담겨 있어 일반 공유(총평 미리보기) 대상에서 뺀다.
+  // 대신 '친구 초대' 공유(질문·이름 없이 결론 한 줄만)를 같은 자리에 둔다. 한 줄 결론이 없는 답(차단 안내 등)에는 두지 않는다.
+  if(selectedAiCategory === 'ask'){
+    const sb = $('#aiResultShareBtn');
+    if(sb){
+      if(!/한 줄 결론\s*—/.test(lastAiResultText || '')){ sb.remove(); }
+      else {
+        sb.textContent = inviteShareLabel(inviteRewardEnabled === true, 'result');
+        const n = document.createElement('div');
+        n.className = 'ask-share-note'; n.id = 'askShareNoteResult'; n.hidden = true;
+        note.appendChild(n);
+        getInviteConfig().then(updateInviteLabels);
+      }
+    }
+  }
 }
 // 비회원은 결제 기록이 DB에 남지 않으므로(내 결제내역 접근 불가), 방금 받은 해석 결과를
 // 기존 downloadPurchasePdf()가 기대하는 형태(row 객체)로 감싸서 그대로 재사용한다.
@@ -9013,6 +9339,89 @@ function openAdModal(){
 }
 function closeAdModal(){ $('#adModal').hidden = true; }
 $('#adModalCancel').addEventListener('click', closeAdModal);
+// 2026-10-05: 질문 기록(관리자 전용). 브라우저는 qa_question_log 테이블을 직접 읽을 수 없고(RLS),
+// 관리자만 통과하는 admin_qa_question_log RPC로만 조회한다.
+const QALOG_LIMIT = 300;
+let qaLogRows = [], qaLogTotal = 0, qaLogPeriod = 'all', qaLogKind = 'all', qaLogSeq = 0;
+function qaLogFmtKst(iso){
+  const d = new Date(new Date(iso).getTime() + 9*3600*1000);
+  const p = n=>String(n).padStart(2,'0');
+  return `${p(d.getUTCMonth()+1)}/${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`;
+}
+function renderQaLog(){
+  const sumEl = $('#qaLogSummary'), listEl = $('#qaLogList');
+  const rows = qaLogRows;
+  const free = rows.filter(r=>r.kind==='preview').length, paid = rows.length - free;
+  const visitors = new Set(rows.map(r=>r.visitor||'')).size;
+  const members = rows.filter(r=>r.member).length;
+  const stat = (n,l)=>`<div class="stat" style="flex:1 1 22%; min-width:70px;"><div class="n">${n}</div><div class="l">${l}</div></div>`;
+  sumEl.style.flexWrap = 'wrap';
+  sumEl.innerHTML = stat(qaLogTotal,'전체 질문') + stat(free,'무료') + stat(paid,'유료') + stat(visitors,'질문한 사람(방문자)') + stat(members,'회원 질문');
+  const kw = String($('#qaLogSearch').value||'').trim().toLowerCase();
+  const view = rows.filter(r=> (qaLogKind==='all' || r.kind===qaLogKind) && (!kw || String(r.question||'').toLowerCase().includes(kw) || String(r.answer||'').toLowerCase().includes(kw)));
+  if(!view.length){ listEl.innerHTML = '<div class="history-empty">조건에 맞는 질문이 없어요</div>'; return; }
+  const note = (qaLogTotal > rows.length) ? `<div class="history-empty" style="padding:8px;">최근 ${rows.length}건만 보여줘요 (전체 ${qaLogTotal}건)</div>` : '';
+  listEl.innerHTML = view.map(r=>{
+    const src = r.source ? (SOURCE_LABELS[r.source] || r.source) : '';
+    const camp = r.campaign ? ' / ' + r.campaign : '';
+    return `<div class="qalog-item"><div class="qalog-q">${escapeHtml(r.question||'')}</div>` +
+      (r.answer ? `<details class="qalog-ans"><summary>AI 답변 보기</summary><div class="qalog-ans-body">${escapeHtml(r.answer)}</div></details>` : `<div class="qalog-noans">AI 답변 기록 없음 (답변 저장 기능 추가 이전 질문)</div>`) +
+      `<div class="history-meta">` +
+      `<span class="qalog-badge ${r.kind==='preview'?'free':'paid'}">${r.kind==='preview'?'무료':'유료'}</span>` +
+      (r.level ? `<span class="qalog-badge lv">전문영역</span>` : '') +
+      `<span>${r.member?'회원':'비회원'}</span><span>${escapeHtml(r.visitor||'-')}</span>` +
+      `<span>${escapeHtml(qaLogFmtKst(r.created_at))}</span>` +
+      (src ? `<span>${escapeHtml(src + camp)}</span>` : '') +
+      `</div></div>`;
+  }).join('') + note;
+}
+async function refreshQaLog(){
+  const listEl = $('#qaLogList');
+  if(!sb) return;
+  listEl.innerHTML = '<div class="history-empty">불러오는 중...</div>';
+  const mySeq = ++qaLogSeq;
+  const { data, error } = await sb.rpc('admin_qa_question_log', { p_start: computeFunnelPeriodStart(qaLogPeriod), p_end: null, p_limit: QALOG_LIMIT });
+  if(mySeq !== qaLogSeq) return;
+  if(error){
+    listEl.innerHTML = '<div class="history-empty">불러오지 못했어요 (' + escapeHtml(error.message) + ')<br>질문 기록 조회용 SQL을 아직 실행하지 않았다면 먼저 실행해 주세요.</div>';
+    $('#qaLogSummary').innerHTML = '';
+    return;
+  }
+  qaLogRows = data || [];
+  qaLogTotal = qaLogRows.length ? Number(qaLogRows[0].total_count) || qaLogRows.length : 0;
+  renderQaLog();
+}
+function openQaLogModal(){
+  $('#qaLogModal').hidden = false;
+  if(!sb || !currentSession){
+    $('#qaLogList').innerHTML = '<div class="history-empty">로그인이 필요해요.</div>';
+    $('#qaLogSummary').innerHTML = '';
+    return;
+  }
+  qaLogPeriod = 'all'; qaLogKind = 'all'; $('#qaLogSearch').value = '';
+  $$('#qaLogPeriodTabs button').forEach(b=>b.classList.toggle('active', b.dataset.period === 'all'));
+  $$('#qaLogKindTabs button').forEach(b=>b.classList.toggle('active', b.dataset.kind === 'all'));
+  refreshQaLog();
+}
+function closeQaLogModal(){ $('#qaLogModal').hidden = true; }
+$('#qaLogModalCancel').addEventListener('click', closeQaLogModal);
+$$('#qaLogPeriodTabs button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    $$('#qaLogPeriodTabs button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    qaLogPeriod = btn.dataset.period;
+    refreshQaLog();
+  });
+});
+$$('#qaLogKindTabs button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    $$('#qaLogKindTabs button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    qaLogKind = btn.dataset.kind;
+    renderQaLog();
+  });
+});
+$('#qaLogSearch').addEventListener('input', renderQaLog);
 async function refreshFunnelSteps(startISO, endISO){
   const el = $('#funnelStepsSummary');
   if(!el || !sb) return;
@@ -9418,12 +9827,14 @@ function renderLoginModal(){
       '<button class="menu-btn" id="inquiryMenuBtn">📮 문의하기</button>' +
       (isAdmin ? '<button class="menu-btn" id="adminMenuBtn">🛠 관리자 페이지</button>' : '') +
       (isAdmin ? '<button class="menu-btn" id="adMenuBtn">📈 광고 분석</button>' : '') +
+      (isAdmin ? '<button class="menu-btn" id="qaLogMenuBtn">💬 질문 기록</button>' : '') +
       '<button class="logout-btn" id="logoutBtn">로그아웃</button>' +
       '<button class="modal-cancel" id="loginModalCancel">닫기</button>';
     $('#historyMenuBtn').addEventListener('click', ()=>{ closeLoginModal(); openHistoryModal(); });
     $('#inquiryMenuBtn').addEventListener('click', ()=>{ closeLoginModal(); openInquiryModal(); });
     if(isAdmin){ $('#adminMenuBtn').addEventListener('click', ()=>{ closeLoginModal(); openAdminModal(); }); }
     if(isAdmin){ $('#adMenuBtn').addEventListener('click', ()=>{ closeLoginModal(); openAdModal(); }); }
+    if(isAdmin){ $('#qaLogMenuBtn').addEventListener('click', ()=>{ closeLoginModal(); openQaLogModal(); }); }
     $('#logoutBtn').addEventListener('click', async ()=>{
       if(sb){ await sb.auth.signOut(); }
       closeLoginModal();
@@ -9741,6 +10152,11 @@ restorePaymentResumeSnapshotIfAny();
 restoreFormSnapshotIfAny();
 restoreResultSnapshotIfAny(); // 2026-09-20: 위 두 복원이 해당 없을 때만(pendingRestoreGroup 미설정) 동작
 showSharePreviewIfAny(); // 2026-09-25: ?share=토큰으로 들어온 경우 보낸 사람 총평 미리보기 카드 표시
+initInviteLanding(); // 2026-10-07: ?inv=코드로 들어온 경우 방문 기록·맛보기 추가·안내 카드
+document.addEventListener('visibilitychange', ()=>{
+  // 초대한 사람이 다른 앱(카톡)에 갔다가 돌아오면 새로 적립된 질문권을 바로 알려준다(15초 안에는 중복 조회 안 함).
+  if(document.visibilityState === 'visible' && lsGet(INVITE_CODE_KEY)) refreshAskWallet();
+});
 })();
 </script>
 <script>
