@@ -7340,6 +7340,21 @@ function buildSeunText(s, targetYear){
   const god = tenGodOf(dmG, GAN_ELEMENT[yp.g], yp.g % 2);
   return `${targetYear}년 세운: ${GAN[yp.g]}${ZHI[yp.z]}(${GAN_HANJA[yp.g]}${ZHI_HANJA[yp.z]})년, ${ELEMENT_NAME[GAN_ELEMENT[yp.g]]}${ELEMENT_NAME[ZHI_ELEMENT[yp.z]]} 기운. 일간 ${GAN[dmG]}(${ELEMENT_NAME[GAN_ELEMENT[dmG]]})과의 십성 관계: ${god}.`;
 }
+// 평생운 프리미엄: 올해부터 10년의 연도별 세운(연간지·일간과의 십성·그 해의 만 나이)을 엔진 계산값으로 만든다.
+// 모델이 "언제"를 지어내지 않고 이 표의 연도만 짚도록, 서버가 프롬프트에 그대로 싣는다.
+function buildLifetimeSeunTable(s){
+  const dmG = s.pillars.day.g;
+  const y0 = new Date().getFullYear();
+  const lines = [];
+  for(let i=0; i<10; i++){
+    const y = y0 + i;
+    const yp = yearPillarIdx(y);
+    const god = tenGodOf(dmG, GAN_ELEMENT[yp.g], yp.g % 2);
+    const age = y - s.input.year;   // 그 해에 도달하는 만 나이 (생일 전 age-1, 생일 후 age)
+    lines.push(`${y}년(만 ${age-1}~${age}세): ${GAN[yp.g]}${ZHI[yp.z]}년, ${ELEMENT_NAME[GAN_ELEMENT[yp.g]]}${ELEMENT_NAME[ZHI_ELEMENT[yp.z]]} 기운, 일간 ${GAN[dmG]}과의 십성: ${god}`);
+  }
+  return lines.join('\n');
+}
 // 평생운 프리미엄(lifetime) 카테고리용. saju.현재대운/ziwei.현재대한은 "지금" 한 구간만
 // 담고 있어서 부족하다 — s.daeun.list/z.daeHan.list에 이미 있는 평생 전체 구간 목록을
 // 그대로 텍스트로 풀어, 각 구간이 지나온/현재/앞으로 올 구간인지 태그를 붙여 반환한다.
@@ -7440,6 +7455,7 @@ function buildAiPayload(){
   }
   if(selectedAiCategory === 'lifetime'){
     payload.평생대운 = buildLifetimeDaeunText(s, z);
+    try{ payload.세운연표 = buildLifetimeSeunTable(s); } catch(e){ console.warn('세운연표 생성 실패 — 생략(평생대운 나이 구간으로만 시기를 짚음)', e); }
   }
   if(selectedAiCategory === 'pet' && petData){
     payload.pet = petData;
