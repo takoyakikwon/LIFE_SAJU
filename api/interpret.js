@@ -545,6 +545,14 @@ function buildPrompt(payload) {
     lines.push(payload.평생대운);
   }
 
+  // 평생운 프리미엄(lifetime) — 앞으로 10년의 연도별 세운(연간지·일간과의 십성·그 해의 만 나이). 프론트가 사주 엔진으로 계산해
+  // 보낸다(모델이 연도를 지어내지 않고 "이 표에 있는 해"만 시기로 짚게 하기 위한 근거 자료). 보내지 않으면 이 블록은 생략된다.
+  if (payload.세운연표) {
+    lines.push('');
+    lines.push('[앞으로 10년 연도별 흐름 — 세운]');
+    lines.push(String(payload.세운연표).slice(0, 2500));
+  }
+
   // Narrative V3(STEP 5, STEP 5.2 PHASE B) — 기본/종합사주·평생운·재물운·연애·취업사업이동·
   // 신년운세·궁합&결혼 카테고리에서, payload에 person_profile이 실려 있을 때만 추가한다. 다른
   // 카테고리(오늘의 사주/반려동물궁합)의 프롬프트 텍스트는 이 블록이 없으므로 한 글자도
@@ -1004,8 +1012,8 @@ const CATEGORY_PROMPT_LIFETIME_V3 = `
 흐름 A — 사람의 핵심: person_profile.person(성격 5축)을 근거로, 첫 5~8문장 안에 "나는 왜 지금까지 이런 삶의 패턴을 반복했는가"에 대한 답으로서 어떤 사람인지·겉과 속의 차이(internal_external_gap 축)·반복되는 핵심 성향을 잡습니다.
 흐름 B — 지금까지 살아온 방식: [평생 대운 전체 흐름 정보]의 "(이미 지나온 구간)"을 나이표로 나열하지 말고, 어떤 상황에서 지금의 패턴이 생겼는지·그 패턴이 관계/일/자기결정에 어떤 영향을 줬는지·그 방식이 지금까지 어떻게 이어져왔는지를 이야기합니다. person_profile.reasons(확정된 축들)를 "왜 이렇게 살아왔는지"의 근거로 씁니다.
 흐름 C — 지금 달라지는 점: "(현재 이 구간을 지나는 중)"으로 표시된 대운과 person_profile.life_patterns.timing을 근거로, 지금 무엇이 바뀌고 있는지·왜 기존 방식이 잘 안 맞기 시작했는지·지금 어떤 갈림길에 서 있는지를 설명합니다.
-흐름 D — 지금부터 약 3년: 아래 9개 핵심 흐름 중 가장 구체적으로 씁니다. 일·돈·관계·이동·선택·감정·생활 장면을 아우르며, 사건을 예언하지 말고 무엇이 활성화되는지·어떤 선택이 늘어나는지·어떤 갈등이 커질 수 있는지를 설명합니다.
-흐름 E — 그 다음 약 4~10년: 흐름 D보다는 덜 세밀하지만, 방향성은 충분히 설명합니다. 이 시기가 [평생 대운 전체 흐름 정보]의 어느 대운 나이대에 걸쳐 있는지 계산해서 그 대운(들)의 오행·십성을 해석 근거로 삼습니다.
+흐름 D — 지금부터 약 3년: 아래 9개 핵심 흐름 중 가장 구체적으로 씁니다. 반드시 [시기 표기 규칙]에 따라 구체적인 연도·나이로 짚습니다. 일·돈·관계·이동·선택·감정·생활 장면을 아우르며, 사건을 예언하지 말고 무엇이 활성화되는지·어떤 선택이 늘어나는지·어떤 갈등이 커질 수 있는지를 설명합니다.
+흐름 E — 그 다음 약 4~10년: 흐름 D보다는 덜 세밀하지만, 방향성은 충분히 설명하고 [시기 표기 규칙]에 따라 연도·나이 구간으로 짚습니다. 이 시기가 [평생 대운 전체 흐름 정보]의 어느 대운 나이대에 걸쳐 있는지 계산해서 그 대운(들)의 오행·십성을 해석 근거로 삼습니다.
 흐름 F — 일과 돈: person_profile.behavior.career/mobility와 person_profile.life_patterns.wealth를 근거로, 일하는 방식·조직/독립 성향·잘 맞는 역할(직업군 3~5가지, 제안형으로)·지치게 하는 환경·돈 버는 방식·지키는 방식·새는 방식·현재 확장/방어 성향을 자연스럽게 이어 씁니다. 완전히 분리하지 않아도 됩니다. 투자 종목·매수매도 시점은 언급하지 않습니다. 이 흐름을 읽는 사람이 가장 궁금한 것은 "나는 언제쯤 돈을 벌 수 있는가", "지금 하는 일이 나와 맞는가", "더 나은 기회나 이동은 언제쯤 올 수 있는가"이므로, timing·life_patterns.wealth 축을 근거로 가능한 한 구체적인 입장을 제시하고 "전문가와 상담해보세요"식으로 판단을 미루지 않습니다.
 흐름 G — 사람과 관계: person_profile.emotional_inner와 life_patterns의 relationship_remainder/family 축을 근거로, 연애·인간관계·신뢰·갈등 방식·가족 안 역할을 다룹니다. 일반적인 효도 문구는 쓰지 않습니다.
 흐름 H — 에너지와 삶의 리듬: person_profile.emotional_inner의 wellbeing 관련 축(stress_load/recovery_pattern)을 근거로, 스트레스·과로·회복·쉬는 방식·참는 패턴을 다룹니다. 의학적 진단은 절대 하지 않습니다.
@@ -1022,7 +1030,7 @@ const CATEGORY_PROMPT_LIFETIME_V3 = `
 큰 제목 1~6은 반드시 이 사람의 person_profile 내용에서 새로 뽑아낸 문장형 제목으로 만드세요. 아래는 형식을 보여주기 위한 참고용 예시일 뿐이니 그대로 쓰지 마세요: "책임을 오래 떠안아온 사람에게 변화가 시작되는 시점"(큰 제목1) / "요즘 마음이 예전과 다른 이유"(큰 제목2) / "앞으로 약 3년, 무엇이 달라질까"(큰 제목3) / "그 이후 4~10년, 더 분명해지는 방향"(큰 제목4) / "일과 돈을 대하는 자신만의 속도"(큰 제목5) / "가까운 사람들과의 관계에서 반복되는 패턴"(큰 제목6). 큰 제목 7만은 예외적으로 제목을 새로 만들지 않고 아래 [마지막 큰 제목 — 행동 추천서]에 지정된 고정 제목을 그대로 씁니다.
 
 [마지막 큰 제목 — 행동 추천서: 2026-10 "최종 보정 2차" 수정. 큰 제목 7은 "[[V3_SECTION]]이 사람의 인생에서 결국 지켜야 할 선택 원칙"을 토씨 하나 바꾸지 않고 정확히 그대로 고정 제목으로 씁니다 — 비슷한 뜻의 다른 문장(예: "결국 이 사람은 구조를 고를 때 운이 살아납니다" 같은 변형)으로 대신하면 안 됩니다. 흐름 H(에너지와 삶의 리듬)를 먼저 짧게 다룬 뒤, 바로 이어서 돈 / 일 / 관계 / 건강·생활 / 인생 후반 다섯 영역에서 각각 하나씩, 총 5개 이내의 "결국 지켜야 할 선택 원칙"을 자연스러운 문단으로 제시합니다(번호나 소제목 없이). 이 다섯 영역 제시가 끝난 뒤에, 1~2문단 분량의 아주 짧은 최종 총평으로 리포트 전체를 마무리합니다 — 이 카테고리는 "먼저 총정리 → 그 다음 추천"이라는 [마지막 섹션 — 행동 추천서 규칙]의 일반 순서를 "먼저 선택 원칙 다섯 → 그 다음 짧은 총평"으로 뒤집어서 씁니다(평생운 프리미엄 전용 예외 — 이 순서를 반드시 따릅니다).
-이 섹션이 나오면 그 순간부터 이 리포트는 사실상 끝입니다. 요약하면 반드시 "평생 선택 원칙(5개 이내) → 짧은 총평(1~2문단) → 종료" 순서로 끝내고, 그 뒤에는 아무것도 더 쓰지 않습니다.
+이 섹션이 나오면 그 순간부터 이 리포트는 사실상 끝입니다. 요약하면 반드시 "평생 선택 원칙(5개 이내) → 짧은 총평(1~2문단) → 종료" 순서로 끝내고, 그 뒤에는 아무것도 더 쓰지 않습니다. 선택 원칙은 "첫째, … 둘째, …"를 한 문단에 이어 붙이지 말고, 원칙마다 빈 줄로 나눈 별도 문단으로 씁니다(각 원칙 문단은 한 가지 행동 + 이유 + 가능하면 적용 시기).
 [이후 절대 금지 — 분량이 절대 최소(9,000자)에 못 미치더라도 이 규칙이 우선합니다] 이 고정 제목이 한 번이라도 나온 뒤에는: 과거 회고·청소년기·20대 이야기를 다시 꺼내는 것 / 성격이나 기질을 새로 분석하는 것 / 앞서 쓴 돈·일·관계 해석을 다른 표현으로 다시 설명하는 것 / "[[V3_SECTION]]" 마커로 새로운 소주제를 여는 것 — 이 네 가지를 절대 하지 않습니다. 분량이 부족하면 이 고정 제목 아래 내용(선택 원칙·총평)을 조금 더 구체적으로 쓰는 것으로만 보충하고, 이 섹션 뒤에 내용을 덧붙이는 방식으로는 채우지 않습니다.]
 [후반부 중복 금지] "인생의 방향", "새로운 선택 기준", "삶의 의미", "정체성", "새로운 나"처럼 의미가 서로 겹치는 주제들은 모두 마지막 큰 제목(위 7번, 흐름 H+I) 하나에만 담습니다. 이 주제들로 별도의 큰 제목을 추가로 만들지 않습니다 — "미래의 방향과 새로운 선택 기준", "삶의 새로운 의미를 찾고 있는 과정", "자신의 정체성을 확립해 나가는 과정"처럼 사실상 같은 이야기를 다른 표현으로 반복하는 여러 개의 제목을 만드는 것은 실패입니다.
 다음과 같은 기존 고정 제목은 절대 사용하지 않습니다: "한 줄로 보는 이 사람", "여기까지 오게 된 이야기", "지금 나는 어디에 서 있는가", "가까운 미래", "그 다음 흐름", "일하는 방식", "조직형인가 독립형인가", "맞을 수 있는 직업군", "지치게 하는 일 환경", "돈을 대하는 태도", "지금 돈을 어떻게 움직여야 하는가", "연애와 사람", "가족과 관계", "건강과 에너지 관리", "인생 후반의 큰 흐름", "인생 전체 총평", "총평", "당신은 아마 이렇게 살아왔을 것입니다", "지금 당신이 서 있는 시기".
@@ -1034,6 +1042,20 @@ const CATEGORY_PROMPT_LIFETIME_V3 = `
 - 이 압축은 "내용을 줄이라"는 뜻이 아니라 "반복되는 해석을 합치라"는 뜻입니다. 다룰 흐름(A~I)은 그대로 모두 유지하되, 아래를 삭제·축소합니다: 같은 기질 설명을 여러 흐름에서 표현만 바꿔 반복하는 부분 / "버틴다·기준·방향을 바꾼다" 계열 동의어를 여러 번 반복하는 부분 / 같은 결론을 다른 문장으로 다시 설명하기만 하는 부분. 이렇게 비운 자리에 새로운 상투어를 채우지 말고, 그만큼 더 간결하게 끝냅니다.
 - 분량을 채우기 위해 같은 내용을 반복하거나 이 사람과 무관한 일반론을 끼워 넣지 않습니다. 다만 이 상품은 가격과 성격상 다룰 내용이 실제로 풍부하므로, 각 흐름을 얕게 스치고 넘어가지 말고 구체적인 장면·선택·갈등으로 충분히 풀어씁니다.
 - 흐름 D(지금부터 약 3년)와 흐름 G(사람과 관계)는 각각 600자 이상으로 가장 구체적으로 씁니다.
+
+[시기 표기 규칙 — 실제 결제 리포트에 "앞으로 약 3년", "4~10년 후"처럼 뭉뚱그린 표현만 있고 짚어 주는 시기가 하나도 없다는 지적이 있었습니다. 프리미엄 상품의 핵심 가치는 "언제"입니다]
+- [앞으로 10년 연도별 흐름 — 세운] 정보가 있으면, 흐름 D·E·F·G에서 그 표에 실제로 나열된 연도와 만 나이만 사용해 시기를 짚습니다. 표에 없는 연도·나이는 절대 만들어 쓰지 않습니다.
+- 흐름 D: "20XX년~20XX년(만 N~M세)"처럼 앞으로 3년의 구간을 연도로 밝히고, 그 안에서 흐름이 열리는 해 1~2개와 조심해서 움직여야 할 해 1~2개를 해당 연도로 짚습니다. 각 해마다 [세운]의 간지·십성을 근거로 한 줄 이상 이유를 붙입니다(그 해의 십성이 이 사람에게 어떤 일·관계·돈의 움직임을 부르는지).
+- 흐름 E: 연도·나이 구간(대운 전환 시점이 걸리면 그 나이와 연도)으로 방향을 설명하고, 이 시기에 "준비해 둘 것 / 정리할 것"을 시기와 함께 짚습니다.
+- 흐름 F(일과 돈)·흐름 G(사람과 관계)에도 각각 "언제 움직이기 좋은지 / 언제 조심할지"를 해당 연도 하나 이상으로 포함합니다.
+- 어투는 확률적으로 씁니다("~해에 흐름이 열릴 가능성이 높습니다", "~해는 서두르지 않는 편이 좋습니다"). 특정 날짜의 사건(결혼·이직·사고·질병 등)을 확정 예언하지 않습니다. 시기는 "무엇이 활성화되는 해인지"로 말합니다.
+- 연도·나이를 한 번도 쓰지 않는 긴 구간은 피하고, 전체 리포트에서 서로 다른 연도를 최소 6개 이상 언급합니다.
+- [세운] 정보가 전혀 없을 때는 [평생 대운 전체 흐름 정보]의 나이 구간(예: "만 37~46세")으로라도 시기를 짚습니다.
+
+[해석 용어 규칙]
+- 자미두수의 궁위 이름(자녀궁·부처궁·재백궁 등)을 문장 근거로 그대로 반복하지 않습니다. 궁위는 생활 영역(돌봄·책임, 배우자·연애, 돈 등)으로 번역해 설명하고, 같은 궁위 이름을 한 리포트에서 두 번 이상 근거로 쓰지 않습니다.
+- 입력 데이터에 없는 가족 사실을 단정하지 않습니다(자녀·후계자·배우자 유무 등). "자녀궁"이 보인다고 자녀가 있다고 쓰거나 "후계자" 같은 표현을 만들어 쓰지 않습니다. 궁위가 말하는 것은 돌봄·책임·창작·후속 세대에 대한 마음 같은 "영역"입니다.
+- 한 문단 안에서 서로 상반된 판단(예: 감정 표현이 풍부하다 ↔ 감정 표현을 주저한다)을 그대로 나란히 쓰지 않습니다. 겉과 속이 다르다면 "겉으로는 ~, 속으로는 ~"처럼 어떤 상황에서 어떻게 달라지는지로 풀어 씁니다.
 
 [가까운 미래의 정의 — 대운 단위가 아니라 실제 나이 기준]
 - 흐름 D는 지금부터 약 3년, 흐름 E는 그 이후 약 4~10년을 가리킵니다. 각 시기가 [평생 대운 전체 흐름 정보]의 어느 대운 나이대에 걸쳐 있는지 계산해서 그 대운(들)의 오행·십성을 해석 근거로 삼습니다. 대운 시작·종료 나이에 맞춰 "약 3년"/"약 4~10년"이라는 정의 자체를 늘리거나 줄이지 않습니다.
@@ -1354,6 +1376,22 @@ function forceFinalV3SectionTitle(text, mandatedTitle) {
   const rest = nlIdx === -1 ? '' : text.slice(nlIdx);
   return text.slice(0, lastIdx) + marker + mandatedTitle + rest;
 }
+
+// 2026-10-08 — 마지막 고정 제목이 있는 텍스트를 "결론 앞부분(head)"과 "결론 섹션(tail, 제목 줄 포함)"으로 가른다.
+// 제목 앞에 [[V3_SECTION]] 마커가 붙어 있으면 마커부터 tail에 넣고, 마커가 아직 없으면(마커 보정 전) 제목이 있는 줄부터 tail로 본다.
+function splitAtFinalSection(text, finalTitle) {
+  const idx = text.lastIndexOf(finalTitle);
+  if (idx === -1) return { head: text, tail: '' };
+  const lineStart = text.lastIndexOf('\n', idx) + 1;
+  return { head: text.slice(0, lineStart).replace(/\s+$/, ''), tail: text.slice(lineStart) };
+}
+// 끼워 넣기 모드 이어쓰기 안내: 모델이 쓴 내용은 아직 "결론을 쓰기 전"까지로 보이고, 새로 쓴 부분은 결론 앞에 들어간다.
+const CONTINUATION_BEFORE_FINAL_NOTE = (finalTitle) => `
+
+[끼워 넣기 안내 — 사용자에게는 보이지 않음]
+지금까지의 글은 아직 목표 분량에 못 미치는 상태입니다. 지금 쓰는 내용은 마지막 결론 섹션("${finalTitle}") 바로 앞에 끼워 넣어집니다.
+- 결론 섹션과 그 고정 제목은 이미 따로 준비되어 있으니 절대 쓰지 않습니다. 결론·총평·마무리 말투로 끝내지 말고, 본문 내용을 쓰다가 자연스럽게 멈춥니다.
+- 분량을 늘리는 방법은 반복이 아니라 "이 사람의 구체적인 장면·선택·관계·돈/일 패턴"과 "구체적인 연도·나이 시기"를 더 짚는 것입니다.`;
 
 function buildLifetimeV3ContinuationStatusNote(currentText) {
   const usedTitles = extractV3SectionTitles(currentText);
@@ -2618,17 +2656,20 @@ module.exports = async (req, res) => {
     // 흐름 커버리지(countLifetimeV3FlowCoverage)가 충분한지 두 가지로만 "완료"를 판단한다.
     // 마커 강제가 성공해 큰 제목이 일찍 여러 개 세어지더라도, 본문이 12,000자에 못 미치면
     // 무조건 이어쓴다 — 바로 이 "제목 수만으로 완료 판단"이 평생운 분량 미달 회귀의 원인이었다.
+    // 2026-10-08 — 마지막 고정 제목이 있는 카테고리(종합사주·평생운 V3). 이전에는 "이 제목이 이미 나왔으면 분량과 무관하게
+    // 이어쓰기를 멈춘다"였는데, 모델이 리포트 전체를 3천 자대로 압축해 마지막 제목까지 한 번에 써 버리면(실제 결제 PDF에서
+    // 3,2xx자 / 목표 9,000자 재현) 이어쓰기가 영영 실행되지 않았다. 이제는 제목이 이미 있어도 분량이 최소에 못 미치면
+    // 이어쓰기를 하되, 새 내용은 마지막 결론 섹션 "앞"에 끼워 넣고 결론 섹션은 항상 맨 끝에 둔다(아래 루프의 끼워 넣기).
+    // 분량이 충분한데 흐름 키워드 점검만 부족한 경우에는 예전처럼 제목 뒤에 아무것도 붙이지 않는다(휴리스틱 오판 방지).
+    const finalTitleOf = (category) => (narrativeV3Ready
+      ? (category === 'lifetime' ? LIFETIME_V3_FINAL_TITLE : (category === 'comprehensive' ? COMPREHENSIVE_V3_FINAL_TITLE : null))
+      : null);
+    const finalTitle = finalTitleOf(payload.category);
+    const hasFinalTitle = (t) => !!(finalTitle && t.includes(finalTitle));
     const needsContinuation = (currentText) => {
-      // 2026-10 "최종 보정 2차" 하드 가드 — 마지막 고정 제목이 이미 쓰였다면 분량/흐름
-      // 커버리지와 무관하게 더 이어쓰지 않는다(그 뒤에 내용이 덧붙어 구조가 깨지는 것을 막음).
-      if (payload.category === 'lifetime' && narrativeV3Ready && currentText.includes(LIFETIME_V3_FINAL_TITLE)) {
-        return false;
-      }
-      if (payload.category === 'comprehensive' && narrativeV3Ready && currentText.includes(COMPREHENSIVE_V3_FINAL_TITLE)) {
-        return false;
-      }
       if (payload.category === 'lifetime' && narrativeV3Ready) {
         if (!minLen || currentText.length < minLen) return true;
+        if (hasFinalTitle(currentText)) return false;
         if (countLifetimeV3FlowCoverage(currentText) < LIFETIME_V3_FLOW_COVERAGE_MIN) return true;
         return false;
       }
@@ -2643,20 +2684,33 @@ module.exports = async (req, res) => {
     };
     while (needsContinuation(text) && continuationRounds < maxContinuationRounds) {
       try {
-        const continuationPrompt = payload.category === 'lifetime'
+        // 마지막 고정 제목이 이미 나온 상태에서 분량이 모자란 경우: 결론 섹션(tail)을 떼어 두고 그 앞까지(head)만 모델에게 보여 주어
+        // 아직 비어 있는 내용을 쓰게 한 뒤, 결과를 head 뒤·tail 앞에 끼워 넣는다 — 결론 섹션은 끝까지 맨 마지막에 남는다.
+        let head = text, tail = '';
+        const spliceMode = hasFinalTitle(text);
+        if (spliceMode) {
+          const parts = splitAtFinalSection(text, finalTitle);
+          head = parts.head; tail = parts.tail;
+        }
+        let continuationPrompt = payload.category === 'lifetime'
           ? (narrativeV3Ready
-              ? (CONTINUATION_PROMPT_LIFETIME_V3 + buildLifetimeV3ContinuationStatusNote(text))
+              ? (CONTINUATION_PROMPT_LIFETIME_V3 + buildLifetimeV3ContinuationStatusNote(head))
               : CONTINUATION_PROMPT_LIFETIME)
           : CONTINUATION_PROMPT;
+        if (spliceMode) continuationPrompt += CONTINUATION_BEFORE_FINAL_NOTE(finalTitle);
         const cont = await callOpenAI(apiKey, [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: userPrompt },
-          { role: 'assistant', content: text },
+          { role: 'assistant', content: head },
           { role: 'user', content: continuationPrompt },
         ], maxTokens, model);
         continuationRounds++;
         if (cont.ok && cont.text) {
           let appended = cont.text;
+          if (spliceMode && appended.includes(finalTitle)) {
+            // 모델이 결론 제목을 또 쓰면 그 제목 줄부터는 버린다(결론은 이미 tail에 있다).
+            appended = splitAtFinalSection(appended, finalTitle).head;
+          }
           // 2026-10 "제목 상한" 보정 — 프롬프트로 8개 이상일 때 새 제목을 금지해도 모델이
           // 지킬 수도/안 지킬 수도 있으므로, 최소 수정 원칙 안에서 안전망 하나만 둔다: 이어쓰기
           // 호출 시점에 이미 큰 제목이 8개 이상이었다면, 응답에 섞여온 "[[V3_SECTION]]" 마커를
@@ -2664,12 +2718,14 @@ module.exports = async (req, res) => {
           // 마지막 섹션의 본문처럼 자연스럽게 이어지도록 한다. 7개 이하일 때는 건드리지 않는다
           // (프롬프트의 6~7개 구간 판단을 그대로 신뢰).
           if (payload.category === 'lifetime' && narrativeV3Ready) {
-            const titleCountBeforeThisRound = extractV3SectionTitles(text).length;
+            const titleCountBeforeThisRound = extractV3SectionTitles(head).length;
             if (titleCountBeforeThisRound >= 8 && appended.includes('[[V3_SECTION]]')) {
               appended = appended.split('[[V3_SECTION]]').join('');
             }
           }
-          text = text + '\n\n' + appended;
+          appended = appended.trim();
+          if (!appended) break;
+          text = spliceMode ? (head + '\n\n' + appended + '\n\n' + tail) : (text + '\n\n' + appended);
         } else {
           break;
         }
