@@ -1819,6 +1819,43 @@ async function releaseAskPreview(id) {
   } catch (e) { console.error('releaseAskPreview error:', e); }
 }
 
+// ---- 로그인 회원의 '오늘의 무료 한 줄'(2026-10-08) ----
+// 카카오 로그인(회원)은 하루 1회(한국시간 0시 리셋, 이월 없음) 무료 한 줄 답을 받는다. 기록은 qa_daily_free(user_id, day)의
+// 복합 기본키 한 줄이라 동시에 두 번 눌러도 두 번째 insert가 409로 막힌다. 하루 전체 상한(QA_DAILY_FREE_CAP)으로 AI 비용을 묶는다.
+// 기록을 확인·남기지 못하면 AI를 부르지 않는다(fail-closed). 로그인 안 한 방문자의 1회 맛보기(qa_free_usage)와는 별개다.
+const ASK_DAILY_FREE_CAP = Math.max(1, parseInt(process.env.QA_DAILY_FREE_CAP || '300', 10) || 300);
+function kstDayString(now) {
+  return new Date((now == null ? Date.now() : now) + 9 * 3600 * 1000).toISOString().slice(0, 10);
+}
+// 오늘 무료를 썼는지: true/false, 확인 못 하면 null(테이블이 아직 없는 경우 포함 → 화면은 예전 방식으로 동작)
+async function dailyFreeUsedToday(userId) {
+  try {
+    const r = await walletRest('GET', `qa_daily_free?select=user_id&user_id=eq.${encodeURIComponent(userId)}&day=eq.${kstDayString()}&limit=1`);
+    if (!r.ok) { console.error('dailyFreeUsedToday failed:', r.status); return null; }
+    const rows = await r.json();
+    return Array.isArray(rows) && rows.length > 0;
+  } catch (e) { console.error('dailyFreeUsedToday error:', e); return null; }
+}
+async function reserveAskDaily(userId) {
+  const fail = (status, code, message) => ({ ok: false, status, code, message });
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return fail(503, 'store_unavailable', '오늘의 무료 한 줄을 잠시 쓸 수 없어요. 잠시 후 다시 시도해주세요.');
+  const day = kstDayString();
+  try {
+    const cr = await walletRest('GET', `qa_daily_free?select=user_id&day=eq.${day}&limit=1`, null, 'count=exact');
+    if (!cr.ok) { console.error('reserveAskDaily count failed:', cr.status); return fail(503, 'store_error', '오늘의 무료 한 줄을 잠시 쓸 수 없어요. 잠시 후 다시 시도해주세요.'); }
+    const total = parseInt(((cr.headers.get('content-range') || '').split('/')[1]), 10);
+    if (!Number.isFinite(total)) return fail(503, 'store_error', '오늘의 무료 한 줄을 잠시 쓸 수 없어요. 잠시 후 다시 시도해주세요.');
+    if (total >= ASK_DAILY_FREE_CAP) return fail(429, 'daily_cap', '오늘 무료 한 줄이 모두 소진됐어요. 내일 다시 이용하시거나 전체 답변을 바로 확인하실 수 있어요.');
+    const ins = await walletRest('POST', 'qa_daily_free', { user_id: userId, day }, 'return=minimal');
+    if (ins.status === 409) return fail(429, 'daily_used', '오늘의 무료 한 줄은 이미 사용하셨어요. 내일 0시에 다시 충전돼요.');
+    if (!ins.ok) { console.error('reserveAskDaily insert failed:', ins.status); return fail(503, 'store_error', '오늘의 무료 한 줄을 잠시 쓸 수 없어요. 잠시 후 다시 시도해주세요.'); }
+    return { ok: true, release: async () => { try { await walletRest('DELETE', `qa_daily_free?user_id=eq.${encodeURIComponent(userId)}&day=eq.${day}`); } catch (e) { console.error('release daily error:', e); } } };
+  } catch (e) {
+    console.error('reserveAskDaily error:', e);
+    return fail(503, 'store_error', '오늘의 무료 한 줄을 잠시 쓸 수 없어요. 잠시 후 다시 시도해주세요.');
+  }
+}
+
 // ---- 질문 기록(서비스 개선용, 2026-10-05) ----
 // 답변까지 만든 질문만 qa_question_log에 남긴다(무료 맛보기 + 이용권 사용). 위기(A)·운명단정(C) 질문은
 // 위쪽에서 고정 안내만 하고 끝나므로 아예 기록하지 않는다. 관리자 테스트도 기록하지 않는다.
@@ -1855,12 +1892,18 @@ async function logAskQuestion({ visitorId, userId, kind, level, question, answer
 }
 
 async function handleAskPreview({ req, res, payload, user, isAdmin, apiKey, question, level }) {
-  let reservedId = null;
-  if (!isAdmin) { // 관리자(서버가 토큰으로 재검증)는 테스트를 위해 한도를 적용하지 않는다.
+  let reservedId = null, dailyGate = null;
+  const isDaily = payload.daily === true && !isAdmin;
+  if (isDaily) { // 로그인 회원의 오늘의 무료 한 줄: 방문자·IP 맛보기 한도 대신 회원·하루 한 번 + 하루 전체 상한
+    if (!user) { res.status(401).json({ error: '카카오 로그인 후 오늘의 무료 한 줄을 쓸 수 있어요.', code: 'login_required' }); return; }
+    dailyGate = await reserveAskDaily(user.id);
+    if (!dailyGate.ok) { res.status(dailyGate.status).json({ error: dailyGate.message, code: dailyGate.code }); return; }
+  } else if (!isAdmin) { // 관리자(서버가 토큰으로 재검증)는 테스트를 위해 한도를 적용하지 않는다.
     const gate = await reserveAskPreview(req, payload.visitorId);
     if (!gate.ok) { res.status(gate.status).json({ error: gate.message, code: gate.code }); return; }
     reservedId = gate.id;
   }
+  const releaseFree = async () => { if (dailyGate) await dailyGate.release(); else await releaseAskPreview(reservedId); };
   try {
     const model = MODEL_BY_CATEGORY.ask;
     const r = await callOpenAI(apiKey, [
@@ -1868,17 +1911,17 @@ async function handleAskPreview({ req, res, payload, user, isAdmin, apiKey, ques
       { role: 'user', content: buildAskUserPrompt(payload, question, '') },
     ], ASK_PREVIEW_MAX_TOKENS, model);
     if (!r || !r.ok || !r.text) {
-      await releaseAskPreview(reservedId);
+      await releaseFree();
       res.status(502).json({ error: '맛보기를 만들지 못했어요. 잠시 후 다시 시도해주세요.', code: 'ai_failed' });
       return;
     }
-    console.log('[ask:preview]', JSON.stringify({ model, level, usage: r.usage || null }));
+    console.log('[ask:preview]', JSON.stringify({ model, level, daily: isDaily, usage: r.usage || null }));
     const previewText = trimAskPreview(scrubAskText(r.text));
     if (!isAdmin) await logAskQuestion({ visitorId: payload.visitorId, userId: user ? user.id : null, kind: 'preview', level, question, answer: previewText });
-    res.status(200).json({ kind: 'preview', level, text: previewText, usage: r.usage || null });
+    res.status(200).json({ kind: 'preview', level, text: previewText, usage: r.usage || null, daily: isDaily });
   } catch (e) {
     console.error('handleAskPreview error:', e);
-    await releaseAskPreview(reservedId);
+    await releaseFree();
     res.status(500).json({ error: '서버 내부 오류가 발생했습니다.', code: 'server_error' });
   }
 }
@@ -2021,9 +2064,16 @@ async function handleWalletQuery(res, payload) {
     let pendingInvite = { count: 0, ids: [] };
     const inviteVid = cleanInviteVisitorId(payload.visitorId);
     if (inviteVid || user) { try { pendingInvite = await pendingInviteRewards(inviteVid, user); } catch (e) { console.error('pendingInviteRewards error:', e); } }
+    // 로그인 회원의 '오늘의 무료 한 줄' 상태(관리자는 한도가 없으니 해당 없음). 확인 못 하면 available:null → 화면은 예전 방식 그대로.
+    let dailyFree = null;
+    if (user) {
+      const used = await dailyFreeUsedToday(user.id);
+      dailyFree = { available: used === null ? null : !used, day: kstDayString() };
+    }
     res.status(200).json({
       kind: 'wallet', balance: walletEffectiveBalance(wallet), expiresAt: wallet ? wallet.expires_at : null,
       linked, loggedIn: !!user, codeNotFound: !!(payload.walletCode && !user && !wallet), pendingInvite,
+      dailyFree,
     });
   } catch (e) {
     console.error('handleWalletQuery error:', e);
