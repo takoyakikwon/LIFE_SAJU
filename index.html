@@ -1129,7 +1129,7 @@ window.SajuAnalytics = (function(){
   .ask-daily-sub{ font-size:11px; color:var(--ink-soft); margin-top:2px; line-height:1.5; }
   .ask-daily-pill{ font-size:11px; font-weight:800; padding:4px 9px; border-radius:100px; background:var(--gold); color:#1a1a1a; white-space:nowrap; }
   .ask-daily-pill.off{ background:transparent; border:1px solid var(--gold-line); color:var(--ink-soft); }
-  .ask-login{ margin:2px 0 10px; padding:14px; border-radius:14px; border:1px solid var(--gold-line); background:rgba(244,196,99,.06); text-align:center; }
+  .ask-login{ margin:14px 0 10px; padding:14px; border-radius:14px; border:1px solid var(--gold-line); background:rgba(244,196,99,.06); text-align:center; }
   .ask-login-title{ font-size:13.5px; font-weight:800; color:var(--ink); margin-bottom:3px; }
   .ask-login-sub{ font-size:11.5px; color:var(--ink-soft); line-height:1.55; margin-bottom:11px; }
   .ask-report-hint{ margin:12px 0 0; padding:11px 12px; border-radius:var(--radius-sm); border:1px dashed var(--gold-line); text-align:center; }
@@ -2052,12 +2052,12 @@ window.SajuAnalytics = (function(){
               <div class="ask-meta"><span id="askCount">0/200</span></div>
               <div class="ask-error" id="askError" hidden></div>
               <div class="ask-used-note" id="askUsedNote" hidden>무료 한 줄 답은 이미 사용하셨어요. 추가 질문은 이용권으로 답해드려요.</div>
+              <button type="button" class="submit-btn" id="askSubmitBtn">무료로 한 줄 답 받기</button>
               <div class="ask-login" id="askLoginBox" hidden>
                 <div class="ask-login-title">🎁 카카오로 로그인하면 매일 1회 무료</div>
                 <div class="ask-login-sub">로그인만 하면 한국시간 0시마다 무료 한 줄 답이 새로 충전돼요.<br>남은 질문권도 어느 기기에서든 그대로 쓸 수 있어요.</div>
                 <button type="button" class="kakao-login-btn" id="askLoginBtn">카카오로 3초 만에 로그인</button>
               </div>
-              <button type="button" class="submit-btn" id="askSubmitBtn">무료로 한 줄 답 받기</button>
               <div class="ask-used-invite" id="askUsedInvite" hidden>
                 <button type="button" class="ask-share-btn" id="askUsedInviteBtn"><span class="ask-share-ico">🎟️</span>친구 초대하고 질문 1회권 쿠폰 받기</button>
                 <div class="ask-share-note" id="askUsedInviteNote" hidden></div>
@@ -2068,13 +2068,13 @@ window.SajuAnalytics = (function(){
                 <div class="ask-preview-text" id="askPreviewBody"></div>
                 <div class="ask-preview-fade" id="askPreviewFade">이 근거가 왜 나오는지, 지금 무엇을 하면 좋은지는 전체 답변에서 확인하세요.</div>
                 <button type="button" class="submit-btn" id="askFullBtn">전체 답변 보기</button>
-                <div class="ask-share-row" id="askShareRow" hidden><button type="button" class="ask-link" id="askShareLink">친구 초대하기</button></div>
-                <div class="ask-share-note" id="askShareNote" hidden></div>
                 <div class="ask-login" id="askPreviewLogin" hidden>
                   <div class="ask-login-title">🎁 카카오로 로그인하면 매일 1회 무료</div>
                   <div class="ask-login-sub">로그인만 하면 한국시간 0시마다 무료 한 줄 답이 새로 충전돼요.<br>남은 질문권도 어느 기기에서든 그대로 쓸 수 있어요.</div>
                   <button type="button" class="kakao-login-btn" id="askPreviewLoginBtn">카카오로 3초 만에 로그인</button>
                 </div>
+                <div class="ask-share-row" id="askShareRow" hidden><button type="button" class="ask-link" id="askShareLink">친구 초대하기</button></div>
+                <div class="ask-share-note" id="askShareNote" hidden></div>
                 <div class="ask-report-hint" id="askReportHint" hidden><div class="ask-report-hint-label">이 고민을 더 깊이 보려면</div><button type="button" class="ask-report-hint-btn" id="askReportHintBtn"></button></div>
               </div>
               <div class="ask-note">사주·자미두수를 근거로 당신의 고민을 상담해드립니다.</div>
