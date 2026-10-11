@@ -86,12 +86,12 @@ window.SajuAnalytics = (function(){
 <title>사주결 · 나의 사주팔자</title>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="사주결">
-<meta property="og:title" content="사주결 · 당신이 모르는 당신의 이야기">
+<meta property="og:title" content="사주결 · 태어난 순간, 하늘이 찍은 네 개의 도장">
 <meta property="og:description" content="사주와 자미두수로 풀어보는 나의 운명 — 지금 무료로 확인해보세요.">
 <meta property="og:image" content="https://sajugyeol.co.kr/kakao-share.jpg">
 <meta property="og:url" content="https://sajugyeol.co.kr/">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="사주결 · 당신이 모르는 당신의 이야기">
+<meta name="twitter:title" content="사주결 · 태어난 순간, 하늘이 찍은 네 개의 도장">
 <meta name="twitter:description" content="사주와 자미두수로 풀어보는 나의 운명 — 지금 무료로 확인해보세요.">
 <meta name="twitter:image" content="https://sajugyeol.co.kr/kakao-share.jpg">
 <!-- PWA: 홈 화면에 추가/설치 -->
@@ -285,7 +285,9 @@ window.SajuAnalytics = (function(){
     background:var(--paper-deep); border-radius:var(--radius-sm);
   }
   .hero-scope b{color:var(--ink-soft); font-weight:700;}
-  .hero-line-main{margin:0 0 14px; font-size:14px; letter-spacing:-0.4px; word-break:keep-all;}
+  .hero-line-main{margin:2px 0 12px; font-size:17px; line-height:1.65; letter-spacing:-0.5px; word-break:keep-all;}
+  .hero-sub{margin:0 0 20px; font-size:13px; line-height:1.7; letter-spacing:-0.3px; color:var(--ink-soft); word-break:keep-all; text-wrap:balance;}
+  .hero-sub b{color:var(--gold); font-weight:800;}
   .hero-scope-main{margin:0 0 26px; font-size:12.5px;}
   .hero-scope-main b{color:var(--gold);}
   /* 2026-10-05: 메인 안내 카드(질문 상담 + 3단계 흐름) */
@@ -1668,8 +1670,11 @@ window.SajuAnalytics = (function(){
   <main>
     <!-- INPUT VIEW -->
     <section id="view-input">
-      <p class="hero-tagline">당신이 모르는<br>당신의 이야기가 시작됩니다</p>
-      <p class="hero-line hero-line-main">태어난 순간, 하늘은 <b>년·월·일·시</b> 네 개의 도장을 찍습니다.<br>그 도장의 비밀을 알려드리겠습니다.</p>
+      <!-- 2026-10-11: 첫 화면 문구 개편 — "당신이 모르는 당신의 이야기가 시작됩니다"(hero-tagline)를 걷어내고
+           '도장' 문구를 첫 헤드라인으로 올렸다. 되돌릴 때: 아래 주석의 hero-tagline 한 줄을 이 자리에 복원하고 hero-line-main 크기를 14px로.
+           <p class="hero-tagline">당신이 모르는<br>당신의 이야기가 시작됩니다</p> -->
+      <p class="hero-line hero-line-main">태어난 순간, 하늘은 <b>년·월·일·시</b><br>네 개의 도장을 찍습니다.<br>그 도장의 비밀을 알려드리겠습니다.</p>
+      <p class="hero-sub">오늘의 운세부터 <b>재물운·연애운·궁합·평생사주</b>까지<br>생년월일을 입력하면<br>나에게 맞는 운세를 확인할 수 있습니다.</p>
       <!-- 2026-10-04: 무료 예시 카드를 걷어내고 예전 범위 안내 문구를 복원 — 메인 개편(10/3) 이후
            "무료"만 강조돼 심층풀이(유료)가 있다는 걸 모르고 들어온 방문자의 결제가 0건이 된 의심에 대응. -->
       <!-- 2026-10-05: 질문형 상담 도입에 맞춰 메인 안내를 "질문 카드 + 3단계 흐름"으로 교체(목업 A+E).
