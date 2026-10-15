@@ -1162,6 +1162,8 @@ window.SajuAnalytics = (function(){
   .campaign-table th:first-child, .campaign-table td:first-child{ text-align:left; white-space:normal; word-break:break-all; }
   .campaign-table td.src{ font-weight:700; }
   .campaign-table td.src small{ display:block; font-weight:400; color:var(--ink-faint); }
+  .campaign-table td.src small b{ color:var(--gold); font-weight:700; }
+  .campaign-table tr.subtotal td{ background:rgba(244,196,99,.08); font-weight:700; }
   .admin-summary{ display:flex; gap:8px; margin:2px 0 14px; }
   .admin-summary .stat{ flex:1; text-align:center; border:1px solid var(--line); border-radius:var(--radius-sm); padding:10px 6px; background:var(--paper-card); }
   .admin-summary .stat .n{ font-family:"Noto Serif KR"; font-weight:900; font-size:15px; }
@@ -9638,11 +9640,12 @@ function campaignRowsHtml(rows, withCampaign){
   return rows.map(r=>{
     const srcKey = r.source || 'direct';
     const label = SOURCE_LABELS[srcKey] || srcKey;
-    const camp = withCampaign ? `<small>${r.campaign ? escapeHtml(r.campaign) : '(캠페인 없음)'}</small>` : '';
+    const campName = r.campaign ? escapeHtml(r.campaign) : '(캠페인 없음)';
+    const camp = withCampaign ? `<small>${r.subtotal ? '<b>' + campName + ' 합계</b>' : (r.content ? campName + ' · <b>' + escapeHtml(r.content) + '</b>' : campName)}</small>` : '';
     const v = r.visitors || 0, sb2 = r.submitters || 0, p = r.purchasers || 0;
     const pct = v ? Math.round(sb2/v*100) : 0;
     const rev = (r.revenue || 0).toLocaleString('ko-KR');
-    return `<tr><td class="src">${escapeHtml(label)}${camp}</td><td>${v}</td><td>${sb2} (${pct}%)</td><td>${p}</td><td>${rev}원</td></tr>`;
+    return `<tr${r.subtotal ? ' class="subtotal"' : ''}><td class="src">${escapeHtml(label)}${camp}</td><td>${v}</td><td>${sb2} (${pct}%)</td><td>${p}</td><td>${rev}원</td></tr>`;
   }).join('');
 }
 function campaignTableHtml(rows, withCampaign){
@@ -9655,7 +9658,9 @@ async function refreshCampaignSummary(startISO, endISO){
   el.innerHTML = '<div class="history-empty">불러오는 중...</div>';
   if(mediaEl) mediaEl.innerHTML = '';
   const mySeq = ++adCampaignSeq;
-  let { data, error } = await sb.rpc('admin_funnel_by_campaign', { p_start: startISO, p_end: endISO });
+  // 2026-10-15: 광고그룹(utm_content)까지 나눈 새 함수를 먼저 부르고, 아직 없으면(SQL 미실행) 예전 함수로 대체한다.
+  let { data, error } = await sb.rpc('admin_funnel_by_campaign_content', { p_start: startISO, p_end: endISO });
+  if(error){ ({ data, error } = await sb.rpc('admin_funnel_by_campaign', { p_start: startISO, p_end: endISO })); }
   if(mySeq !== adCampaignSeq) return;
   if(error){
     el.innerHTML = '<div class="history-empty">불러오지 못했어요 (' + escapeHtml(error.message) + ')</div>';
@@ -9671,12 +9676,24 @@ async function refreshCampaignSummary(startISO, endISO){
   const merged = {};
   data.forEach(r0=>{
     const r = Object.assign({}, r0, { source: toNaver(r0.source) });
-    const k = (r.source || 'direct') + '\u0001' + (r.campaign || '');
+    const k = (r.source || 'direct') + '\u0001' + (r.campaign || '') + '\u0001' + (r.content || '');
     const m = merged[k] || (merged[k] = Object.assign({}, r, { visitors:0, submitters:0, purchasers:0, revenue:0 }));
     m.visitors += Number(r.visitors)||0; m.submitters += Number(r.submitters)||0;
     m.purchasers += Number(r.purchasers)||0; m.revenue += Number(r.revenue)||0;
   });
   data = Object.values(merged).sort((x,y)=> (Number(y.visitors)||0) - (Number(x.visitors)||0));
+  // 같은 매체·캠페인에 광고그룹이 2개 이상이면 그 캠페인의 광고그룹 행들을 모아 보여 주고, 맨 위에 캠페인 합계 행을 둔다.
+  const groups = {};
+  data.forEach(r=>{ const k = (r.source || 'direct') + '\u0001' + (r.campaign || ''); (groups[k] || (groups[k] = [])).push(r); });
+  const tableRows = [];
+  Object.values(groups).sort((a,b)=> b.reduce((s2,x)=>s2+(Number(x.visitors)||0),0) - a.reduce((s2,x)=>s2+(Number(x.visitors)||0),0)).forEach(g=>{
+    if(g.length > 1 && g.some(x=>x.content)){
+      const tot = { source:g[0].source, campaign:g[0].campaign, subtotal:true, visitors:0, submitters:0, purchasers:0, revenue:0 };
+      g.forEach(x=>{ tot.visitors += Number(x.visitors)||0; tot.submitters += Number(x.submitters)||0; tot.purchasers += Number(x.purchasers)||0; tot.revenue += Number(x.revenue)||0; });
+      tableRows.push(tot);
+    }
+    g.forEach(x=>tableRows.push(x));
+  });
   // 매체별 합계는 캠페인 행을 매체(source)로 묶어 더한 것
   const bySrc = {};
   data.forEach(r=>{
@@ -9687,7 +9704,7 @@ async function refreshCampaignSummary(startISO, endISO){
   });
   const mediaRows = Object.values(bySrc).sort((a,b)=> b.visitors - a.visitors);
   if(mediaEl) mediaEl.innerHTML = campaignTableHtml(mediaRows, false);
-  el.innerHTML = campaignTableHtml(data, true);
+  el.innerHTML = campaignTableHtml(tableRows, true);
 }
 function applyAdPeriod(startISO, endISO){ refreshCampaignSummary(startISO, endISO); }
 $$('#adPeriodTabs button').forEach(btn=>{
