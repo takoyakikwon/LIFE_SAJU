@@ -9143,6 +9143,28 @@ function captureAttribution(){
   return cur;
 }
 const ATTRIBUTION = captureAttribution();
+// 2026-10-15: 광고그룹별 첫 화면 문구. 지금 접속한 주소의 utm_content 값에 따라 헤드라인·설명 문구만 바꾼다.
+// 표에 없는 값(brand, free, group1 등 모든 다른 값, 값 없음)은 기존 첫 화면 그대로.
+// 입력창·결제·풀이 엔진은 건드리지 않는다. 문구를 늘릴 때는 HERO_THEMES에 항목만 추가하면 된다.
+const HERO_THEMES = {
+  love:    { h:'내 <b>연애운</b>,<br>지금 어떤 흐름일까?',
+             s:'만나는 사람이 있든 아직 없든,<br>나의 <b>연애 패턴</b>과 <b>인연이 들어오는 흐름</b>을<br>사주로 확인해보세요.' },
+  general: { h:'내 사주에는<br>어떤 이야기가 담겨 있을까?',
+             s:'<b>돈, 일, 사랑</b> 중 지금 가장 궁금한 것을<br>물어보세요. 사주로 풀어드립니다.' },
+};
+(function applyHeroTheme(){
+  try{
+    const key = cleanAttr(new URLSearchParams(location.search).get('utm_content'));
+    const t = Object.prototype.hasOwnProperty.call(HERO_THEMES, key) ? HERO_THEMES[key] : null;
+    if(!t) return;
+    const main = document.querySelector('.hero-line-main');
+    const sub = document.querySelector('.hero-sub');
+    if(!main || !sub) return;
+    main.innerHTML = t.h;
+    sub.innerHTML = t.s;
+    main.setAttribute('data-hero-theme', key);
+  } catch(e){}
+})();
 // 실패해도 사용자 경험에는 절대 영향을 주면 안 되므로 결과를 기다리지 않고(fire-and-forget),
 // 에러도 조용히 무시한다(funnel_events 테이블이 아직 없어도 앱 동작에는 지장 없음).
 // 출처 컬럼이 아직 DB에 없으면(SQL 미실행) 거부될 수 있어, 그때는 출처 없이 한 번 더 기록해
