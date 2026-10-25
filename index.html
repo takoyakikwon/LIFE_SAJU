@@ -1248,6 +1248,16 @@ window.SajuAnalytics = (function(){
     color:#241d13; font-family:"JetBrains Mono",monospace; font-weight:700; font-size:9px;
     letter-spacing:.05em;
   }
+  /* 2026-10-25: 종합 사주 해석 '가장 인기' 강조 + 질문형 상담 카드를 리포트 목록 아래로 옮기며 생긴 구분선 */
+  .cat-option-hot{
+    position:relative;
+    border:1.5px solid var(--gold);
+    background:linear-gradient(160deg, rgba(244,196,99,.14), rgba(244,196,99,.04));
+    box-shadow:0 0 0 3px rgba(244,196,99,.10);
+  }
+  .cat-option-hot .cat-option-name{padding-right:74px;}
+  .ask-divider{display:flex; align-items:center; gap:10px; margin:22px 0 14px; color:var(--ink-faint); font-size:11.5px;}
+  .ask-divider::before, .ask-divider::after{content:""; flex:1; height:1px; background:var(--gold-line);}
   /* 질문형 상담 카드 (2026-10-05) */
   .ask-card{
     border:1.5px solid var(--gold); border-radius:var(--radius-sm);
@@ -2032,6 +2042,55 @@ window.SajuAnalytics = (function(){
         <p class="section-desc">지금까지 계산된 사주·자미두수 데이터를 바탕으로 성격과 기질, 지금의 흐름을 자세히 풀어드려요.</p>
         <div id="aiLocked">
           <div id="aiStepCategory">
+            <p class="section-desc" style="margin-bottom:14px;">원하는 리포트를 선택해주세요.</p>
+            <div class="cat-picker">
+              <button type="button" class="cat-option cat-option-hot" data-cat="comprehensive">
+                <div class="cat-option-badge">가장 인기</div>
+                <div class="cat-option-name">종합 사주 해석</div>
+                <div class="cat-option-desc">성격·기질부터 지금의 흐름까지, 사주 전체를 폭넓게 풀어드려요.</div>
+                <div class="cat-option-price">9,900원</div>
+              </button>
+              <button type="button" class="cat-option cat-option-premium" data-cat="lifetime">
+                <div class="cat-option-badge">PREMIUM</div>
+                <div class="cat-option-name">평생운 프리미엄 👑</div>
+                <div class="cat-option-desc">과거부터 지금, 그리고 앞으로의 대운까지 — 이 사람의 인생 전체를 하나의 이야기로 풀어드려요. 귀인이 오는 시기, 투자와 건강까지 챙기는 가장 깊은 리포트예요.</div>
+                <div class="cat-option-gift">🎁 구매하면 질문권 2회 증정 (3,900원 상당)</div>
+                <div class="cat-option-price">24,900원</div>
+              </button>
+              <button type="button" class="cat-option" data-cat="love">
+                <div class="cat-option-name">연애·재회운</div>
+                <div class="cat-option-desc">지금 이 사람의 연애 흐름과 마음이 흔들리는 지점을 짚어드려요.</div>
+                <div class="cat-option-price">4,900원</div>
+              </button>
+              <button type="button" class="cat-option" data-cat="wealth">
+                <div class="cat-option-name">재물운</div>
+                <div class="cat-option-desc">돈을 대하는 태도부터 지금 시기의 재물 흐름까지, 이 사람만의 돈 이야기를 풀어드려요.</div>
+                <div class="cat-option-price">7,900원</div>
+              </button>
+              <button type="button" class="cat-option" data-cat="career">
+                <div class="cat-option-name">취업·사업·이동운 🧭</div>
+                <div class="cat-option-desc">지금이 움직일 때인지 자리를 지킬 때인지, 일과 이동의 타이밍을 짚어드려요.</div>
+                <div class="cat-option-price">7,900원</div>
+              </button>
+              <button type="button" class="cat-option" data-cat="compatibility">
+                <div class="cat-option-name">궁합&결혼</div>
+                <div class="cat-option-desc">상대방 정보를 더해, 두 사람의 궁합을 함께 풀어드려요.</div>
+                <div class="cat-option-price">7,900원</div>
+              </button>
+              <button type="button" class="cat-option" data-cat="newyear">
+                <div class="cat-option-name">2027 신년운세</div>
+                <div class="cat-option-desc">원국·대운을 바탕으로 2027년 한 해의 흐름을 분기별로 풀어드려요.</div>
+                <div class="cat-option-price">14,900원</div>
+              </button>
+              <button type="button" class="cat-option" data-cat="pet">
+                <div class="cat-option-name">반려동물궁합 🐾</div>
+                <div class="cat-option-desc">우리 아이와 나, 얼마나 잘 통하는 콤비일까요? 유쾌하고 행복한 궁합 이야기예요.</div>
+                <div class="cat-option-price">1,900원</div>
+              </button>
+            </div>
+            <!-- 2026-10-25: 리포트 결제 전환을 높이려고 질문형 상담 카드를 리포트 목록 아래로 옮기고(목업 D),
+                 종합 사주 해석에 '가장 인기' 배지를 붙였다. 카드 안의 id·동작은 그대로다. -->
+            <div class="ask-divider"><span>리포트가 고민된다면</span></div>
             <div class="ask-card" id="askCard">
               <div class="ask-card-badge">NEW · 질문형 상담</div>
               <div class="ask-card-title">지금 가장 궁금한 한 가지, 직접 물어보세요</div>
@@ -2090,51 +2149,6 @@ window.SajuAnalytics = (function(){
                 <div class="ask-restore-line"><input type="text" id="askRestoreInput" class="ask-restore-input" placeholder="XXXX-XXXX-XXXX-XXXX" maxlength="24" autocomplete="off" autocapitalize="characters"><button type="button" class="ask-chip" id="askRestoreBtn">불러오기</button></div>
                 <div class="ask-error" id="askRestoreMsg" hidden></div>
               </div>
-            </div>
-            <p class="section-desc" style="margin-bottom:14px;">원하는 리포트를 선택해주세요.</p>
-            <div class="cat-picker">
-              <button type="button" class="cat-option" data-cat="comprehensive">
-                <div class="cat-option-name">종합 사주 해석</div>
-                <div class="cat-option-desc">성격·기질부터 지금의 흐름까지, 사주 전체를 폭넓게 풀어드려요.</div>
-                <div class="cat-option-price">9,900원</div>
-              </button>
-              <button type="button" class="cat-option cat-option-premium" data-cat="lifetime">
-                <div class="cat-option-badge">PREMIUM</div>
-                <div class="cat-option-name">평생운 프리미엄 👑</div>
-                <div class="cat-option-desc">과거부터 지금, 그리고 앞으로의 대운까지 — 이 사람의 인생 전체를 하나의 이야기로 풀어드려요. 귀인이 오는 시기, 투자와 건강까지 챙기는 가장 깊은 리포트예요.</div>
-                <div class="cat-option-gift">🎁 구매하면 질문권 2회 증정 (3,900원 상당)</div>
-                <div class="cat-option-price">24,900원</div>
-              </button>
-              <button type="button" class="cat-option" data-cat="love">
-                <div class="cat-option-name">연애·재회운</div>
-                <div class="cat-option-desc">지금 이 사람의 연애 흐름과 마음이 흔들리는 지점을 짚어드려요.</div>
-                <div class="cat-option-price">4,900원</div>
-              </button>
-              <button type="button" class="cat-option" data-cat="wealth">
-                <div class="cat-option-name">재물운</div>
-                <div class="cat-option-desc">돈을 대하는 태도부터 지금 시기의 재물 흐름까지, 이 사람만의 돈 이야기를 풀어드려요.</div>
-                <div class="cat-option-price">7,900원</div>
-              </button>
-              <button type="button" class="cat-option" data-cat="career">
-                <div class="cat-option-name">취업·사업·이동운 🧭</div>
-                <div class="cat-option-desc">지금이 움직일 때인지 자리를 지킬 때인지, 일과 이동의 타이밍을 짚어드려요.</div>
-                <div class="cat-option-price">7,900원</div>
-              </button>
-              <button type="button" class="cat-option" data-cat="compatibility">
-                <div class="cat-option-name">궁합&결혼</div>
-                <div class="cat-option-desc">상대방 정보를 더해, 두 사람의 궁합을 함께 풀어드려요.</div>
-                <div class="cat-option-price">7,900원</div>
-              </button>
-              <button type="button" class="cat-option" data-cat="newyear">
-                <div class="cat-option-name">2027 신년운세</div>
-                <div class="cat-option-desc">원국·대운을 바탕으로 2027년 한 해의 흐름을 분기별로 풀어드려요.</div>
-                <div class="cat-option-price">14,900원</div>
-              </button>
-              <button type="button" class="cat-option" data-cat="pet">
-                <div class="cat-option-name">반려동물궁합 🐾</div>
-                <div class="cat-option-desc">우리 아이와 나, 얼마나 잘 통하는 콤비일까요? 유쾌하고 행복한 궁합 이야기예요.</div>
-                <div class="cat-option-price">1,900원</div>
-              </button>
             </div>
           </div>
 
