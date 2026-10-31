@@ -55,6 +55,8 @@ function matchFilter(row, key, val) {
   if (op === 'lt') return cell != null && String(cell) < arg;
   if (op === 'is') return arg === 'null' ? cell == null : cell != null;
   if (op === 'in') return arg.replace(/^\(|\)$/g, '').split(',').includes(String(cell));
+  if (op === 'like') return cell != null && new RegExp('^' + arg.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$').test(String(cell));
+  if (op === 'not') return !matchFilter(row, key, arg);
   return false;
 }
 function rowMatches(row, params) {
