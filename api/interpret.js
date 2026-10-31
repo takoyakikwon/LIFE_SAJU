@@ -560,7 +560,7 @@ function buildPrompt(payload) {
   // 궁합&결혼은 두 사람의 person_profile을 나란히 실어야 하므로 별도 분기다 — 상대방용
   // partner_person_profile이 없으면(생성 실패 등) 이 블록 자체를 생략하고, module.exports의
   // narrativeV3Ready 판정도 함께 false가 되어 기존(비V3) 궁합 프롬프트로 자동 폴백한다.
-  if ((NARRATIVE_V3_CATEGORIES.includes(payload.category) || payload.category === 'ask') && payload.person_profile) {
+  if ((NARRATIVE_V3_CATEGORIES.includes(payload.category) || payload.category === 'ask' || payload.category === 'topic') && payload.person_profile) {
     if (payload.category === 'compatibility') {
       if (payload.partner_person_profile) {
         const myLabel = (name || '').trim() || '나';
@@ -1619,6 +1619,12 @@ const ASK_QUESTION_MAX_LEN = 200;
 const ASK_PREVIEW_MAX_TOKENS = 1200;
 const ASK_PREVIEW_DAILY_CAP = Math.max(1, parseInt(process.env.QA_PREVIEW_DAILY_CAP || '300', 10) || 300);
 const ASK_PREVIEW_IP_DAILY_LIMIT = Math.max(1, parseInt(process.env.QA_PREVIEW_IP_DAILY_LIMIT || '5', 10) || 5);
+// 결과 화면의 "지금 가장 궁금한 건?" 주제 무료 풀이(2026-10-31). 방문자 1명이 주제마다 한 번만 AI를 부른다.
+// 한도 기록은 기존 qa_free_usage 테이블을 그대로 쓰되(새 SQL 불필요) visitor_id를 'tp:<주제>:<방문자>'로 남겨
+// 질문 맛보기 한도(방문자당 1회, 하루 총량, IP)와 서로 세지 않도록 분리한다.
+const TOPIC_USAGE_PREFIX = 'tp:';
+const TOPIC_PREVIEW_DAILY_CAP = Math.max(1, parseInt(process.env.TOPIC_PREVIEW_DAILY_CAP || '2000', 10) || 2000);
+const TOPIC_PREVIEW_IP_DAILY_LIMIT = Math.max(1, parseInt(process.env.TOPIC_PREVIEW_IP_DAILY_LIMIT || '30', 10) || 30);
 
 // 질문 문장을 정리한다 — 제어문자 제거, 프롬프트 구분자(<<< >>>) 무력화, 공백 정리, 길이 제한.
 function sanitizeAskQuestion(raw) {
@@ -1823,11 +1829,11 @@ async function reserveAskPreview(req, visitorId) {
   const ipHash = hashRequestIp(req);
   const since = encodeURIComponent(new Date(Date.now() - 24 * 3600 * 1000).toISOString());
   try {
-    const dayTotal = await countAskUsage(`created_at=gte.${since}`);
+    const dayTotal = await countAskUsage(`created_at=gte.${since}&visitor_id=not.like.${TOPIC_USAGE_PREFIX}*`);
     if (dayTotal === null) return fail(503, 'store_error', '맛보기를 잠시 쓸 수 없어요. 잠시 후 다시 시도해주세요.');
     if (dayTotal >= ASK_PREVIEW_DAILY_CAP) return fail(429, 'daily_cap', '오늘 무료 맛보기가 마감됐어요. 전체 답변은 바로 확인하실 수 있어요.');
     if (ipHash) {
-      const ipCount = await countAskUsage(`ip_hash=eq.${ipHash}&created_at=gte.${since}`);
+      const ipCount = await countAskUsage(`ip_hash=eq.${ipHash}&created_at=gte.${since}&visitor_id=not.like.${TOPIC_USAGE_PREFIX}*`);
       if (ipCount === null) return fail(503, 'store_error', '맛보기를 잠시 쓸 수 없어요. 잠시 후 다시 시도해주세요.');
       if (ipCount >= ASK_PREVIEW_IP_DAILY_LIMIT) return fail(429, 'ip_limit', '무료 맛보기를 오늘 여러 번 사용하셨어요. 전체 답변은 바로 확인하실 수 있어요.');
     }
@@ -1960,6 +1966,91 @@ async function handleAskPreview({ req, res, payload, user, isAdmin, apiKey, ques
   } catch (e) {
     console.error('handleAskPreview error:', e);
     await releaseFree();
+    res.status(500).json({ error: '서버 내부 오류가 발생했습니다.', code: 'server_error' });
+  }
+}
+
+// ============================================================
+// 주제 무료 풀이(2026-10-31) — 무료 결과 화면에서 재물·연애·직업·궁합·전체 사주·신년운세 중 하나를 고르면
+// 그 주제의 경향을 짧게(두 문단) 풀어 준다. 질문형 상담 맛보기와 같은 프롬프트·같은 판단 레이어(person_profile)를 쓰고,
+// 질문 문장만 주제별 고정 문구로 대신한다(사용자 입력이 프롬프트에 들어가지 않는다). 무료는 경향과 방향까지만 —
+// 구체적 시기와 행동 조언은 유료 리포트의 몫이라 프롬프트로 막는다.
+// ============================================================
+const TOPIC_PREVIEWS = {
+  money: { label: '재물', question: '제 사주에서 재물은 어떤 방식으로 들어오고, 어떻게 지키거나 새는 구조인가요?', note: '' },
+  love: { label: '연애', question: '제 사주에서 연애와 인연은 어떤 경향으로 나타나나요?', note: '' },
+  job: { label: '직업', question: '제 사주에서 일과 직업은 어떤 자리와 방식에서 힘이 나나요?', note: '' },
+  match: { label: '궁합', question: '제 사주만 놓고 보면, 어떤 사람과 관계를 맺을 때 편안하고 어떤 점이 부딪히기 쉬운가요?',
+    note: '상대방의 사주 정보는 없습니다. 내 사주 기준의 관계 성향까지만 쓰고, 두 사람의 궁합이나 상대에 대한 판단은 쓰지 않습니다.' },
+  all: { label: '전체 사주', question: '제 사주 전체를 한마디로 보면 어떤 기질과 삶의 큰 방향을 가진 사람인가요?', note: '' },
+  new: { label: '신년운세', question: '2027년은 제 원래 사주 위에 어떤 성격의 해로 겹쳐지나요? 큰 방향만 알고 싶어요.',
+    note: '월별 시기나 특정 날짜는 쓰지 않고, 그 해의 성격과 큰 방향까지만 씁니다.' },
+};
+const TOPIC_FREE_LIMIT_NOTE = `
+[무료 풀이 제한 — 반드시 지키세요]
+이 답은 결제 전에 보여 주는 짧은 무료 풀이입니다. 경향과 방향까지만 쓰고, 구체적인 시기(몇 월·몇 살·몇 년 뒤)와 지금 해볼 행동·대처법은 쓰지 않습니다. 이 뒤에 더 이어질 내용이나 유료 리포트를 암시하는 문장도 쓰지 않습니다.`;
+// 같은 방문자가 가족·친구 사주를 따로 입력해 볼 수 있도록, 한도 기록은 방문자·주제·(생년월일시+성별) 단위로 센다.
+// 생년월일시는 해시 앞부분만 남긴다(하루 총량·IP 한도가 따로 있어 우회로 쓸 수 없다).
+function topicProfileHash(payload) {
+  const raw = String(payload.birth || '') + '|' + String(payload.gender || '');
+  return crypto.createHash('sha256').update(raw).digest('hex').slice(0, 10);
+}
+function topicStoreKey(topic, profileHash, visitorId) { return TOPIC_USAGE_PREFIX + topic + ':' + profileHash + ':' + visitorId; }
+async function reserveTopicPreview(req, topic, profileHash, visitorId) {
+  const fail = (status, code, message) => ({ ok: false, status, code, message });
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return fail(503, 'store_unavailable', '잠시 후 다시 시도해주세요.');
+  const vid = typeof visitorId === 'string' ? visitorId.trim().slice(0, 80) : '';
+  if (!vid) return fail(400, 'no_visitor', '새로고침 후 다시 시도해주세요.');
+  const ipHash = hashRequestIp(req);
+  const since = encodeURIComponent(new Date(Date.now() - 24 * 3600 * 1000).toISOString());
+  try {
+    const dayTotal = await countAskUsage(`created_at=gte.${since}&visitor_id=like.${TOPIC_USAGE_PREFIX}*`);
+    if (dayTotal === null) return fail(503, 'store_error', '잠시 후 다시 시도해주세요.');
+    if (dayTotal >= TOPIC_PREVIEW_DAILY_CAP) return fail(429, 'daily_cap', '오늘 무료 풀이가 마감됐어요.');
+    if (ipHash) {
+      const ipCount = await countAskUsage(`ip_hash=eq.${ipHash}&created_at=gte.${since}&visitor_id=like.${TOPIC_USAGE_PREFIX}*`);
+      if (ipCount === null) return fail(503, 'store_error', '잠시 후 다시 시도해주세요.');
+      if (ipCount >= TOPIC_PREVIEW_IP_DAILY_LIMIT) return fail(429, 'ip_limit', '오늘 여러 번 사용하셨어요.');
+    }
+    const ins = await fetch(`${SUPABASE_URL}/rest/v1/qa_free_usage`, {
+      method: 'POST',
+      headers: askStoreHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=representation' }),
+      body: JSON.stringify({ visitor_id: topicStoreKey(topic, profileHash, vid), ip_hash: ipHash }),
+    });
+    if (ins.status === 409) return fail(429, 'topic_used', '이 주제는 이미 풀이해 드렸어요.');
+    if (!ins.ok) { console.error('reserveTopicPreview insert failed:', ins.status, await ins.text()); return fail(503, 'store_error', '잠시 후 다시 시도해주세요.'); }
+    const rows = await ins.json();
+    return { ok: true, id: Array.isArray(rows) && rows[0] ? rows[0].id : null };
+  } catch (e) {
+    console.error('reserveTopicPreview error:', e);
+    return fail(503, 'store_error', '잠시 후 다시 시도해주세요.');
+  }
+}
+async function handleTopicPreview({ req, res, payload, apiKey }) {
+  const topic = typeof payload.topic === 'string' && Object.prototype.hasOwnProperty.call(TOPIC_PREVIEWS, payload.topic) ? payload.topic : null;
+  if (!topic) { res.status(400).json({ error: '주제를 확인하지 못했어요.', code: 'bad_topic' }); return; }
+  const gate = await reserveTopicPreview(req, topic, topicProfileHash(payload), payload.visitorId);
+  if (!gate.ok) { res.status(gate.status).json({ error: gate.message, code: gate.code }); return; }
+  const t = TOPIC_PREVIEWS[topic];
+  try {
+    const model = MODEL_BY_CATEGORY.ask;
+    const system = buildAskSystemPrompt('preview', null) + TOPIC_FREE_LIMIT_NOTE + (t.note ? `\n[이 주제의 추가 규칙]\n${t.note}` : '');
+    const r = await callOpenAI(apiKey, [
+      { role: 'system', content: system },
+      { role: 'user', content: buildAskUserPrompt(payload, t.question, '') },
+    ], ASK_PREVIEW_MAX_TOKENS, model);
+    if (!r || !r.ok || !r.text) {
+      await releaseAskPreview(gate.id);
+      res.status(502).json({ error: '풀이를 만들지 못했어요. 잠시 후 다시 시도해주세요.', code: 'ai_failed' });
+      return;
+    }
+    console.log('[topic:preview]', JSON.stringify({ model, topic, usage: r.usage || null }));
+    const text = trimAskPreview(scrubAskText(r.text));
+    if (!text) { await releaseAskPreview(gate.id); res.status(502).json({ error: '풀이를 만들지 못했어요. 잠시 후 다시 시도해주세요.', code: 'ai_failed' }); return; }
+    res.status(200).json({ kind: 'topic', topic, text });
+  } catch (e) {
+    console.error('handleTopicPreview error:', e);
+    await releaseAskPreview(gate.id);
     res.status(500).json({ error: '서버 내부 오류가 발생했습니다.', code: 'server_error' });
   }
 }
@@ -2447,6 +2538,12 @@ module.exports = async (req, res) => {
 
   if (!payload || !payload.saju) {
     res.status(400).json({ error: '사주 데이터가 없습니다.' });
+    return;
+  }
+
+  // 주제 무료 풀이: 로그인·결제와 무관한 무료 경로(방문자·주제별 1회 + IP·하루 총량 한도). 결제 게이트 이전에 여기서 끝낸다.
+  if (payload.category === 'topic') {
+    await handleTopicPreview({ req, res, payload, apiKey });
     return;
   }
 
