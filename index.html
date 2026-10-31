@@ -808,6 +808,38 @@ window.SajuAnalytics = (function(){
   }
   .hook-teaser-btn:active{ transform:translateY(1px); }
   .hook-ask-btn{ margin-top:8px; background:transparent; }
+  /* 2026-10-31 주제 선택 무료 풀이: 요약 카드 아래 "지금 가장 궁금한 건?" 칩 + 주제별 짧은 풀이 */
+  .topic-pick{ margin-top:4px; }
+  .topic-pick-title{ font-family:"Noto Serif KR"; font-weight:900; font-size:17px; color:var(--ink); margin-bottom:4px; }
+  .topic-new{ display:inline-block; vertical-align:middle; margin-left:4px; padding:2px 7px; border-radius:6px; background:#c2412d; color:#fff; font:800 11px/1.4 "Noto Sans KR",sans-serif; }
+  .topic-pick-sub{ font-size:12.5px; color:var(--ink-soft); margin-bottom:12px; line-height:1.5; }
+  .topic-chips{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .topic-chip{
+    border:1px solid rgba(255,255,255,.2); background:rgba(255,255,255,.06); color:var(--ink);
+    border-radius:14px; padding:11px 4px 10px; font:700 13px "Noto Sans KR",sans-serif; cursor:pointer; text-align:center;
+  }
+  .topic-chip i{ display:block; font-style:normal; font-family:"Noto Serif KR"; font-weight:900; font-size:22px; line-height:1.2; margin-bottom:3px; color:var(--gold); }
+  .topic-chip:active{ transform:translateY(1px); }
+  .topic-chip[aria-pressed="true"]{ background:var(--gold); border-color:var(--gold); color:#1b1b1b; }
+  .topic-chip[aria-pressed="true"] i{ color:#1b1b1b; }
+  .topic-ask-link{ display:block; margin:12px auto 0; background:none; border:0; padding:6px 8px; color:var(--ink-soft); font:600 12.5px "Noto Sans KR",sans-serif; text-decoration:underline; cursor:pointer; }
+  .topic-out{ margin-top:12px; }
+  .topic-load{ display:flex; align-items:center; gap:8px; padding:16px 6px; color:var(--ink-soft); font-size:13px; }
+  .topic-load b{ width:7px; height:7px; border-radius:50%; background:var(--gold); animation:topicPulse 1s infinite; }
+  .topic-load b:nth-child(2){ animation-delay:.2s; } .topic-load b:nth-child(3){ animation-delay:.4s; }
+  @keyframes topicPulse{ 50%{ opacity:.2; } }
+  .topic-card{ border:1px solid var(--gold-line); border-radius:16px; padding:16px 16px 18px; background:rgba(8,13,22,.62); animation:topicIn .3s ease; }
+  @keyframes topicIn{ from{ opacity:0; transform:translateY(6px); } }
+  .topic-card h4{ margin:0 0 10px; font-family:"Noto Serif KR"; font-weight:900; font-size:16px; color:var(--gold); }
+  .topic-card p{ margin:0 0 10px; font-family:"Noto Serif KR"; font-weight:600; font-size:14.5px; line-height:1.75; color:var(--ink); }
+  .topic-ev-label{ font-size:11.5px; color:var(--ink-soft); margin:4px 0 6px; }
+  .topic-ev{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+  .topic-ev span{ border:1px solid rgba(255,255,255,.22); border-radius:999px; padding:4px 10px; font-size:11.5px; color:var(--ink); }
+  .topic-gap{ margin-top:12px; padding:12px 14px; border-radius:12px; border:1px dashed var(--gold-line); background:rgba(244,196,99,.08); font-family:"Noto Serif KR"; font-weight:600; font-size:14px; line-height:1.65; color:var(--ink); }
+  .topic-gap b{ color:var(--gold); }
+  .topic-gap ul{ margin:8px 0 0; padding-left:18px; font-family:"Noto Sans KR",sans-serif; font-weight:500; font-size:12.5px; line-height:1.75; color:var(--ink-soft); }
+  .topic-cta{ display:block; width:100%; margin-top:14px; padding:14px; border:0; border-radius:14px; background:linear-gradient(180deg,#f0cf7c,#d9a93f); color:#241a05; font:800 15px "Noto Sans KR",sans-serif; cursor:pointer; }
+  .topic-cta:active{ transform:translateY(1px); }
   /* 2026-08-25 이어지는 스크롤 + 마스코트 개편 — "목차 미리보기(챕터+가격 리스트)"는 방향이
      맞지 않아 걷어내고, 대신 무료 5개 그룹을 하나의 스크롤로 이어붙이면서 사이사이 마스코트
      코멘트 + 훅 한 줄(hook-quote, 기존 tocFreeTeaser() 데이터 재사용) + CTA 카드를 배치한다. */
@@ -1863,13 +1895,22 @@ window.SajuAnalytics = (function(){
       <div class="summary" id="summaryBox"></div>
       <div class="friend-card" id="friendCardBox" hidden></div>
       <div class="hook-teaser" id="hookTeaserBox">
-        <div class="hook-teaser-type-row">
-          <span class="hook-teaser-type" id="hookTeaserType"></span>
-        </div>
         <div class="hook-teaser-label">✦ 지금 나온 결과, 한눈에 보면</div>
         <div class="hook-teaser-text" id="hookTeaserText"></div>
-        <button type="button" class="hook-teaser-btn" id="hookTeaserBtn">내 사주 더 깊이 알아보기 →</button>
-        <button type="button" class="hook-teaser-btn hook-ask-btn" id="hookAskBtn">💬 궁금한 걸 직접 물어보기</button>
+        <div class="topic-pick" id="topicPick">
+          <div class="topic-pick-title">지금 가장 궁금한 건 뭐예요? <span class="topic-new">NEW</span></div>
+          <div class="topic-pick-sub">하나 골라 보세요. 내 사주로 바로 짚어 드려요. (무료)</div>
+          <div class="topic-chips" id="topicChips" role="group" aria-label="궁금한 주제">
+            <button type="button" class="topic-chip" data-topic="money" aria-pressed="false"><i aria-hidden="true">財</i>재물</button>
+            <button type="button" class="topic-chip" data-topic="love" aria-pressed="false"><i aria-hidden="true">緣</i>연애</button>
+            <button type="button" class="topic-chip" data-topic="job" aria-pressed="false"><i aria-hidden="true">業</i>직업</button>
+            <button type="button" class="topic-chip" data-topic="match" aria-pressed="false"><i aria-hidden="true">合</i>궁합</button>
+            <button type="button" class="topic-chip" data-topic="all" aria-pressed="false"><i aria-hidden="true">命</i>전체 사주</button>
+            <button type="button" class="topic-chip" data-topic="new" aria-pressed="false"><i aria-hidden="true">歲</i>신년운세</button>
+          </div>
+          <button type="button" class="topic-ask-link" id="hookAskBtn">위에 없다면, 직접 물어보기</button>
+          <div class="topic-out" id="topicOut" aria-live="polite"></div>
+        </div>
       </div>
       <div class="subtab-bar" id="subtabBar" hidden></div>
       <div class="panel active" data-panel="palja">
@@ -5708,6 +5749,7 @@ function renderHookTeaser(saju, zw){
   // 2026-09-22: "조율가 × 리더형" 같은 딱딱한 라벨 대신, 어떤 조합이 나와도 자연스럽게 읽히는
   // 문장형 문구로 변경 — "이자"/"에"는 받침 유무와 상관없이 그대로 붙일 수 있어 모든 조합에 안전함.
   if(typeEl) typeEl.textContent = `당신은 ${ELEMENT_TYPE_LABEL[maxEl]}이자 ${TEN_GOD_GROUP_TYPE_LABEL[topGroup]}에 속하는 사람입니다.`;
+  if(typeof resetTopicPick === 'function') resetTopicPick();   // 새 사주를 계산했으면 이전 주제 풀이는 지운다
 }
 // ---- 목차 미리보기(TOC 프리뷰) 데이터 ----
 // group/sub은 TAB_GROUPS(아래에서 정의)의 키와 맞춰서, 행을 누르면 activateGroup()으로 바로
@@ -8245,6 +8287,150 @@ $('#askAgainBtn').addEventListener('click', ()=> askAgain(''));
 $('#hookAskBtn')?.addEventListener('click', ()=>{
   activateGroup('ai');
   setTimeout(()=>{ const c = $('#askCard'); if(c && c.scrollIntoView) c.scrollIntoView({ block: 'start' }); else window.scrollTo(0,0); }, 0);
+});
+
+/* =========================================================
+   주제 선택 무료 풀이 (2026-10-31)
+   — 결과 화면 맨 위에서 재물·연애·직업·궁합·전체 사주·신년운세 중 하나를 고르면 그 주제의 경향을 짧게 풀어 주고,
+   "아직 남은 질문"과 함께 해당 유료 리포트로 이어 준다. 풀이는 서버(/api/interpret, category:'topic')가 질문 맛보기와 같은
+   판단 레이어로 만든다. 방문자·주제·사람(생년월일) 단위로 한 번만 생성하고, 실패·한도 초과 때는 고정 문구로 대신해
+   고르는 흐름이 막히지 않게 한다. 근거 칩은 이미 계산된 값(일간·강한 오행·두드러지는 십성)만 쓴다.
+   ========================================================= */
+const TOPIC_DEFS = {
+  money: { label:'재물', cat:'wealth',
+    fallback:'재물은 얼마나 버느냐보다, 어떤 방식으로 들어오고 어디에 머무느냐가 사람마다 크게 달라요. 당신의 사주에서도 돈이 움직이는 방식에는 분명한 결이 있어요.',
+    gap:'그럼 돈이 들어오는 때와 새는 때는 언제일까?', list:['돈이 붙는 시기와 조심할 시기','왜 벌어도 안 모이는지 패턴','지금 가장 먼저 잡을 재물 기준'] },
+  love: { label:'연애', cat:'love',
+    fallback:'연애는 누구를 만나느냐 못지않게, 내가 마음을 여는 방식과 속도가 중요해요. 당신의 사주에는 관계에서 반복되는 나만의 결이 담겨 있어요.',
+    gap:'이 관계가 결혼까지 갈 수 있는 구조일까?', list:['연애운이 열리는 시기','나와 잘 맞는 사람의 결','반복되는 연애 패턴과 바꾸는 법'] },
+  job: { label:'직업', cat:'career',
+    fallback:'일은 무엇을 하느냐보다 어떤 자리와 방식에서 힘이 나느냐가 더 중요해요. 당신의 사주에는 일에서 힘이 붙는 방식이 비교적 뚜렷하게 담겨 있어요.',
+    gap:'지금 옮길 때일까, 버틸 때일까?', list:['이직·창업에 유리한 시기','조직형과 독립형, 내 쪽은','올해 가장 먼저 정할 선택 기준'] },
+  match: { label:'궁합', cat:'compatibility',
+    fallback:'궁합은 두 사람의 사주를 나란히 놓아야 정확히 보여요. 먼저 내 사주만 보면, 관계에서 내가 편안해지는 방식에는 나만의 결이 있어요.',
+    gap:'우리 두 사람은 정말 잘 맞을까?', list:['두 사람의 기질 궁합','갈등이 생기는 지점과 푸는 법','결혼 시기와 관계의 흐름'] },
+  all: { label:'전체 사주', cat:'comprehensive',
+    fallback:'사주는 한 사람의 기질과 삶의 큰 방향을 여덟 글자에 담아 보여 줘요. 당신의 사주에도 분명하게 드러나는 중심이 있어요.',
+    gap:'앞으로 10년, 어떤 흐름으로 가게 될까?', list:['성격·재물·관계 전체 흐름','대운 10년 시기별 변화','지금 가장 중요한 한 가지'] },
+  new: { label:'신년운세', cat:'newyear',
+    fallback:'새해의 운은 타고난 구조 위에 그 해의 기운이 얹히는 방식으로 읽어요. 내년은 당신의 원래 결이 어떻게 드러나는지가 포인트예요.',
+    gap:'내년, 어느 달에 무엇이 움직일까?', list:['월별 흐름과 중요한 달','재물·관계·일 영역별 신호','2027년 첫 번째 선택 기준'] },
+};
+const TOPIC_CACHE_KEY = 'sajuTopicCache_v1';
+let topicSeq = 0, topicMem = {};
+function topicHash(str){ let h = 5381; for(let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0; return (h >>> 0).toString(36); }
+function topicCacheGet(k){
+  if(topicMem[k]) return topicMem[k];
+  try{ const o = JSON.parse(lsGet(TOPIC_CACHE_KEY) || '{}'); return (o && typeof o[k] === 'string') ? o[k] : ''; } catch(e){ return ''; }
+}
+function topicCacheSet(k, text){
+  topicMem[k] = text;
+  try{
+    const o = JSON.parse(lsGet(TOPIC_CACHE_KEY) || '{}') || {};
+    o[k] = text;
+    const keys = Object.keys(o); if(keys.length > 30) delete o[keys[0]];   // 오래된 것부터 정리(용량 제한)
+    lsSet(TOPIC_CACHE_KEY, JSON.stringify(o));
+  } catch(e){}
+}
+// 서버가 준 "소제목 — 본문" 두 문단에서 소제목을 떼고 본문만 쓴다.
+function topicParagraphs(text){
+  return String(text || '').split(/\n+/).map(s=>s.trim()).filter(Boolean).slice(0, 2).map(line=>{
+    const idx = line.indexOf(' — ');
+    return (idx > 0 && idx <= 12) ? line.slice(idx + 3).trim() : line;
+  }).filter(Boolean);
+}
+function topicEvidence(){
+  try{
+    const s = lastSajuResult, z = lastZiweiResult;
+    if(!s) return [];
+    const dmG = s.pillars.day.g, dmEl = GAN_ELEMENT[dmG];
+    const out = [`일간 ${GAN[dmG]}(${ELEMENT_NAME[dmEl]})`];
+    if(z){
+      const c = computeCrossIdentity(s, z);
+      out.push(`${ELEMENT_NAME[c.maxEl]}(${ELEMENT_HANJA[c.maxEl]}) 기운 ${c.elPercent}%`);
+      out.push(`${c.topGroup} 두드러짐`);
+    }
+    return out;
+  } catch(e){ return []; }
+}
+function resetTopicPick(){
+  topicSeq++;
+  const out = $('#topicOut'); if(out) out.textContent = '';
+  $$('#topicChips .topic-chip').forEach(b=>b.setAttribute('aria-pressed', 'false'));
+}
+function renderTopicCard(key, text){
+  const def = TOPIC_DEFS[key], out = $('#topicOut');
+  if(!def || !out) return;
+  const paras = text ? topicParagraphs(text) : [def.fallback];
+  const card = document.createElement('div'); card.className = 'topic-card';
+  const h = document.createElement('h4'); h.textContent = `${def.label}, 이렇게 보여요`; card.appendChild(h);
+  const p1 = document.createElement('p'); p1.textContent = paras[0] || def.fallback; card.appendChild(p1);
+  const ev = topicEvidence();
+  if(ev.length){
+    const lab = document.createElement('div'); lab.className = 'topic-ev-label'; lab.textContent = '이렇게 본 근거'; card.appendChild(lab);
+    const row = document.createElement('div'); row.className = 'topic-ev';
+    ev.forEach(t=>{ const sp = document.createElement('span'); sp.textContent = t; row.appendChild(sp); });
+    card.appendChild(row);
+  }
+  if(paras[1]){ const p2 = document.createElement('p'); p2.textContent = paras[1]; card.appendChild(p2); }
+  const gap = document.createElement('div'); gap.className = 'topic-gap';
+  const gb = document.createElement('b'); gb.textContent = '아직 남은 질문';
+  gap.appendChild(gb); gap.appendChild(document.createElement('br')); gap.appendChild(document.createTextNode(def.gap));
+  const ul = document.createElement('ul'); def.list.forEach(t=>{ const li = document.createElement('li'); li.textContent = t; ul.appendChild(li); });
+  gap.appendChild(ul); card.appendChild(gap);
+  const cta = document.createElement('button'); cta.type = 'button'; cta.className = 'topic-cta'; cta.textContent = '리포트 보기';
+  cta.addEventListener('click', ()=>{
+    const opt = document.querySelector(`.cat-option[data-cat="${def.cat}"]`);
+    logFunnelEvent('topic_cta_' + key);
+    if(!opt) return;
+    activateGroup('ai');   // 무료 결과 화면에서 왔으니 먼저 심층풀이 화면으로 옮긴 뒤 그 리포트의 다음 단계를 연다
+    opt.click();
+    window.scrollTo(0, 0);
+  });
+  card.appendChild(cta);
+  out.textContent = '';
+  out.appendChild(card);
+  logFunnelEvent('topic_view_' + key);
+  if(out.scrollIntoView) out.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+async function pickTopic(key){
+  const def = TOPIC_DEFS[key], out = $('#topicOut');
+  if(!def || !out) return;
+  const seq = ++topicSeq;
+  $$('#topicChips .topic-chip').forEach(b=>b.setAttribute('aria-pressed', b.dataset.topic === key ? 'true' : 'false'));
+  logFunnelEvent('topic_pick_' + key);
+  out.textContent = '';
+  const load = document.createElement('div'); load.className = 'topic-load';
+  load.appendChild(document.createElement('b')); load.appendChild(document.createElement('b')); load.appendChild(document.createElement('b'));
+  load.appendChild(document.createTextNode(`${def.label} 쪽을 짚어 보는 중…`));
+  out.appendChild(load);
+  let text = '';
+  try{
+    const prevCat = selectedAiCategory;
+    let payload;
+    try{ selectedAiCategory = key === 'new' ? 'newyear' : 'comprehensive'; payload = buildAiPayload(); } finally { selectedAiCategory = prevCat; }
+    if(payload){
+      const ck = key + ':' + topicHash(String(payload.birth || '') + '|' + String(payload.gender || ''));
+      text = topicCacheGet(ck);
+      if(!text){
+        payload.category = 'topic'; payload.topic = key;
+        delete payload.paymentId; delete payload.access_token;
+        const ctrl = (typeof AbortController === 'function') ? new AbortController() : null;
+        const timer = ctrl ? setTimeout(()=>ctrl.abort(), 25000) : null;
+        try{
+          const res = await fetch('/api/interpret', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(payload), signal: ctrl ? ctrl.signal : undefined });
+          const d = await res.json().catch(()=>({}));
+          if(res.ok && d && d.kind === 'topic' && d.topic === key && typeof d.text === 'string' && d.text.trim()){ text = d.text; topicCacheSet(ck, text); }
+        } finally { if(timer) clearTimeout(timer); }
+      }
+    }
+  } catch(e){ text = ''; }
+  if(seq !== topicSeq) return;   // 그 사이 다른 주제를 눌렀거나 새 결과로 바뀜
+  renderTopicCard(key, text);
+}
+$('#topicChips')?.addEventListener('click', (e)=>{
+  const b = e.target.closest && e.target.closest('.topic-chip');
+  if(b && b.dataset.topic) pickTopic(b.dataset.topic);
 });
 // 2026-08-30: 포트원(PortOne) V2 결제창을 실제로 띄운다(KG이니시스 테스트 채널).
 // 결제창의 성공/실패는 여기서 참고만 하고, 최종 신뢰는 서버(api/interpret.js)가
