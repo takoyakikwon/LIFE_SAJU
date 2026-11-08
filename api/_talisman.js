@@ -134,4 +134,4 @@ function buildTalismanSvg(opts) {
     '</svg>';
 }
 
-module.exports = { buildTalismanSvg, normalize, ELEMENTS, KIND_KEYS, PURPOSES, KINDS, TALISMAN_PRICE_KRW: 990 };
+module.exports = { buildTalismanSvg, normalize, ELEMENTS, KIND_KEYS, PURPOSES, KINDS, TALISMAN_PRICE_KRW: 1900 };

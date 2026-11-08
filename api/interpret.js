@@ -2251,13 +2251,13 @@ async function handleAskPackPurchase({ res, payload, user, isAdmin }) {
 }
 
 // ============================================================
-// 부적(합격·재물·궁합) 구매 (2026-11). 990원 디지털 이미지 상품.
+// 부적(합격·재물·궁합) 구매 (2026-11). 1,900원 디지털 이미지 상품.
 //  - 사주 계산·AI 호출 없이 결제 검증 → 같은 결제 재사용 차단 → 이미지 생성 → 구매 기록만 한다.
 //  - 어떤 부적을 만들지(종류·오행·목적)는 브라우저가 보내지만, 값은 서버가 허용 목록으로 다시 검사한다.
 //  - 같은 결제번호(paymentId)로 다시 요청하면 처음 기록해 둔 값으로 같은 이미지를 다시 만들어 준다(15일 동안).
 //    새로고침·결제 후 페이지 이동·재열람을 위한 것이며, 새 부적을 더 받는 길은 아니다(값은 기록된 것을 쓴다).
 // ============================================================
-const TALISMAN_PRICE_KRW = 990; // api/_talisman.js 의 TALISMAN_PRICE_KRW 와 같아야 한다(프론트 표시 가격과도 일치).
+const TALISMAN_PRICE_KRW = 1900; // api/_talisman.js 의 TALISMAN_PRICE_KRW 와 같아야 한다(프론트 표시 가격과도 일치).
 const TALISMAN_VIEW_DAYS = 15;
 function kstYearNow() { return new Date(Date.now() + 9 * 3600 * 1000).getUTCFullYear(); }
 function talismanResponse(params, createdAt, extra) {
