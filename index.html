@@ -1168,7 +1168,7 @@ window.SajuAnalytics = (function(){
   .ask-report-hint{ margin:12px 0 0; padding:11px 12px; border-radius:var(--radius-sm); border:1px dashed var(--gold-line); text-align:center; }
   .ask-report-hint-label{ font-size:11.5px; color:var(--ink-soft); margin-bottom:6px; }
   .ask-report-hint-btn{ border:none; background:none; color:var(--gold); font-family:"Noto Sans KR"; font-weight:800; font-size:13.5px; cursor:pointer; padding:2px 4px; text-decoration:underline; text-underline-offset:3px; }
-  /* 2026-11: 부적(합격·재물·궁합) 990원 디지털 이미지 상품 — 심층풀이 탭 입구 카드 + 전체 화면 시트 */
+  /* 2026-11: 부적(합격·재물·궁합) 1,900원 디지털 이미지 상품 — 심층풀이 탭 입구 카드 + 전체 화면 시트 */
   .tal-entry{ margin:18px 0 6px; padding:16px; border-radius:var(--radius-md); border:1px solid var(--gold-line); background:linear-gradient(160deg, rgba(212,175,99,.10), rgba(178,59,46,.08)); }
   .tal-entry-badge{ display:inline-block; padding:2px 9px; border-radius:999px; margin-bottom:8px; background:linear-gradient(160deg, var(--gold), #b8912f); color:#241d13; font-size:10.5px; font-weight:900; letter-spacing:.04em; }
   .tal-entry-title{ font-family:"Noto Serif KR"; font-weight:900; font-size:16px; line-height:1.45; margin-bottom:4px; }
@@ -2248,7 +2248,7 @@ window.SajuAnalytics = (function(){
             </div>
             <div class="tal-entry" id="talEntry">
               <div class="tal-entry-badge">NEW · 부적</div>
-              <div class="tal-entry-title">마음을 담은 나만의 부적, 990원</div>
+              <div class="tal-entry-title">마음을 담은 나만의 부적, 1,900원</div>
               <div class="tal-entry-sub">내 사주에서 보완하면 좋은 기운을 색과 문양에 담아, 고화질 이미지로 만들어 드려요. 질문하지 않아도 바로 받을 수 있어요.</div>
               <div class="tal-entry-row">
                 <button type="button" class="tal-mini k-pass" data-tal-kind="pass"><b>合格</b><span>합격 부적</span></button>
@@ -2488,7 +2488,7 @@ window.SajuAnalytics = (function(){
         <p class="tal-help" style="text-align:center">미리보기는 분위기만 보여 드려요. 결제하면 문양과 글씨가 살아 있는 고화질 이미지로 완성돼요.</p>
       </div>
       <div class="tal-err" id="talErr" hidden></div>
-      <button type="button" class="submit-btn" id="talPayBtn">990원 결제하고 부적 받기</button>
+      <button type="button" class="submit-btn" id="talPayBtn">1,900원 결제하고 부적 받기</button>
       <p class="tal-note">로그인 없이 구매할 수 있어요 · 완성된 부적은 15일 동안 다시 볼 수 있어요</p>
     </div>
     <div id="talBusy" class="tal-busy" hidden>결제를 확인하고 부적을 만드는 중이에요.<br>잠시만 기다려 주세요.</div>
@@ -11007,12 +11007,12 @@ document.addEventListener('visibilitychange', ()=>{
   if(document.visibilityState === 'visible' && lsGet(INVITE_CODE_KEY)) refreshAskWallet();
 });
 /* =========================================================
-   부적(합격·재물·궁합) — 990원 디지털 이미지 (2026-11)
+   부적(합격·재물·궁합) — 1,900원 디지털 이미지 (2026-11)
    - 어떤 오행을 새길지는 브라우저가 내 사주(와 상대 생년월일)로 계산해 '오행 글자 하나'만 서버에 보낸다.
    - 이미지는 서버(api/interpret.js category:'talisman')가 결제를 포트원에 재조회해 확인한 뒤에만 만들어 내려준다.
    - 모바일은 결제창이 페이지를 이동했다 돌아오므로, 결제 직전 선택값을 localStorage 에 잠깐 저장해 두고 돌아오면 이어서 받는다.
    ========================================================= */
-const TAL_PRICE = 990;
+const TAL_PRICE = 1900;
 const TAL_PENDING_KEY = 'sajuTalPending_v1';
 const TAL_MINE_KEY = 'sajuTalismans_v1';
 const TAL_VIEW_MS = 15 * 86400000;
