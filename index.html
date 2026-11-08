@@ -7694,6 +7694,7 @@ function buildAiPayload(){
   return payload;
 }
 function openPayModal(){
+  logPayEvent('pay_modal_open');
   const meta = AI_CATEGORY_META[selectedAiCategory] || AI_CATEGORY_META.comprehensive;
   $('#modalPrice').textContent = meta.price;
   if(selectedAiCategory === 'ask' && selectedAskPack){
@@ -8551,7 +8552,9 @@ $('#mockPayBtn').addEventListener('click', async ()=>{
   // 중복될 수 있어서 막아둠).
   if(aiInterpretInFlight) return;
   if(selectedAiCategory === 'ask' && (!askQuestionText || !selectedAskPack)){ closePayModal(); showAiStep('aiStepCategory'); return; }
+  logPayEvent('pay_click');
   if(!window.PortOne){
+    logPayEvent('pay_fail');
     alert('결제 모듈을 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
     return;
   }
@@ -8569,6 +8572,7 @@ $('#mockPayBtn').addEventListener('click', async ()=>{
   // 신호가 되고, restorePaymentResumeSnapshotIfAny()가 이를 읽어 복원 + 결제 검증을 이어간다.
   savePaymentResumeSnapshot(paymentId);
   try{
+    logPayEvent('pay_window_open');
     const response = await window.PortOne.requestPayment({
       storeId: PORTONE_STORE_ID,
       channelKey: PORTONE_CHANNEL_KEY,
@@ -8597,6 +8601,7 @@ $('#mockPayBtn').addEventListener('click', async ()=>{
     // (REDIRECTION으로 실제 페이지 이동이 일어나면 이 아래 코드는 아예 실행되지 않고,
     // 대신 페이지가 다시 로드되면서 restorePaymentResumeSnapshotIfAny()가 이어받는다.)
     if(response && response.code){
+      logPayEvent(payCodeEvent(response.code));
       alert('결제가 완료되지 않았어요. (' + (response.message || response.code) + ')');
       payBtnEl.disabled = false;
       payBtnEl.textContent = prevBtnText;
@@ -8612,6 +8617,7 @@ $('#mockPayBtn').addEventListener('click', async ()=>{
     saveResultSnapshot();
     await runAiInterpretation();
   } catch(err){
+    logPayEvent('pay_fail');
     alert('결제 진행 중 오류가 발생했어요. (' + err.message + ')');
   } finally {
     payBtnEl.disabled = false;
@@ -8779,7 +8785,9 @@ async function runAiInterpretation(){
       const purchaseValue = parseInt((purchaseMeta.price || '').replace(/[^0-9]/g, ''), 10) || 0;
       window.SajuAnalytics.purchase({ paymentId: payload.paymentId, value: purchaseValue });
     }
+    if(payload.paymentId) logPayEvent('pay_success');   // 서버가 포트원에 재조회해 확인한 뒤에만 여기에 온다
     renderAiResult($('#aiResultText'), lastAiResultText);
+    if(payload.paymentId && data.interpretation) logPayEvent('report_view');
     renderAiResultNote();
     applyAskWalletResponse(data);
     if(payload.category === 'ask' && data.interpretation){ showAskAgain(askQuestionText); } else { $('#askAgain').hidden = true; }
@@ -9478,6 +9486,14 @@ const HERO_THEMES = {
 // 에러도 조용히 무시한다(funnel_events 테이블이 아직 없어도 앱 동작에는 지장 없음).
 // 출처 컬럼이 아직 DB에 없으면(SQL 미실행) 거부될 수 있어, 그때는 출처 없이 한 번 더 기록해
 // 기존 퍼널 집계가 끊기지 않게 한다.
+// 2026-11-08: 결제 단계 수집(결제하기 → 리포트 보기, 결제창까지 갔다가 취소·실패한 사람 포함). 관리자 계정의 시험 결제는 퍼널에 섞이지 않게 기록하지 않는다.
+// 이벤트: pay_modal_open · pay_click · pay_window_open · pay_cancel(결제창에서 닫음) · pay_fail · pay_success(서버가 결제를 확인한 뒤) · report_view
+//         부적은 tal_pay_<종류>(결제하기 클릭, 기존) · tal_pay_cancel · tal_pay_fail · tal_pay_success · tal_report_view
+function logPayEvent(eventType){
+  try{ if(currentProfile && currentProfile.is_admin) return; }catch(e){}
+  logFunnelEvent(eventType);
+}
+function payCodeEvent(code, prefix){ return (prefix || 'pay_') + (String(code || '') === 'PAY_PROCESS_CANCELED' ? 'cancel' : 'fail'); }
 function logFunnelEvent(eventType){
   if(!sb || IS_PREVIEW_HOST) return;
   try{
@@ -9960,7 +9976,23 @@ const FUNNEL_STEP_LABELS = {
   submit_blocked_time: '막힘: 태어난 시간 미입력',
   submit_blocked_lunar: '막힘: 음력 날짜 오류',
   form_submit: '기본운세 확인 완료',
+  // 2026-11-08: 결제 단계(결제하기 → 리포트 보기). 결제창까지 갔다가 취소·실패한 사람도 따로 센다.
+  pay_modal_open: '결제 안내창 열기',
+  pay_click: '결제하기 클릭',
+  pay_window_open: '결제창 열림',
+  pay_cancel: '결제창에서 취소',
+  pay_fail: '결제 실패·오류',
+  pay_success: '결제 완료(서버 확인)',
+  report_view: '리포트 보기',
+  tal_pay_pass: '부적(합격) 결제하기 클릭',
+  tal_pay_match: '부적(궁합) 결제하기 클릭',
+  tal_pay_wealth: '부적(재물) 결제하기 클릭',
+  tal_pay_cancel: '부적 결제창에서 취소',
+  tal_pay_fail: '부적 결제 실패·오류',
+  tal_pay_success: '부적 결제 완료',
+  tal_report_view: '부적 이미지 보기',
 };
+const FUNNEL_PAY_ORDER = ['pay_modal_open','pay_click','pay_window_open','pay_cancel','pay_fail','pay_success','report_view','tal_pay_pass','tal_pay_match','tal_pay_wealth','tal_pay_cancel','tal_pay_fail','tal_pay_success','tal_report_view'];
 const FUNNEL_STEP_ORDER = ['visit','date_sheet_open','date_input_error','time_sheet_open','time_input_error','city_sheet_open','submit_click','submit_blocked','submit_blocked_date','submit_blocked_time','submit_blocked_lunar','form_submit'];
 // 2026-09-26: 방문 이후 어느 입력 단계에서 이탈하는지 세분화해서 보여주는 패널.
 // funnel_events에 쌓이는 세분화 이벤트(date_sheet_open 등)를 event_type별 방문자 수로 집계하는
@@ -10230,9 +10262,15 @@ async function refreshFunnelSteps(startISO, endISO){
   }
   const counts = {};
   (steps||[]).forEach(r=>{ counts[r.event_type] = r.visitors || 0; });
-  el.innerHTML = FUNNEL_STEP_ORDER.map(k=>
-    `<div class="stat" style="flex:1 1 28%; min-width:84px;"><div class="n">${counts[k]||0}</div><div class="l">${escapeHtml(FUNNEL_STEP_LABELS[k]||k)}</div></div>`
-  ).join('');
+  const tile = (k)=>`<div class="stat" style="flex:1 1 28%; min-width:84px;"><div class="n">${counts[k]||0}</div><div class="l">${escapeHtml(FUNNEL_STEP_LABELS[k]||k)}</div></div>`;
+  // 결제 단계: 결제하기를 누른 뒤 결제를 끝내지 못한 사람(취소·실패·그냥 이탈)을 따로 보여준다. 방문자 수 기준(같은 사람은 1명).
+  const notPaid = Math.max(0, (counts.pay_click||0) - (counts.pay_success||0));
+  const talNotPaid = Math.max(0, ((counts.tal_pay_pass||0) + (counts.tal_pay_match||0) + (counts.tal_pay_wealth||0)) - (counts.tal_pay_success||0));
+  el.innerHTML = FUNNEL_STEP_ORDER.map(tile).join('') +
+    `<div class="l" style="flex:1 1 100%; margin-top:10px; font-weight:700;">결제 단계 (결제하기 → 리포트 보기)</div>` +
+    FUNNEL_PAY_ORDER.map(tile).join('') +
+    `<div class="stat" style="flex:1 1 28%; min-width:84px;"><div class="n">${notPaid}</div><div class="l">결제하기 후 미결제(심층풀이)</div></div>` +
+    `<div class="stat" style="flex:1 1 28%; min-width:84px;"><div class="n">${talNotPaid}</div><div class="l">결제하기 후 미결제(부적, 근사치)</div></div>`;
 }
 // 관리자 CSV 다운로드(2026-09-02 신규) — 지금 화면에 로드된(=현재 기간 필터가 적용된) 결제내역/
 // CS 문의를 그대로 CSV로 내려받는다. 별도로 다시 조회하지 않고, refreshPurchaseList/
@@ -10770,6 +10808,7 @@ function restorePaymentResumeSnapshotIfAny(){
   let snap;
   try{ snap = JSON.parse(raw); } catch(err){ return; }
   if(!snap || !snap.paymentId || (!snap.solarDate && !snap.lunarYear)) return; // 복원할 실제 입력/결제 정보가 없으면 조용히 종료
+  try{ const rc = new URLSearchParams(location.search).get('code'); if(rc) logPayEvent(payCodeEvent(rc)); }catch(e){}   // 모바일 결제창에서 취소·실패하고 돌아온 경우
   $('#inpName').value = snap.name || '';
   if(snap.calType === 'lunar'){
     const lunarBtn = $('#inpCalSeg button[data-val="lunar"]');
@@ -11120,10 +11159,12 @@ async function talClaim(pending){
   talShowStep('busy');
   try{
     const d = await talCallServer({ paymentId: pending.paymentId, talisman: pending.talisman });
+    logPayEvent('tal_pay_success');
     talLsDel(TAL_PENDING_KEY);
     talRememberPurchase(pending.paymentId, d.talismanKind, d.purposeLabel ? `${d.name} · ${d.purposeLabel}` : d.name);
     if(window.SajuAnalytics && !d.again) window.SajuAnalytics.purchase({ paymentId: pending.paymentId, value: TAL_PRICE });
     await talShowResult(d);
+    logPayEvent('tal_report_view');
   } catch(err){
     talShowStep('pick'); talRenderPick();
     if(err.status === 409 || err.status === 400) talLsDel(TAL_PENDING_KEY);   // 402(결제 미확인)는 지우지 않는다 — 결제는 됐는데 확인이 늦은 경우를 위해
@@ -11161,7 +11202,7 @@ async function talPay(){
     if(pe.error){ talShowErr(pe.error); return; }
     t.el2 = pe.el;
   }
-  if(!window.PortOne){ talShowErr('결제 모듈을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'); return; }
+  if(!window.PortOne){ logPayEvent('tal_pay_fail'); talShowErr('결제 모듈을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'); return; }
   talShowErr('');
   talState.busy = true;
   const btn = $('#talPayBtn'); const prev = btn.textContent;
@@ -11184,12 +11225,14 @@ async function talPay(){
       },
     });
     if(response && response.code){
+      logPayEvent(payCodeEvent(response.code, 'tal_pay_'));
       talLsDel(TAL_PENDING_KEY);
       talShowErr('결제가 완료되지 않았어요. (' + (response.message || response.code) + ')');
       return;
     }
     await talClaim(pending);
   } catch(err){
+    logPayEvent('tal_pay_fail');
     talLsDel(TAL_PENDING_KEY);
     talShowErr('결제 진행 중 오류가 발생했어요. (' + err.message + ')');
   } finally {
@@ -11205,7 +11248,7 @@ function talResumeIfAny(){
   const q = new URLSearchParams(location.search);
   if(q.get('paymentId') !== pending.paymentId) return;
   try{ history.replaceState(history.state, '', location.pathname); } catch(e){}
-  if(q.get('code')){ talLsDel(TAL_PENDING_KEY); return; }   // 결제창에서 취소·실패하고 돌아옴
+  if(q.get('code')){ logPayEvent(payCodeEvent(q.get('code'), 'tal_pay_')); talLsDel(TAL_PENDING_KEY); return; }   // 결제창에서 취소·실패하고 돌아옴
   openTalSheet(null, { step: 'busy' });
   talClaim(pending);
 }
