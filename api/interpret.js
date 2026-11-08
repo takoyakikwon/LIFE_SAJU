@@ -6,6 +6,10 @@
 // 이 파일은 Node.js 런타임의 Vercel 서버리스 함수 형식(module.exports = async (req,res)=>{...})입니다.
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
+// 부적(합격·재물·궁합) 이미지 생성기 — 결제 검증을 통과한 요청에만 쓴다(아래 handleTalismanRequest).
+// (처음 부적 요청이 올 때 불러온다 — 시험 로더가 이 파일을 샌드박스에서 실행하므로 모듈 최상단에서 상대 경로를 읽지 않는다.)
+let _talismanLib = null;
+function talismanLib() { return _talismanLib || (_talismanLib = require('./_talisman.js')); }
 // 필요 시 환경변수로 모델을 바꿀 수 있게 해둠. 기본값은 gpt-5.4-mini(2026-08-26 gpt-4o-mini/gpt-4o
 // 대비 실측 비교 후 전환 — 분량 미달 문제가 사라지고 문장 품질도 더 나으면서 gpt-4o보다도 저렴함).
 // 프롬프트 개선만으로 부족한 카테고리가 생기면 전체를 다 올리지 않고 그 카테고리만 다른 모델로
@@ -2247,6 +2251,83 @@ async function handleAskPackPurchase({ res, payload, user, isAdmin }) {
 }
 
 // ============================================================
+// 부적(합격·재물·궁합) 구매 (2026-11). 990원 디지털 이미지 상품.
+//  - 사주 계산·AI 호출 없이 결제 검증 → 같은 결제 재사용 차단 → 이미지 생성 → 구매 기록만 한다.
+//  - 어떤 부적을 만들지(종류·오행·목적)는 브라우저가 보내지만, 값은 서버가 허용 목록으로 다시 검사한다.
+//  - 같은 결제번호(paymentId)로 다시 요청하면 처음 기록해 둔 값으로 같은 이미지를 다시 만들어 준다(15일 동안).
+//    새로고침·결제 후 페이지 이동·재열람을 위한 것이며, 새 부적을 더 받는 길은 아니다(값은 기록된 것을 쓴다).
+// ============================================================
+const TALISMAN_PRICE_KRW = 990; // api/_talisman.js 의 TALISMAN_PRICE_KRW 와 같아야 한다(프론트 표시 가격과도 일치).
+const TALISMAN_VIEW_DAYS = 15;
+function kstYearNow() { return new Date(Date.now() + 9 * 3600 * 1000).getUTCFullYear(); }
+function talismanResponse(params, createdAt, extra) {
+  const kind = talismanLib().KINDS[params.kind];
+  const purpose = talismanLib().PURPOSES[params.kind][params.purposeKey];
+  const created = createdAt ? new Date(createdAt) : new Date();
+  return Object.assign({
+    kind: 'talisman',
+    svg: talismanLib().buildTalismanSvg({ kind: params.kind, el: params.el, el2: params.el2, purpose: params.purposeKey, year: params.year, date: params.date }),
+    name: kind.name,
+    purposeLabel: params.kind === 'match' ? null : purpose.label,
+    talismanKind: params.kind, el: params.el, el2: params.el2 || null,
+    createdAt: created.toISOString(),
+    expiresAt: new Date(created.getTime() + TALISMAN_VIEW_DAYS * 86400000).toISOString(),
+  }, extra || {});
+}
+async function findTalismanPurchase(paymentId) {
+  const r = await fetch(
+    `${SUPABASE_URL}/rest/v1/purchases?payment_id=eq.${encodeURIComponent(paymentId)}&category=eq.talisman&status=eq.paid&select=payload,created_at&limit=1`,
+    { headers: { 'apikey': SUPABASE_SERVICE_ROLE_KEY, 'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` } }
+  );
+  if (!r.ok) throw new Error('lookup ' + r.status);
+  const rows = await r.json();
+  return Array.isArray(rows) && rows.length ? rows[0] : null;
+}
+async function handleTalismanRequest({ res, payload }) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) { res.status(503).json({ error: '부적을 잠시 만들 수 없어요. 잠시 후 다시 시도해주세요.', code: 'store_unavailable' }); return; }
+  const paymentId = typeof payload.paymentId === 'string' ? payload.paymentId : '';
+  if (!/^[A-Za-z0-9_.-]{8,80}$/.test(paymentId)) { res.status(400).json({ error: '결제 정보가 올바르지 않아요.', code: 'bad_payment' }); return; }
+  const user = payload.access_token ? await verifySupabaseUser(payload.access_token) : null;
+  const isAdmin = user ? await checkIsAdmin(user.id) : false;
+  // 1) 이미 만든 부적이면 기록된 값으로 다시 보여 준다(기간 안에서만).
+  let prior = null;
+  try { prior = await findTalismanPurchase(paymentId); }
+  catch (e) { console.error('findTalismanPurchase error:', e); res.status(503).json({ error: '부적을 불러오지 못했어요. 잠시 후 다시 시도해주세요.', code: 'lookup_failed' }); return; }
+  if (prior) {
+    const saved = prior.payload && prior.payload.talisman;
+    const created = new Date(prior.created_at);
+    if (!saved) { res.status(500).json({ error: '부적 정보를 찾지 못했어요. 고객센터로 문의해 주세요.', code: 'no_saved' }); return; }
+    if (isNaN(created) || Date.now() > created.getTime() + TALISMAN_VIEW_DAYS * 86400000) { res.status(410).json({ error: '다시 볼 수 있는 기간(15일)이 지났어요.', code: 'expired' }); return; }
+    res.status(200).json(talismanResponse(saved, prior.created_at, { again: true }));
+    return;
+  }
+  if (payload.mode === 'view') { res.status(404).json({ error: '이 결제로 만든 부적을 찾지 못했어요.', code: 'not_found' }); return; }
+  // 2) 새 구매: 입력 검사 → 결제 검증 → 재사용 차단 → 생성·기록.
+  const t = payload.talisman || {};
+  let params;
+  try {
+    const year = kstYearNow();
+    const n = talismanLib().normalize({ kind: t.kind, el: t.el, el2: t.el2, purpose: t.purpose, year, date: t.date });
+    params = { kind: n.kind, el: n.el, el2: n.el2, purposeKey: n.purposeKey, year, date: (n.kind === 'pass' && t.date) ? t.date : null };
+  } catch (e) { res.status(400).json({ error: '부적 선택 값이 올바르지 않아요.', code: String(e && e.message || 'bad_input') }); return; }
+  if (!isAdmin) {
+    const pc = await verifyPortOnePayment(paymentId, TALISMAN_PRICE_KRW);
+    if (!pc.ok) { res.status(402).json({ error: `결제 확인에 실패했습니다. (${pc.reason})` }); return; }
+    if (await isPaymentAlreadyUsed(paymentId)) { res.status(409).json({ error: '이미 사용된 결제입니다. 같은 결제로 다시 요청할 수 없습니다.' }); return; }
+  }
+  let out;
+  try { out = talismanResponse(params, null); }
+  catch (e) { console.error('talisman build error:', e); res.status(500).json({ error: '부적을 만들지 못했어요. 결제는 확인되었으니 고객센터로 문의해 주세요.', code: 'build_failed' }); return; }
+  const recorded = await recordPurchase({
+    userId: user ? user.id : null, category: 'talisman', amount: isAdmin ? 0 : TALISMAN_PRICE_KRW,
+    visitorId: payload.visitorId || null, pgProvider: isAdmin ? 'admin_bypass' : 'portone_inicis', paymentId,
+    payload: { talisman: params }, resultText: `${out.name}${out.purposeLabel ? ' · ' + out.purposeLabel : ''}`,
+  });
+  if (!recorded) console.error('talisman purchase record failed (이미지는 전달함):', paymentId);
+  res.status(200).json(out);
+}
+
+// ============================================================
 // 친구 초대 보상 (2026-10-07 설계서: "사주결 친구 초대 보상(질문권) 설계서")
 //  - 초대자가 공유하면 방문자별 초대 코드(qa_invites)를 만들고, 친구가 ?inv=코드 링크로 들어와
 //    기본운세를 확인하면 초대자 지갑에 질문권 +1회를 적립한다. 초대 횟수는 무제한, 보상은 초대자당 하루 3회.
@@ -2533,6 +2614,12 @@ module.exports = async (req, res) => {
   // 친구 초대(코드 발급·방문 기록·보상 청구·알림 완료): AI·결제와 무관해 사주 데이터가 필요 없다.
   if (payload && payload.category === 'ask' && typeof payload.askMode === 'string' && payload.askMode.indexOf('invite_') === 0) {
     await handleInviteRequest(req, res, payload);
+    return;
+  }
+
+  // 부적 구매·재열람: 사주 데이터가 필요 없다(종류·오행은 브라우저가 고르고 서버가 허용 목록으로 검사).
+  if (payload && payload.category === 'talisman') {
+    await handleTalismanRequest({ res, payload });
     return;
   }
 
