@@ -1168,6 +1168,60 @@ window.SajuAnalytics = (function(){
   .ask-report-hint{ margin:12px 0 0; padding:11px 12px; border-radius:var(--radius-sm); border:1px dashed var(--gold-line); text-align:center; }
   .ask-report-hint-label{ font-size:11.5px; color:var(--ink-soft); margin-bottom:6px; }
   .ask-report-hint-btn{ border:none; background:none; color:var(--gold); font-family:"Noto Sans KR"; font-weight:800; font-size:13.5px; cursor:pointer; padding:2px 4px; text-decoration:underline; text-underline-offset:3px; }
+  /* 2026-11: 부적(합격·재물·궁합) 990원 디지털 이미지 상품 — 심층풀이 탭 입구 카드 + 전체 화면 시트 */
+  .tal-entry{ margin:18px 0 6px; padding:16px; border-radius:var(--radius-md); border:1px solid var(--gold-line); background:linear-gradient(160deg, rgba(212,175,99,.10), rgba(178,59,46,.08)); }
+  .tal-entry-badge{ display:inline-block; padding:2px 9px; border-radius:999px; margin-bottom:8px; background:linear-gradient(160deg, var(--gold), #b8912f); color:#241d13; font-size:10.5px; font-weight:900; letter-spacing:.04em; }
+  .tal-entry-title{ font-family:"Noto Serif KR"; font-weight:900; font-size:16px; line-height:1.45; margin-bottom:4px; }
+  .tal-entry-sub{ font-size:12.5px; color:var(--ink-soft); line-height:1.6; margin-bottom:12px; }
+  .tal-entry-row{ display:flex; gap:8px; margin-bottom:12px; }
+  .tal-mini{ flex:1; min-width:0; text-align:center; padding:10px 4px 8px; border-radius:var(--radius-sm); border:1px solid var(--line); background:rgba(6,10,20,.35); cursor:pointer; color:var(--ink); font-family:"Noto Sans KR"; }
+  .tal-mini b{ display:block; font-family:"Noto Serif KR"; font-weight:900; font-size:20px; letter-spacing:.08em; margin-bottom:2px; }
+  .tal-mini span{ font-size:11.5px; color:var(--ink-soft); }
+  .tal-mini.k-pass b{ color:#e2c57c; } .tal-mini.k-wealth b{ color:#9cb0ff; } .tal-mini.k-match b{ color:#f0a9b6; }
+  .tal-mine{ margin-top:10px; font-size:12px; color:var(--ink-soft); }
+  .tal-mine button{ border:none; background:none; color:var(--gold); font-weight:800; font-size:12.5px; cursor:pointer; text-decoration:underline; text-underline-offset:3px; padding:2px 6px 2px 0; font-family:"Noto Sans KR"; }
+  .tal-overlay{ position:fixed; inset:0; z-index:60; background:var(--paper); overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .tal-overlay[hidden]{ display:none; }
+  .tal-wrap{ max-width:460px; margin:0 auto; padding:18px 16px 40px; }
+  .tal-close{ border:none; background:none; color:var(--ink-faint); font-size:13px; cursor:pointer; padding:6px 0; font-family:"Noto Sans KR"; }
+  .tal-eyebrow{ font-size:11.5px; color:var(--gold); font-weight:800; letter-spacing:.06em; margin:6px 0 4px; }
+  .tal-wrap h2{ font-family:"Noto Serif KR"; font-weight:900; font-size:20px; line-height:1.4; margin:0 0 6px; }
+  .tal-lead{ font-size:13px; color:var(--ink-soft); line-height:1.65; margin:0 0 14px; }
+  .tal-tabs{ display:flex; gap:6px; margin-bottom:12px; }
+  .tal-tabs button{ flex:1; padding:11px 0; border-radius:12px; border:1px solid var(--line); background:none; color:var(--ink-soft); font-family:"Noto Sans KR"; font-weight:700; font-size:13.5px; cursor:pointer; }
+  .tal-tabs button.on{ border-color:var(--gold); color:var(--gold); background:rgba(224,187,90,.12); }
+  .tal-card{ border:1px solid var(--line); background:var(--paper-card); border-radius:var(--radius-md); padding:14px; margin-bottom:12px; }
+  .tal-card[hidden]{ display:none; }
+  .tal-lbl{ font-size:12px; color:var(--gold); font-weight:800; margin-bottom:8px; letter-spacing:.03em; }
+  .tal-chips{ display:flex; flex-wrap:wrap; gap:8px; }
+  .tal-chips button{ padding:9px 13px; border-radius:999px; border:1px solid var(--line); background:none; color:var(--ink-soft); font-family:"Noto Sans KR"; font-size:13.5px; cursor:pointer; }
+  .tal-chips button.on{ border-color:var(--gold); color:var(--gold); background:rgba(224,187,90,.12); font-weight:700; }
+  .tal-field{ display:block; width:100%; padding:12px; border-radius:12px; border:1px solid var(--line); background:rgba(6,10,20,.45); color:var(--ink); font-family:"Noto Sans KR"; font-size:15px; }
+  .tal-help{ font-size:11.5px; color:var(--ink-faint); line-height:1.55; margin:8px 0 0; }
+  .tal-check{ display:flex; gap:8px; align-items:center; font-size:13px; color:var(--ink-soft); margin-top:10px; }
+  .tal-kv{ display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid var(--line); font-size:13.5px; }
+  .tal-kv:last-child{ border:none; }
+  .tal-kv span:first-child{ color:var(--ink-faint); flex:0 0 auto; }
+  .tal-kv span:last-child{ text-align:right; }
+  .tal-kv .tal-price{ font-family:"Noto Serif KR"; font-weight:900; font-size:20px; color:var(--ink); }
+  .tal-pv{ display:flex; justify-content:center; margin:14px 0 4px; }
+  .tal-pvcard{ width:150px; aspect-ratio:240/420; border-radius:4px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-family:"Noto Serif KR"; font-weight:900; font-size:54px; line-height:1.05; box-shadow:0 8px 22px rgba(0,0,0,.5); border:3px double currentColor; position:relative; }
+  .tal-pvcard small{ position:absolute; bottom:9px; right:9px; width:24px; height:24px; display:flex; align-items:center; justify-content:center; font-size:15px; background:currentColor; border-radius:2px; }
+  .tal-pvcard small i{ font-style:normal; color:var(--tal-bg); }
+  .tal-pvcard.k-pass{ --tal-bg:#ecd58f; background:#ecd58f; color:#a3231a; }
+  .tal-pvcard.k-wealth{ --tal-bg:#1d2547; background:#1d2547; color:#e6c36a; }
+  .tal-pvcard.k-match{ --tal-bg:#f1d3c9; background:#f1d3c9; color:#9c2646; }
+  .tal-err{ margin:8px 0; padding:10px 12px; border-radius:var(--radius-sm); background:rgba(178,59,46,.16); border:1px solid rgba(178,59,46,.5); font-size:12.5px; color:#f2c2b9; line-height:1.55; }
+  .tal-note{ font-size:11.5px; color:var(--ink-faint); text-align:center; margin:12px 0 0; line-height:1.6; }
+  .tal-busy{ text-align:center; padding:90px 10px; font-size:14px; color:var(--ink-soft); line-height:1.8; }
+  .tal-result{ text-align:center; }
+  .tal-result img{ display:block; width:min(300px, 78vw); height:auto; aspect-ratio:240/420; margin:14px auto 12px; border-radius:4px; box-shadow:0 12px 30px rgba(0,0,0,.6); -webkit-touch-callout:default; }
+  .tal-actions{ display:flex; gap:8px; margin-top:6px; }
+  .tal-actions .submit-btn{ margin-top:0; font-size:14.5px; padding:14px 0; flex:1; width:auto; }
+  .tal-ghost{ flex:1; padding:14px 0; border-radius:100px; border:1px solid var(--gold-line); background:none; color:var(--gold); font-family:"Noto Serif KR"; font-weight:900; font-size:14.5px; cursor:pointer; }
+  .ask-talisman-hint{ margin:8px 0 0; text-align:center; }
+  .ask-talisman-hint button{ border:none; background:none; color:var(--ink-soft); font-family:"Noto Sans KR"; font-size:12.5px; cursor:pointer; padding:2px 4px; text-decoration:underline; text-underline-offset:3px; }
+  .ask-talisman-hint button b{ color:var(--gold); }
   .ask-used-note{ font-size:11.5px; line-height:1.55; color:var(--gold); margin:0 2px 8px; text-align:center; }
   .ask-pack-used{ font-size:11.5px; line-height:1.6; color:var(--gold); margin:0 2px 10px; padding:9px 11px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--paper-card); }
   .qalog-filters{ display:flex; gap:6px; align-items:center; margin:2px 0 8px; flex-wrap:wrap; }
@@ -2169,6 +2223,7 @@ window.SajuAnalytics = (function(){
                 <div class="ask-share-note" id="askUsedInviteNote" hidden></div>
               </div>
               <div class="ask-report-hint" id="askUsedReportHint" hidden><div class="ask-report-hint-label">이 고민을 더 깊이 보려면</div><button type="button" class="ask-report-hint-btn" id="askUsedReportHintBtn"></button></div>
+              <div class="ask-talisman-hint" id="askUsedTalismanHint" hidden><button type="button"></button></div>
               <div class="ask-preview" id="askPreview" hidden>
                 <div class="ask-preview-label" id="askPreviewLabel">✦ 무료 맛보기</div>
                 <div class="ask-preview-text" id="askPreviewBody"></div>
@@ -2182,6 +2237,7 @@ window.SajuAnalytics = (function(){
                 <div class="ask-share-row" id="askShareRow" hidden><button type="button" class="ask-link" id="askShareLink">친구 초대하기</button></div>
                 <div class="ask-share-note" id="askShareNote" hidden></div>
                 <div class="ask-report-hint" id="askReportHint" hidden><div class="ask-report-hint-label">이 고민을 더 깊이 보려면</div><button type="button" class="ask-report-hint-btn" id="askReportHintBtn"></button></div>
+                <div class="ask-talisman-hint" id="askTalismanHint" hidden><button type="button"></button></div>
               </div>
               <div class="ask-note">사주·자미두수를 근거로 당신의 고민을 상담해드립니다.</div>
               <div class="ask-restore-row"><button type="button" class="ask-link" id="askRestoreToggle">질문 이용권 코드가 있어요</button></div>
@@ -2189,6 +2245,17 @@ window.SajuAnalytics = (function(){
                 <div class="ask-restore-line"><input type="text" id="askRestoreInput" class="ask-restore-input" placeholder="XXXX-XXXX-XXXX-XXXX" maxlength="24" autocomplete="off" autocapitalize="characters"><button type="button" class="ask-chip" id="askRestoreBtn">불러오기</button></div>
                 <div class="ask-error" id="askRestoreMsg" hidden></div>
               </div>
+            </div>
+            <div class="tal-entry" id="talEntry">
+              <div class="tal-entry-badge">NEW · 부적</div>
+              <div class="tal-entry-title">마음을 담은 나만의 부적, 990원</div>
+              <div class="tal-entry-sub">내 사주에서 보완하면 좋은 기운을 색과 문양에 담아, 고화질 이미지로 만들어 드려요. 질문하지 않아도 바로 받을 수 있어요.</div>
+              <div class="tal-entry-row">
+                <button type="button" class="tal-mini k-pass" data-tal-kind="pass"><b>合格</b><span>합격 부적</span></button>
+                <button type="button" class="tal-mini k-wealth" data-tal-kind="wealth"><b>財福</b><span>재물 부적</span></button>
+                <button type="button" class="tal-mini k-match" data-tal-kind="match"><b>良緣</b><span>궁합 부적</span></button>
+              </div>
+              <div class="tal-mine" id="talMine" hidden></div>
             </div>
           </div>
 
@@ -2392,6 +2459,48 @@ window.SajuAnalytics = (function(){
     <button data-group="today"><span class="ico">☀</span><span class="lb">오늘</span></button>
     <button data-group="ai"><span class="ico">深</span><span class="lb">심층풀이</span><span class="tab-badge-dot" id="aiTabBadge" hidden></span></button>
   </nav>
+</div>
+<div id="talSheet" class="tal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="talTitle">
+  <div class="tal-wrap">
+    <button type="button" class="tal-close" id="talClose">← 닫기</button>
+    <div id="talPick">
+      <div class="tal-eyebrow">사주결 부적</div>
+      <h2 id="talTitle">마음을 담은 나만의 부적</h2>
+      <p class="tal-lead">내 사주에서 보완하면 좋은 기운을 색과 문양에 담아, 고화질 이미지로 만들어 드려요.</p>
+      <div class="tal-tabs" id="talTabs">
+        <button type="button" data-tal-kind="pass">합격</button>
+        <button type="button" data-tal-kind="wealth">재물</button>
+        <button type="button" data-tal-kind="match">궁합</button>
+      </div>
+      <div class="tal-card" id="talPurposeCard"><div class="tal-lbl">무엇을 기원할까요?</div><div class="tal-chips" id="talPurposes"></div></div>
+      <div class="tal-card" id="talDateCard"><div class="tal-lbl">시험(발표)일 · 선택</div><input type="date" class="tal-field" id="talDate"><p class="tal-help">입력하면 부적 아래에 날짜가 새겨져요. 비워 두면 올해 연도가 새겨져요.</p></div>
+      <div class="tal-card" id="talPartnerCard" hidden>
+        <div class="tal-lbl">상대방 생년월일</div>
+        <input type="date" class="tal-field" id="talPartnerDate" aria-label="상대방 생년월일">
+        <label class="tal-check"><input type="checkbox" id="talPartnerUnknown" checked> 태어난 시간은 몰라요</label>
+        <input type="time" class="tal-field" id="talPartnerTime" hidden aria-label="상대방 태어난 시간" style="margin-top:8px">
+        <p class="tal-help">이름은 받지 않아요. 상대방 생년월일은 부적에 들어갈 기운을 계산하는 데에만 쓰고, 서버에는 보내지 않아요.</p>
+      </div>
+      <div class="tal-card">
+        <div class="tal-lbl">내 사주에 맞춘 구성</div>
+        <div id="talSummary"></div>
+        <div class="tal-pv"><div class="tal-pvcard k-pass" id="talPvCard"></div></div>
+        <p class="tal-help" style="text-align:center">미리보기는 분위기만 보여 드려요. 결제하면 문양과 글씨가 살아 있는 고화질 이미지로 완성돼요.</p>
+      </div>
+      <div class="tal-err" id="talErr" hidden></div>
+      <button type="button" class="submit-btn" id="talPayBtn">990원 결제하고 부적 받기</button>
+      <p class="tal-note">로그인 없이 구매할 수 있어요 · 완성된 부적은 15일 동안 다시 볼 수 있어요</p>
+    </div>
+    <div id="talBusy" class="tal-busy" hidden>결제를 확인하고 부적을 만드는 중이에요.<br>잠시만 기다려 주세요.</div>
+    <div id="talResult" class="tal-result" hidden>
+      <div class="tal-eyebrow" id="talResEyebrow"></div>
+      <h2 id="talResTitle"></h2>
+      <img id="talResImg" alt="완성된 부적 이미지">
+      <p class="tal-help" id="talResNote"></p>
+      <div class="tal-actions"><button type="button" class="submit-btn" id="talSaveBtn">이미지 저장</button><button type="button" class="tal-ghost" id="talDoneBtn">닫기</button></div>
+      <p class="tal-note">이미지가 저장되지 않으면 부적을 길게 눌러 저장해 주세요.</p>
+    </div>
+  </div>
 </div>
 <div id="payModal" class="modal-overlay" hidden>
   <div class="modal-card">
@@ -7814,6 +7923,7 @@ function pickReportForQuestion(q){
 }
 // 질문 문장에 맞는 리포트를 부드럽게 권한다("심도 있는 ○○ 리포트를 추천드려요"). 가격은 보여주지 않는다(2026-10-08).
 function setReportHint(boxSel, btnSel, q){
+  setTalismanHint(boxSel.replace('ReportHint','TalismanHint'), q);   // 부적 안내(2026-11) — 리포트 안내와 별개로 주제에 맞을 때만 보인다
   const box = $(boxSel), btn = $(btnSel);
   if(!box || !btn) return;
   if(!q || q.length < 2){ box.hidden = true; return; }
@@ -10844,6 +10954,306 @@ document.addEventListener('visibilitychange', ()=>{
   // 초대한 사람이 다른 앱(카톡)에 갔다가 돌아오면 새로 적립된 질문권을 바로 알려준다(15초 안에는 중복 조회 안 함).
   if(document.visibilityState === 'visible' && lsGet(INVITE_CODE_KEY)) refreshAskWallet();
 });
+/* =========================================================
+   부적(합격·재물·궁합) — 990원 디지털 이미지 (2026-11)
+   - 어떤 오행을 새길지는 브라우저가 내 사주(와 상대 생년월일)로 계산해 '오행 글자 하나'만 서버에 보낸다.
+   - 이미지는 서버(api/interpret.js category:'talisman')가 결제를 포트원에 재조회해 확인한 뒤에만 만들어 내려준다.
+   - 모바일은 결제창이 페이지를 이동했다 돌아오므로, 결제 직전 선택값을 localStorage 에 잠깐 저장해 두고 돌아오면 이어서 받는다.
+   ========================================================= */
+const TAL_PRICE = 990;
+const TAL_PENDING_KEY = 'sajuTalPending_v1';
+const TAL_MINE_KEY = 'sajuTalismans_v1';
+const TAL_VIEW_MS = 15 * 86400000;
+const TAL_INFO = {
+  pass:   { name: '합격 부적', hanja: ['合','格'], color: '황지 + 진홍', purposes: [['univ','대학 합격'],['job','취업·면접'],['exam','공무원·자격증'],['move','승진·이직']] },
+  wealth: { name: '재물 부적', hanja: ['財','福'], color: '남청 + 금니', purposes: [['biz','사업·장사'],['home','내 집·큰 계약'],['save','저축·재테크'],['pay','월급·이직']] },
+  match:  { name: '궁합 부적', hanja: ['良','緣'], color: '분홍 한지 + 연지', purposes: null },
+};
+const TAL_PATTERN = { '木': '덩굴·잎 문양', '火': '불꽃 문양', '土': '산 문양', '金': '엽전 문양', '水': '물결 문양' };
+const TAL_EL_NAME = { '木': '목(나무)', '火': '화(불)', '土': '토(흙)', '金': '금(쇠)', '水': '수(물)' };
+const talState = { kind: 'pass', purpose: 'univ', busy: false };
+
+function talLsGet(k){ try{ return localStorage.getItem(k); } catch(e){ return null; } }
+function talLsSet(k, v){ try{ localStorage.setItem(k, v); } catch(e){} }
+function talLsDel(k){ try{ localStorage.removeItem(k); } catch(e){} }
+
+// 사주 여덟 글자(시를 모르면 여섯 글자)의 오행 개수에서 가장 적은 오행을 '보완하면 좋은 기운'으로 삼는다.
+// 같은 개수면 ① 나(일간)를 낳아 주는 오행 ② 일간과 같은 오행 ③ 목·화·토·금·수 순서로 고른다. 고정 규칙이며 같은 사주는 늘 같은 결과다.
+function talLackElement(pillars){
+  const c = [0,0,0,0,0];
+  [pillars.year, pillars.month, pillars.day].forEach(p => { c[GAN_ELEMENT[p.g]]++; c[ZHI_ELEMENT[p.z]]++; });
+  if(pillars.hour){ c[GAN_ELEMENT[pillars.hour.g]]++; c[ZHI_ELEMENT[pillars.hour.z]]++; }
+  const min = Math.min.apply(null, c);
+  const dayEl = GAN_ELEMENT[pillars.day.g];
+  const gen = (dayEl + 4) % 5;
+  const cands = [0,1,2,3,4].filter(i => c[i] === min);
+  const pick = cands.indexOf(gen) >= 0 ? gen : (cands.indexOf(dayEl) >= 0 ? dayEl : cands[0]);
+  return ELEMENT_HANJA[pick];
+}
+function talPartnerElement(){
+  const d = $('#talPartnerDate').value;
+  if(!d) return { error: '상대방 생년월일을 입력해 주세요.' };
+  const [y, m, dd] = d.split('-').map(Number);
+  if(!y || y < 1900 || y > new Date().getFullYear()) return { error: '상대방 생년월일을 다시 확인해 주세요.' };
+  const unknown = $('#talPartnerUnknown').checked;
+  let hh = 12, mi = 0;
+  if(!unknown){
+    const tv = $('#talPartnerTime').value;
+    if(!tv) return { error: '상대방 태어난 시간을 입력하거나 \'몰라요\'를 선택해 주세요.' };
+    [hh, mi] = tv.split(':').map(Number);
+  }
+  try{
+    const r = calcSaju({ year: y, month: m, day: dd, hour: hh, minute: mi, unknownTime: unknown, gender: '남', longitude: 127.5 });
+    return { el: talLackElement(r.pillars) };
+  } catch(e){ return { error: '상대방 생년월일을 다시 확인해 주세요.' }; }
+}
+function talMyElement(){
+  if(!lastSajuResult || !lastSajuResult.pillars) return null;
+  return talLackElement(lastSajuResult.pillars);
+}
+function talShowErr(msg){ const e = $('#talErr'); e.textContent = msg || ''; e.hidden = !msg; }
+function talRenderPick(){
+  const info = TAL_INFO[talState.kind];
+  $$('#talTabs button').forEach(b => b.classList.toggle('on', b.dataset.talKind === talState.kind));
+  const pc = $('#talPurposeCard');
+  pc.hidden = !info.purposes;
+  if(info.purposes){
+    if(!info.purposes.some(p => p[0] === talState.purpose)) talState.purpose = info.purposes[0][0];
+    $('#talPurposes').innerHTML = info.purposes.map(p => `<button type="button" data-p="${p[0]}" class="${p[0] === talState.purpose ? 'on' : ''}">${p[1]}</button>`).join('');
+  }
+  $('#talDateCard').hidden = talState.kind !== 'pass';
+  $('#talPartnerCard').hidden = talState.kind !== 'match';
+  const mine = talMyElement();
+  const rows = [['상품', info.name + ' (이미지)']];
+  if(info.purposes) rows.push(['목적', info.purposes.find(p => p[0] === talState.purpose)[1]]);
+  if(mine) rows.push([talState.kind === 'match' ? '나의 보완 기운' : '보완하면 좋은 기운', TAL_EL_NAME[mine]]);
+  if(talState.kind === 'match') rows.push(['상대의 보완 기운', '상대 생년월일을 넣으면 정해져요']);
+  rows.push(['색', info.color]);
+  if(mine) rows.push(['문양', TAL_PATTERN[mine]]);
+  rows.push(['형태', '고화질 이미지 (저장해서 배경화면으로)']);
+  rows.push(['결제 금액', `<span class="tal-price">${TAL_PRICE.toLocaleString('ko-KR')}원</span>`]);
+  $('#talSummary').innerHTML = rows.map(r => `<div class="tal-kv"><span>${r[0]}</span><span>${r[1]}</span></div>`).join('');
+  const pv = $('#talPvCard');
+  pv.className = 'tal-pvcard k-' + talState.kind;
+  pv.innerHTML = `${info.hanja[0]}<br>${info.hanja[1]}` + (mine ? `<small><i>${mine}</i></small>` : '');
+  talShowErr('');
+}
+function talShowStep(which){
+  $('#talPick').hidden = which !== 'pick';
+  $('#talBusy').hidden = which !== 'busy';
+  $('#talResult').hidden = which !== 'result';
+  $('#talSheet').scrollTop = 0;
+}
+function openTalSheet(kind, opts){
+  if(kind && TAL_INFO[kind]) talState.kind = kind;
+  $('#talSheet').hidden = false;
+  document.body.style.overflow = 'hidden';
+  if(opts && opts.step){ talShowStep(opts.step); return; }
+  talShowStep('pick');
+  talRenderPick();
+  if(!talMyElement()){
+    talShowErr('내 사주를 먼저 확인하면 부적에 담을 기운을 정할 수 있어요. 처음 화면에서 생년월일을 입력해 주세요.');
+  }
+}
+function closeTalSheet(){
+  $('#talSheet').hidden = true;
+  document.body.style.overflow = '';
+  talState.busy = false;
+}
+function talMineList(){
+  let list = [];
+  try{ list = JSON.parse(talLsGet(TAL_MINE_KEY) || '[]'); } catch(e){ list = []; }
+  const now = Date.now();
+  return (Array.isArray(list) ? list : []).filter(x => x && x.p && now - x.at < TAL_VIEW_MS);
+}
+function talRememberPurchase(paymentId, kind, label){
+  const list = talMineList().filter(x => x.p !== paymentId);
+  list.unshift({ p: paymentId, k: kind, label, at: Date.now() });
+  talLsSet(TAL_MINE_KEY, JSON.stringify(list.slice(0, 10)));
+  talRenderMine();
+}
+function talRenderMine(){
+  const box = $('#talMine');
+  if(!box) return;
+  const list = talMineList();
+  box.hidden = !list.length;
+  if(!list.length) return;
+  box.innerHTML = '내 부적 다시 보기 · ' + list.map(x => `<button type="button" data-tal-view="${x.p}">${x.label}</button>`).join('');
+}
+function svgToPngDataUrl(svg){
+  const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      try{
+        const c = document.createElement('canvas'); c.width = 960; c.height = 1680;
+        c.getContext('2d').drawImage(img, 0, 0, 960, 1680);
+        resolve(c.toDataURL('image/png'));
+      } catch(e){ resolve(url); }
+    };
+    img.onerror = () => resolve(url);
+    img.src = url;
+  });
+}
+let talLastPng = null, talLastName = '사주결_부적';
+async function talShowResult(d){
+  const png = await svgToPngDataUrl(d.svg);
+  talLastPng = png;
+  talLastName = '사주결_' + d.name.replace(/\s+/g, '');
+  $('#talResEyebrow').textContent = d.purposeLabel ? `${d.name} · ${d.purposeLabel}` : d.name;
+  $('#talResTitle').textContent = '나만의 부적이 완성됐어요';
+  $('#talResImg').src = png;
+  const exp = new Date(d.expiresAt);
+  $('#talResNote').textContent = `${TAL_EL_NAME[d.el] || d.el}${d.el2 ? ' · ' + (TAL_EL_NAME[d.el2] || d.el2) : ''} 기운을 담았어요. 이 화면은 ${isNaN(exp) ? '15일' : (exp.getMonth() + 1) + '월 ' + exp.getDate() + '일'}까지 다시 볼 수 있어요.`;
+  talShowStep('result');
+}
+async function talCallServer(body){
+  const payload = Object.assign({ category: 'talisman', visitorId: VISITOR_ID }, body);
+  if(currentSession && currentSession.access_token) payload.access_token = currentSession.access_token;
+  const res = await fetch('/api/interpret', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  const d = await res.json().catch(() => ({}));
+  if(!res.ok){ const e = new Error((d && d.error) || `부적을 만들지 못했어요. (${res.status})`); e.code = d && d.code; e.status = res.status; throw e; }
+  return d;
+}
+// 결제가 끝난 뒤(또는 모바일 결제창에서 돌아온 뒤) 서버에서 부적을 받는다. 성공하면 보관 목록에 넣고 보관해 둔 '결제 직전 선택값'은 지운다.
+async function talClaim(pending){
+  talShowStep('busy');
+  try{
+    const d = await talCallServer({ paymentId: pending.paymentId, talisman: pending.talisman });
+    talLsDel(TAL_PENDING_KEY);
+    talRememberPurchase(pending.paymentId, d.talismanKind, d.purposeLabel ? `${d.name} · ${d.purposeLabel}` : d.name);
+    if(window.SajuAnalytics && !d.again) window.SajuAnalytics.purchase({ paymentId: pending.paymentId, value: TAL_PRICE });
+    await talShowResult(d);
+  } catch(err){
+    talShowStep('pick'); talRenderPick();
+    if(err.status === 409 || err.status === 400) talLsDel(TAL_PENDING_KEY);   // 402(결제 미확인)는 지우지 않는다 — 결제는 됐는데 확인이 늦은 경우를 위해
+    talShowErr(err.status === 402
+      ? '결제가 확인되지 않았어요. 결제가 취소된 경우에는 청구되지 않아요. 결제를 마쳤는데도 이 안내가 계속되면 고객센터로 문의해 주세요.'
+      : err.message);
+  }
+}
+async function talViewAgain(paymentId){
+  openTalSheet(null, { step: 'busy' });
+  try{
+    const d = await talCallServer({ paymentId, mode: 'view' });
+    await talShowResult(d);
+  } catch(err){
+    talShowStep('pick'); talRenderPick(); talShowErr(err.message);
+  }
+}
+async function talPay(){
+  if(talState.busy) return;
+  const info = TAL_INFO[talState.kind];
+  const mine = talMyElement();
+  if(!mine){ talShowErr('내 사주를 먼저 확인해 주세요. 처음 화면에서 생년월일을 입력하면 돼요.'); return; }
+  const t = { kind: talState.kind, el: mine };
+  if(info.purposes) t.purpose = talState.purpose;
+  if(talState.kind === 'pass'){
+    const dv = $('#talDate').value;
+    if(dv){
+      const y = +dv.slice(0, 4);
+      if(!(y >= 2000 && y <= 2100)){ talShowErr('시험(발표)일을 다시 확인해 주세요.'); return; }
+      t.date = dv;
+    }
+  }
+  if(talState.kind === 'match'){
+    const pe = talPartnerElement();
+    if(pe.error){ talShowErr(pe.error); return; }
+    t.el2 = pe.el;
+  }
+  if(!window.PortOne){ talShowErr('결제 모듈을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'); return; }
+  talShowErr('');
+  talState.busy = true;
+  const btn = $('#talPayBtn'); const prev = btn.textContent;
+  btn.disabled = true; btn.textContent = '결제창 여는 중...';
+  const paymentId = 'pay_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+  const pending = { paymentId, talisman: t, at: Date.now() };
+  talLsSet(TAL_PENDING_KEY, JSON.stringify(pending));
+  logFunnelEvent('tal_pay_' + talState.kind);
+  if(window.SajuAnalytics) window.SajuAnalytics.initiateCheckout({ content_name: info.name, value: TAL_PRICE });
+  try{
+    const response = await window.PortOne.requestPayment({
+      storeId: PORTONE_STORE_ID, channelKey: PORTONE_CHANNEL_KEY, paymentId,
+      orderName: `사주결 - ${info.name}`, totalAmount: TAL_PRICE, currency: 'KRW', payMethod: 'CARD',
+      windowType: { mobile: 'REDIRECTION' },
+      redirectUrl: location.origin + location.pathname,
+      customer: {
+        fullName: (lastName || (currentSession && currentSession.user && currentSession.user.user_metadata && currentSession.user.user_metadata.name)) || '고객',
+        email: (currentSession && currentSession.user && currentSession.user.email) || 'noemail@lifesaju.app',
+        phoneNumber: '010-0000-0000',
+      },
+    });
+    if(response && response.code){
+      talLsDel(TAL_PENDING_KEY);
+      talShowErr('결제가 완료되지 않았어요. (' + (response.message || response.code) + ')');
+      return;
+    }
+    await talClaim(pending);
+  } catch(err){
+    talLsDel(TAL_PENDING_KEY);
+    talShowErr('결제 진행 중 오류가 발생했어요. (' + err.message + ')');
+  } finally {
+    talState.busy = false; btn.disabled = false; btn.textContent = prev;
+  }
+}
+// 모바일 결제창에서 돌아온 경우: 주소의 paymentId 가 보관해 둔 값과 같을 때만 이어서 처리한다(다른 결제 흐름과는 섞이지 않는다).
+function talResumeIfAny(){
+  let pending = null;
+  try{ pending = JSON.parse(talLsGet(TAL_PENDING_KEY) || 'null'); } catch(e){ pending = null; }
+  if(!pending || !pending.paymentId) return;
+  if(Date.now() - pending.at > 30 * 60 * 1000){ talLsDel(TAL_PENDING_KEY); return; }
+  const q = new URLSearchParams(location.search);
+  if(q.get('paymentId') !== pending.paymentId) return;
+  try{ history.replaceState(history.state, '', location.pathname); } catch(e){}
+  if(q.get('code')){ talLsDel(TAL_PENDING_KEY); return; }   // 결제창에서 취소·실패하고 돌아옴
+  openTalSheet(null, { step: 'busy' });
+  talClaim(pending);
+}
+function talSave(){
+  if(!talLastPng) return;
+  const a = document.createElement('a');
+  a.href = talLastPng; a.download = talLastName + '.png';
+  document.body.appendChild(a); a.click(); a.remove();
+}
+// 질문 주제에 어울리는 부적을 고른다(고정 규칙, AI 호출 없음).
+const TAL_HINT_RULES = [
+  { kind: 'pass', label: '합격 부적', re: /시험|합격|수능|입시|면접|자격증|공무원|대학|취업|승진|이직|발표/ },
+  { kind: 'match', label: '궁합 부적', re: /궁합|연애|만나|이별|재회|사랑|썸|남자친구|여자친구|애인|결혼|인연|짝사랑/ },
+  { kind: 'wealth', label: '재물 부적', re: /돈|재물|수입|월급|투자|부업|저축|재테크|부자|주식|코인|사업|창업|장사|가게|계약|부동산|매출/ },
+];
+function setTalismanHint(boxSel, q){
+  const box = $(boxSel);
+  if(!box) return;
+  const hit = q && q.length >= 2 ? TAL_HINT_RULES.find(r => r.re.test(q)) : null;
+  if(!hit){ box.hidden = true; return; }
+  const btn = box.querySelector('button');
+  btn.dataset.talKind = hit.kind;
+  btn.innerHTML = `마음을 담은 <b>${hit.label}</b>도 있어요 · ${TAL_PRICE.toLocaleString('ko-KR')}원 →`;
+  box.hidden = false;
+}
+document.addEventListener('click', (e) => {
+  const t = e.target;
+  if(!t || !t.closest) return;
+  const mini = t.closest('.tal-mini');
+  if(mini){ logFunnelEvent('tal_entry_' + mini.dataset.talKind); openTalSheet(mini.dataset.talKind); return; }
+  const hint = t.closest('.ask-talisman-hint button');
+  if(hint){ logFunnelEvent('tal_hint_' + hint.dataset.talKind); openTalSheet(hint.dataset.talKind); return; }
+  const tab = t.closest('#talTabs button');
+  if(tab){ talState.kind = tab.dataset.talKind; talRenderPick(); return; }
+  const chip = t.closest('#talPurposes button');
+  if(chip){ talState.purpose = chip.dataset.p; talRenderPick(); return; }
+  const view = t.closest('[data-tal-view]');
+  if(view){ talViewAgain(view.dataset.talView); return; }
+});
+$('#talClose').addEventListener('click', closeTalSheet);
+$('#talDoneBtn').addEventListener('click', closeTalSheet);
+$('#talPayBtn').addEventListener('click', talPay);
+$('#talSaveBtn').addEventListener('click', talSave);
+$('#talPartnerUnknown').addEventListener('change', () => { $('#talPartnerTime').hidden = $('#talPartnerUnknown').checked; });
+document.addEventListener('keydown', (e) => { if(e.key === 'Escape' && !$('#talSheet').hidden) closeTalSheet(); });
+talRenderMine();
+talResumeIfAny();
+
 })();
 </script>
 <script>
