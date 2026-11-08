@@ -8554,7 +8554,7 @@ $('#mockPayBtn').addEventListener('click', async ()=>{
   if(selectedAiCategory === 'ask' && (!askQuestionText || !selectedAskPack)){ closePayModal(); showAiStep('aiStepCategory'); return; }
   logPayEvent('pay_click');
   if(!window.PortOne){
-    logPayEvent('pay_fail');
+    logPayEvent('pay_fail'); logPayFailureReason('sdk_missing', false);
     alert('결제 모듈을 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
     return;
   }
@@ -8601,7 +8601,7 @@ $('#mockPayBtn').addEventListener('click', async ()=>{
     // (REDIRECTION으로 실제 페이지 이동이 일어나면 이 아래 코드는 아예 실행되지 않고,
     // 대신 페이지가 다시 로드되면서 restorePaymentResumeSnapshotIfAny()가 이어받는다.)
     if(response && response.code){
-      logPayEvent(payCodeEvent(response.code));
+      logPayFailure(response, false);
       alert('결제가 완료되지 않았어요. (' + (response.message || response.code) + ')');
       payBtnEl.disabled = false;
       payBtnEl.textContent = prevBtnText;
@@ -8617,7 +8617,7 @@ $('#mockPayBtn').addEventListener('click', async ()=>{
     saveResultSnapshot();
     await runAiInterpretation();
   } catch(err){
-    logPayEvent('pay_fail');
+    logPayEvent('pay_fail'); logPayFailureReason('exception', false);
     alert('결제 진행 중 오류가 발생했어요. (' + err.message + ')');
   } finally {
     payBtnEl.disabled = false;
@@ -9493,6 +9493,18 @@ function logPayEvent(eventType){
   try{ if(currentProfile && currentProfile.is_admin) return; }catch(e){}
   logFunnelEvent(eventType);
 }
+// 2026-11-08: 실패 사유 기록 — 실패(취소 제외)면 사유 코드를 이벤트 이름 payfail_<코드>[_<PG코드>] (부적은 앞에 tal_)로 한 번 더 남긴다.
+function logPayFailure(response, tal){
+  const pre = tal ? 'tal_' : '';
+  const ev = payCodeEvent(response && response.code, pre + 'pay_');
+  logPayEvent(ev);
+  if(!/fail$/.test(ev)) return;
+  const clean = (v, n)=>String(v == null ? '' : v).replace(/[^A-Za-z0-9_]/g, '').slice(0, n);
+  const c = clean(response && response.code, 30) || 'NOCODE';
+  const pg = clean(response && response.pgCode, 20);
+  logPayEvent(pre + 'payfail_' + c + (pg ? '_' + pg : ''));
+}
+function logPayFailureReason(reason, tal){ logPayEvent((tal ? 'tal_' : '') + 'payfail_' + String(reason).replace(/[^A-Za-z0-9_]/g, '').slice(0, 30)); }
 function payCodeEvent(code, prefix){ return (prefix || 'pay_') + (String(code || '') === 'PAY_PROCESS_CANCELED' ? 'cancel' : 'fail'); }
 function logFunnelEvent(eventType){
   if(!sb || IS_PREVIEW_HOST) return;
@@ -10269,6 +10281,7 @@ async function refreshFunnelSteps(startISO, endISO){
   el.innerHTML = FUNNEL_STEP_ORDER.map(tile).join('') +
     `<div class="l" style="flex:1 1 100%; margin-top:10px; font-weight:700;">결제 단계 (결제하기 → 리포트 보기)</div>` +
     FUNNEL_PAY_ORDER.map(tile).join('') +
+    Object.keys(counts).filter(k=>/^(tal_)?payfail_/.test(k)).sort((a,b)=>counts[b]-counts[a]).map(k=>`<div class="stat" style="flex:1 1 28%; min-width:84px;"><div class="n">${counts[k]}</div><div class="l">${k.startsWith('tal_')?'부적 ':''}실패 사유: ${escapeHtml(k.replace(/^(tal_)?payfail_/,''))}</div></div>`).join('') +
     `<div class="stat" style="flex:1 1 28%; min-width:84px;"><div class="n">${notPaid}</div><div class="l">결제하기 후 미결제(심층풀이)</div></div>` +
     `<div class="stat" style="flex:1 1 28%; min-width:84px;"><div class="n">${talNotPaid}</div><div class="l">결제하기 후 미결제(부적, 근사치)</div></div>`;
 }
@@ -10808,7 +10821,7 @@ function restorePaymentResumeSnapshotIfAny(){
   let snap;
   try{ snap = JSON.parse(raw); } catch(err){ return; }
   if(!snap || !snap.paymentId || (!snap.solarDate && !snap.lunarYear)) return; // 복원할 실제 입력/결제 정보가 없으면 조용히 종료
-  try{ const rc = new URLSearchParams(location.search).get('code'); if(rc) logPayEvent(payCodeEvent(rc)); }catch(e){}   // 모바일 결제창에서 취소·실패하고 돌아온 경우
+  try{ const rc = new URLSearchParams(location.search).get('code'); if(rc) logPayFailure({ code: rc }, false); }catch(e){}   // 모바일 결제창에서 취소·실패하고 돌아온 경우
   $('#inpName').value = snap.name || '';
   if(snap.calType === 'lunar'){
     const lunarBtn = $('#inpCalSeg button[data-val="lunar"]');
@@ -11202,7 +11215,7 @@ async function talPay(){
     if(pe.error){ talShowErr(pe.error); return; }
     t.el2 = pe.el;
   }
-  if(!window.PortOne){ logPayEvent('tal_pay_fail'); talShowErr('결제 모듈을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'); return; }
+  if(!window.PortOne){ logPayEvent('tal_pay_fail'); logPayFailureReason('sdk_missing', true); talShowErr('결제 모듈을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'); return; }
   talShowErr('');
   talState.busy = true;
   const btn = $('#talPayBtn'); const prev = btn.textContent;
@@ -11225,14 +11238,14 @@ async function talPay(){
       },
     });
     if(response && response.code){
-      logPayEvent(payCodeEvent(response.code, 'tal_pay_'));
+      logPayFailure(response, true);
       talLsDel(TAL_PENDING_KEY);
       talShowErr('결제가 완료되지 않았어요. (' + (response.message || response.code) + ')');
       return;
     }
     await talClaim(pending);
   } catch(err){
-    logPayEvent('tal_pay_fail');
+    logPayEvent('tal_pay_fail'); logPayFailureReason('exception', true);
     talLsDel(TAL_PENDING_KEY);
     talShowErr('결제 진행 중 오류가 발생했어요. (' + err.message + ')');
   } finally {
@@ -11248,7 +11261,7 @@ function talResumeIfAny(){
   const q = new URLSearchParams(location.search);
   if(q.get('paymentId') !== pending.paymentId) return;
   try{ history.replaceState(history.state, '', location.pathname); } catch(e){}
-  if(q.get('code')){ logPayEvent(payCodeEvent(q.get('code'), 'tal_pay_')); talLsDel(TAL_PENDING_KEY); return; }   // 결제창에서 취소·실패하고 돌아옴
+  if(q.get('code')){ logPayFailure({ code: q.get('code') }, true); talLsDel(TAL_PENDING_KEY); return; }   // 결제창에서 취소·실패하고 돌아옴
   openTalSheet(null, { step: 'busy' });
   talClaim(pending);
 }
