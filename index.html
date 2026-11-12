@@ -36,7 +36,7 @@ window.SajuAnalytics = (function(){
   // 2026-11-12: 네이버 추적전환(공통 스크립트 + 전환). NAVER_WA 에 네이버가 발급한 공통키(AccountId, s_… 형태)를 넣으면 켜진다.
   // 비어 있으면 스크립트도 전송도 전혀 없다. 관리자·본인 기기(notrack) · 미리보기 주소(*.vercel.app)는 보내지 않는다.
   // 전환: begin_checkout(결제 단계 진입) · purchase(서버가 결제를 확인한 뒤, 실결제 금액) · sign_up(가입 직후 1회).
-  var NAVER_WA = '';
+  var NAVER_WA = 's_18b8275ce891';
   var nv = { on:false, ready:false, q:[] };
   function nvAllowed(){
     try{
@@ -53,7 +53,7 @@ window.SajuAnalytics = (function(){
       window.wcs_add = window.wcs_add || {}; window.wcs_add['wa'] = NAVER_WA;
       var sc = document.createElement('script'); sc.async = true; sc.src = 'https://wcs.naver.net/wcslog.js';
       sc.onload = function(){
-        try{ if(window.wcs && window.wcs_do) window.wcs_do(); } catch(e){}
+        try{ window._nasa = window._nasa || {}; if(window.wcs){ if(window.wcs.inflow) window.wcs.inflow(); if(window.wcs_do) window.wcs_do(); } } catch(e){}
         nv.ready = true;
         while(nv.q.length){ var c = nv.q.shift(); try{ window.wcs.trans(c); } catch(e){} }
       };
