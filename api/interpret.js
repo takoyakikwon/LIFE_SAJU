@@ -2586,6 +2586,136 @@ async function handleInviteRequest(req, res, payload) {
   }
 }
 
+// ---- 가입 쿠폰(2026-11-12) ----
+// 카카오로 처음 로그인(=가입)한 계정에 3,000원 쿠폰을 1장 준다(계정당 1장: signup_coupons.user_id UNIQUE).
+// 쓸 수 있는 상품은 정가 4,900원 이상 리포트(COUPON_CATEGORIES)뿐이고, 질문 이용권·부적·반려동물궁합에는 쓸 수 없다.
+// 결제 금액은 브라우저가 아니라 서버가 정한다: 결제창을 열기 전에 서버가 쿠폰을 그 결제번호(paymentId)로 30분간 "예약"하고
+// 깎인 금액을 알려 주면, 브라우저는 그 금액으로 결제한다. 결제 후에는 예약된 결제번호·상품이 일치하고 포트원이 그 깎인
+// 금액을 PAID 로 확인했을 때만 쿠폰을 "사용 완료"로 바꾼다. 예약 없이 깎인 금액으로 결제하면 금액 불일치로 거절된다.
+// SQL: docs/signup_coupons.sql (Supabase SQL Editor 에서 실행). 표가 없으면 쿠폰은 조용히 꺼진 상태로 동작한다.
+const SIGNUP_COUPON_AMOUNT = 3000;
+const SIGNUP_COUPON_MIN_PRICE = 4900;
+const SIGNUP_COUPON_DAYS = 7;
+const SIGNUP_COUPON_RESERVE_MIN = 30;
+const COUPON_CATEGORIES = ['comprehensive', 'love', 'compatibility', 'newyear', 'wealth', 'career', 'lifetime'];
+const COUPON_PAYMENT_ID_RE = /^pay_[A-Za-z0-9_]{6,80}$/;
+function couponEnabled() { return process.env.SIGNUP_COUPON_DISABLED !== '1'; }
+function couponStartMs() { const t = Date.parse(process.env.SIGNUP_COUPON_FROM || '2026-11-12T00:00:00Z'); return Number.isFinite(t) ? t : Date.parse('2026-11-12T00:00:00Z'); }
+function couponView(row) {
+  if (!row) return null;
+  const now = Date.now();
+  const expired = Date.parse(row.expires_at) <= now;
+  const reserved = !!row.reserved_until && Date.parse(row.reserved_until) > now;
+  return {
+    id: row.id, amount: row.amount, minPrice: row.min_price, expiresAt: row.expires_at,
+    status: row.status === 'used' ? 'used' : (expired ? 'expired' : 'unused'),
+    reserved, categories: COUPON_CATEGORIES,
+  };
+}
+async function couponFindByUser(userId) {
+  const r = await walletRest('GET', `signup_coupons?user_id=eq.${encodeURIComponent(userId)}&select=*&limit=1`);
+  if (!r.ok) { console.error('couponFindByUser failed', r.status, await r.text()); throw new Error('coupon_store_error'); }
+  const rows = (await r.json()) || [];
+  return rows[0] || null;
+}
+async function couponClaim(user) {
+  const existing = await couponFindByUser(user.id);
+  if (existing) return { row: existing, newlyGranted: false };
+  const createdMs = Date.parse(user.created_at || '');
+  if (!couponEnabled() || !Number.isFinite(createdMs) || createdMs < couponStartMs()) return { row: null, newlyGranted: false };
+  const expires = new Date(Date.now() + SIGNUP_COUPON_DAYS * 24 * 3600 * 1000).toISOString();
+  const r = await walletRest('POST', 'signup_coupons?on_conflict=user_id',
+    { user_id: user.id, amount: SIGNUP_COUPON_AMOUNT, min_price: SIGNUP_COUPON_MIN_PRICE, expires_at: expires },
+    'resolution=ignore-duplicates,return=representation');
+  if (!r.ok) { console.error('couponClaim insert failed', r.status, await r.text()); throw new Error('coupon_store_error'); }
+  const rows = (await r.json()) || [];
+  if (rows[0]) return { row: rows[0], newlyGranted: true };
+  return { row: await couponFindByUser(user.id), newlyGranted: false };   // 동시에 두 번 들어와 한 쪽만 만들어진 경우
+}
+async function handleCouponRequest(res, payload) {
+  try {
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) { res.status(200).json({ kind: 'coupon', coupon: null, enabled: false }); return; }
+    if (payload.couponMode === 'config') {
+      // 로그인 전 안내문구용: 쿠폰이 켜져 있고(표가 실제로 있고) 새로 가입한 사람에게 줄 수 있는지만 알려 준다.
+      let tableOk = false;
+      try { const pr = await walletRest('GET', 'signup_coupons?select=id&limit=1'); tableOk = pr.ok; } catch (e) { tableOk = false; }
+      res.status(200).json({ kind: 'coupon_config', enabled: couponEnabled() && tableOk, amount: SIGNUP_COUPON_AMOUNT, minPrice: SIGNUP_COUPON_MIN_PRICE, days: SIGNUP_COUPON_DAYS });
+      return;
+    }
+    const user = payload.access_token ? await verifySupabaseUser(payload.access_token) : null;
+    if (!user) { res.status(401).json({ error: '로그인이 필요해요.', code: 'login_required' }); return; }
+    const mode = payload.couponMode;
+    if (mode === 'status' || mode === 'claim') {
+      let row;
+      let newlyGranted = false;
+      if (mode === 'claim' && !(await checkIsAdmin(user.id))) { const c = await couponClaim(user); row = c.row; newlyGranted = c.newlyGranted; }
+      else row = await couponFindByUser(user.id);
+      res.status(200).json({ kind: 'coupon', enabled: couponEnabled(), coupon: couponView(row), newlyGranted });
+      return;
+    }
+    if (mode === 'reserve') {
+      const cat = String(payload.product || '');   // 쿠폰을 쓸 상품(리포트 종류). payload.category 는 'coupon' 고정이라 따로 받는다
+      const pid = String(payload.paymentId || '');
+      const cid = String(payload.couponId || '');
+      if (!COUPON_CATEGORIES.includes(cat) || !COUPON_PAYMENT_ID_RE.test(pid) || !/^[0-9a-f-]{36}$/i.test(cid)) { res.status(400).json({ error: '쿠폰을 쓸 수 없는 상품이에요.', code: 'coupon_bad_request' }); return; }
+      const price = CATEGORY_AMOUNT_KRW[cat];
+      const nowIso = new Date().toISOString();
+      const until = new Date(Date.now() + SIGNUP_COUPON_RESERVE_MIN * 60000).toISOString();
+      const q = `signup_coupons?id=eq.${encodeURIComponent(cid)}&user_id=eq.${encodeURIComponent(user.id)}&status=eq.unused&expires_at=gt.${encodeURIComponent(nowIso)}`
+        + `&or=(reserved_until.is.null,reserved_until.lt.${encodeURIComponent(nowIso)},reserved_payment_id.eq.${encodeURIComponent(pid)})`;
+      const peek = await walletRest('GET', `signup_coupons?id=eq.${encodeURIComponent(cid)}&user_id=eq.${encodeURIComponent(user.id)}&select=amount,min_price&limit=1`);
+      const peekRows = peek.ok ? ((await peek.json()) || []) : [];
+      if (!peekRows[0] || price < peekRows[0].min_price || price - peekRows[0].amount < 1) { res.status(409).json({ error: '이 쿠폰은 지금 쓸 수 없어요.', code: 'coupon_unavailable' }); return; }
+      const r = await walletRest('PATCH', q, { reserved_payment_id: pid, reserved_category: cat, reserved_until: until }, 'return=representation');
+      if (!r.ok) { console.error('coupon reserve failed', r.status, await r.text()); res.status(503).json({ error: '쿠폰을 확인하지 못했어요. 잠시 후 다시 시도해주세요.', code: 'coupon_unavailable' }); return; }
+      const rows = (await r.json()) || [];
+      if (!rows[0]) { res.status(409).json({ error: '이 쿠폰은 지금 쓸 수 없어요. (사용했거나 기간이 지났거나 다른 결제에 쓰는 중이에요)', code: 'coupon_unavailable' }); return; }
+      res.status(200).json({ kind: 'coupon_reserved', couponId: rows[0].id, discount: rows[0].amount, price, amount: price - rows[0].amount, reservedUntil: until });
+      return;
+    }
+    if (mode === 'release') {
+      const pid = String(payload.paymentId || '');
+      const cid = String(payload.couponId || '');
+      if (COUPON_PAYMENT_ID_RE.test(pid) && /^[0-9a-f-]{36}$/i.test(cid)) {
+        await walletRest('PATCH', `signup_coupons?id=eq.${encodeURIComponent(cid)}&user_id=eq.${encodeURIComponent(user.id)}&status=eq.unused&reserved_payment_id=eq.${encodeURIComponent(pid)}`,
+          { reserved_payment_id: null, reserved_category: null, reserved_until: null }, 'return=minimal');
+      }
+      res.status(200).json({ kind: 'coupon_released' });
+      return;
+    }
+    res.status(400).json({ error: '알 수 없는 요청입니다.', code: 'bad_mode' });
+  } catch (e) {
+    console.error('handleCouponRequest error:', e);
+    res.status(200).json({ kind: 'coupon', coupon: null, enabled: false, error: true });
+  }
+}
+// 결제 검증 직전: 이 요청이 예약된 쿠폰을 쓰는 결제인지 확인한다(결제 금액 = 정가 − 쿠폰 금액).
+async function couponForPurchase({ user, couponId, paymentId, category }) {
+  if (!user || !COUPON_CATEGORIES.includes(category) || !COUPON_PAYMENT_ID_RE.test(String(paymentId || ''))) return { ok: false, status: 409, code: 'coupon_invalid', error: '쿠폰을 쓸 수 없는 결제예요.' };
+  try {
+    const r = await walletRest('GET', `signup_coupons?id=eq.${encodeURIComponent(couponId)}&user_id=eq.${encodeURIComponent(user.id)}&select=*&limit=1`);
+    if (!r.ok) { console.error('couponForPurchase failed', r.status, await r.text()); return { ok: false, status: 503, code: 'coupon_unavailable', error: '쿠폰을 확인하지 못했어요.' }; }
+    const row = ((await r.json()) || [])[0];
+    const price = CATEGORY_AMOUNT_KRW[category];
+    if (!row || row.status !== 'unused' || row.reserved_payment_id !== paymentId || row.reserved_category !== category || price < row.min_price || price - row.amount < 1) {
+      return { ok: false, status: 409, code: 'coupon_invalid', error: '쿠폰을 쓸 수 없는 결제예요.' };
+    }
+    return { ok: true, coupon: row };
+  } catch (e) {
+    console.error('couponForPurchase error:', e);
+    return { ok: false, status: 503, code: 'coupon_unavailable', error: '쿠폰을 확인하지 못했어요.' };
+  }
+}
+// 결제가 확인된 뒤 쿠폰을 "사용 완료"로 바꾼다. 조건을 건 한 번의 갱신이라 같은 쿠폰을 두 번 쓸 수 없다.
+async function couponConsume({ couponId, userId, paymentId, category }) {
+  try {
+    const r = await walletRest('PATCH', `signup_coupons?id=eq.${encodeURIComponent(couponId)}&user_id=eq.${encodeURIComponent(userId)}&status=eq.unused&reserved_payment_id=eq.${encodeURIComponent(paymentId)}`,
+      { status: 'used', used_at: new Date().toISOString(), used_payment_id: paymentId, used_category: category }, 'return=representation');
+    if (!r.ok) { console.error('couponConsume failed', r.status, await r.text()); return false; }
+    return (((await r.json()) || []).length === 1);
+  } catch (e) { console.error('couponConsume error:', e); return false; }
+}
+
 module.exports = async (req, res) => {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'POST 요청만 지원합니다.' });
@@ -2614,6 +2744,12 @@ module.exports = async (req, res) => {
   // 친구 초대(코드 발급·방문 기록·보상 청구·알림 완료): AI·결제와 무관해 사주 데이터가 필요 없다.
   if (payload && payload.category === 'ask' && typeof payload.askMode === 'string' && payload.askMode.indexOf('invite_') === 0) {
     await handleInviteRequest(req, res, payload);
+    return;
+  }
+
+  // 가입 쿠폰(상태 조회·지급·결제 전 예약·예약 해제): AI·사주 데이터와 무관하다.
+  if (payload && payload.category === 'coupon') {
+    await handleCouponRequest(res, payload);
     return;
   }
 
@@ -2753,7 +2889,16 @@ module.exports = async (req, res) => {
       return;
     }
   }
-  const recordAmount = (isAdmin || walletUse) ? 0 : amount;
+  // 가입 쿠폰: 결제 전에 서버가 이 결제번호로 예약해 둔 쿠폰이 있을 때만 깎인 금액을 인정한다(위 가입 쿠폰 주석 참고).
+  let couponUse = null;
+  let chargeAmount = amount;
+  if (payload.couponId && !isAdmin && !walletUse) {
+    const cu = await couponForPurchase({ user, couponId: String(payload.couponId), paymentId: payload.paymentId, category: payload.category });
+    if (!cu.ok) { res.status(cu.status).json({ error: cu.error, code: cu.code }); return; }
+    couponUse = cu.coupon;
+    chargeAmount = amount - couponUse.amount;
+  }
+  const recordAmount = (isAdmin || walletUse) ? 0 : chargeAmount;
   const recordPgProvider = walletUse ? 'qa_credit' : (isAdmin ? 'admin_bypass' : 'portone_inicis');
   let walletDelivered = false;
 
@@ -2765,7 +2910,7 @@ module.exports = async (req, res) => {
     res.status(402).json({ error: '질문 이용권이 필요해요.', code: 'no_credit' });
     return;
   }
-  const paymentCheck = (isAdmin || walletUse) ? { ok: true } : await verifyPortOnePayment(payload.paymentId, amount);
+  const paymentCheck = (isAdmin || walletUse) ? { ok: true } : await verifyPortOnePayment(payload.paymentId, chargeAmount);
   if (!paymentCheck.ok) {
     res.status(402).json({ error: `결제 확인에 실패했습니다. (${paymentCheck.reason})` });
     return;
@@ -2779,10 +2924,17 @@ module.exports = async (req, res) => {
     return;
   }
 
+  // 가입 쿠폰: 결제가 확인됐으므로 쿠폰을 사용 완료로 바꾼다(조건부 갱신이라 중복 사용 불가).
+  if (couponUse && !(await couponConsume({ couponId: couponUse.id, userId: user.id, paymentId: payload.paymentId, category: payload.category }))) {
+    res.status(409).json({ error: '쿠폰 사용을 확인하지 못했어요. 고객센터로 문의해주세요.', code: 'coupon_invalid' });
+    return;
+  }
+
   // access_token이 payload에 그대로 있으면 DB에 시크릿 성격의 값이 남으므로, 결제 검증
   // 통과 직후(=이 시점부터는 실제로 돈이 청구된 결제라 아래 어떤 경로로 끝나든 흔적을
   // 남겨야 하므로) 미리 한 번만 떼어둔다.
   const { access_token, ...payloadWithoutToken } = payload;
+  if (couponUse) payloadWithoutToken.couponDiscount = couponUse.amount;
 
   try {
     const first = await callOpenAI(apiKey, [
