@@ -2533,6 +2533,19 @@ window.SajuAnalytics = (function(){
     <button class="submit-btn" id="couponWelcomeOk">확인</button>
   </div>
 </div>
+<div id="couponPromoModal" class="modal-overlay" hidden>
+  <div class="modal-card">
+    <div class="coupon-welcome-emoji">🎟</div>
+    <div class="modal-title" style="text-align:center;">카카오로 가입하면 쿠폰을 드려요</div>
+    <div class="coupon-ticket">
+      <div class="amt" id="couponPromoAmt">3,000원 쿠폰</div>
+      <div class="sub" id="couponPromoSub"></div>
+    </div>
+    <p class="modal-desc" style="text-align:center;">처음 카카오로 로그인하면 바로 받아요. 리포트를 결제할 때 자동으로 적용돼요.</p>
+    <button class="submit-btn" id="couponPromoLogin">카카오로 로그인하고 쿠폰 받기</button>
+    <button class="modal-cancel" id="couponPromoClose">나중에 할게요</button>
+  </div>
+</div>
 <div id="exitConfirmModal" class="modal-overlay" hidden>
   <div class="modal-card">
     <div class="modal-title">종료할까요?</div>
@@ -9684,6 +9697,31 @@ function loadCouponConfig(){
     .catch(()=>{ couponConfigCache = { enabled:false }; });
 }
 
+// 2026-11-12: 로그인하지 않은 방문자에게 첫 화면에서 한 번만 "카카오로 가입하면 쿠폰" 안내. 이 브라우저에서 한 번 보이면(닫든 로그인하든) 다시 띄우지 않는다.
+const COUPON_PROMO_KEY = 'sjk_cpn_promo_v1';
+function maybeCouponPromo(){
+  try{
+    if(currentSession || lsGet(COUPON_PROMO_KEY)) return;
+    if(/[?&](share|inv)=/.test(location.search)) return;   // 공유·초대 링크로 들어온 화면에는 겹쳐 띄우지 않는다
+  }catch(e){ return; }
+  fetch('/api/interpret', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ category:'coupon', couponMode:'config' }) })
+    .then(r=>r.json()).then(d=>{
+      if(!(d && d.kind === 'coupon_config' && d.enabled)) return;
+      couponConfigCache = d;
+      setTimeout(()=>{
+        if(currentSession || lsGet(COUPON_PROMO_KEY)) return;
+        if(document.querySelector('.modal-overlay:not([hidden])')) return;   // 다른 창이 열려 있으면 건너뜀(다음 방문 때)
+        try{ localStorage.setItem(COUPON_PROMO_KEY, String(Date.now())); }catch(e){}
+        $('#couponPromoAmt').textContent = d.amount.toLocaleString('ko-KR') + '원 쿠폰';
+        $('#couponPromoSub').textContent = d.minPrice.toLocaleString('ko-KR') + '원 이상 리포트에 · 가입 후 ' + d.days + '일 안에 사용';
+        $('#couponPromoModal').hidden = false;
+        logFunnelEvent('coupon_promo_view');
+      }, 1800);
+    }).catch(()=>{});
+}
+$('#couponPromoClose').addEventListener('click', ()=>{ $('#couponPromoModal').hidden = true; });
+$('#couponPromoLogin').addEventListener('click', ()=>{ $('#couponPromoModal').hidden = true; logFunnelEvent('coupon_promo_login'); loginWithKakao(); });
+
 // 사용자가 입력한 문자열(닉네임 등)을 innerHTML에 꽂아넣을 때 HTML/스크립트로 해석되지 않도록 이스케이프.
 function escapeHtml(str){
   return String(str == null ? '' : str)
@@ -11157,7 +11195,7 @@ async function initAuth(){
 }
 
 $('#accountBtn').addEventListener('click', openLoginModal);
-initAuth();
+initAuth().then(maybeCouponPromo, maybeCouponPromo);
 // 결제(모바일 리디렉션) 복원을 먼저 시도하고, 없으면 로그인 리다이렉트 복원을 시도한다 —
 // 두 스냅샷은 서로 다른 localStorage 키를 쓰므로 평소엔 최대 하나만 존재한다.
 restorePaymentResumeSnapshotIfAny();
