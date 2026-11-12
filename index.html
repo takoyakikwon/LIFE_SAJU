@@ -33,6 +33,40 @@ window.SajuAnalytics = (function(){
       if(typeof fbq === 'function') fbq.apply(null, arguments);
     } catch(e){ /* Pixel 오류가 앱 동작에 영향을 주면 안 됨 */ }
   }
+  // 2026-11-12: 네이버 추적전환(공통 스크립트 + 전환). NAVER_WA 에 네이버가 발급한 공통키(AccountId, s_… 형태)를 넣으면 켜진다.
+  // 비어 있으면 스크립트도 전송도 전혀 없다. 관리자·본인 기기(notrack) · 미리보기 주소(*.vercel.app)는 보내지 않는다.
+  // 전환: begin_checkout(결제 단계 진입) · purchase(서버가 결제를 확인한 뒤, 실결제 금액) · sign_up(가입 직후 1회).
+  var NAVER_WA = '';
+  var nv = { on:false, ready:false, q:[] };
+  function nvAllowed(){
+    try{
+      if(/\.vercel\.app$/i.test(location.hostname)) return false;
+      if(localStorage.getItem('sajuNoTrack_v1') === '1') return false;
+      if(/[?&]notrack=1(&|$)/.test(location.search)) return false;
+    } catch(e){}
+    return true;
+  }
+  (function nvInit(){
+    try{
+      if(!NAVER_WA || !/^[A-Za-z0-9_]{3,40}$/.test(NAVER_WA) || !nvAllowed()) return;
+      nv.on = true;
+      window.wcs_add = window.wcs_add || {}; window.wcs_add['wa'] = NAVER_WA;
+      var sc = document.createElement('script'); sc.async = true; sc.src = 'https://wcs.naver.net/wcslog.js';
+      sc.onload = function(){
+        try{ if(window.wcs && window.wcs_do) window.wcs_do(); } catch(e){}
+        nv.ready = true;
+        while(nv.q.length){ var c = nv.q.shift(); try{ window.wcs.trans(c); } catch(e){} }
+      };
+      document.head.appendChild(sc);
+    } catch(e){}
+  })();
+  function nvTrans(conv){
+    try{
+      if(!nv.on || !nvAllowed()) return;
+      if(!nv.ready){ nv.q.push(conv); return; }
+      window.wcs.trans(conv);
+    } catch(e){}
+  }
   // Purchase 중복 방지: 같은 paymentId로 이 함수가 여러 번 불려도(새로고침, 모바일 결제
   // 리디렉션 복귀 등으로 runAiInterpretation()이 다시 실행되는 경우) fbq Purchase는 딱
   // 한 번만 나가도록, 이미 보고한 paymentId 목록을 세션에 걸쳐 남는 sessionStorage에 기록한다.
@@ -64,6 +98,7 @@ window.SajuAnalytics = (function(){
         value: opts.value || 0,
         currency: 'KRW',
       });
+      nvTrans({ type: 'begin_checkout' });
     },
     // 서버(api/interpret.js)가 포트원 결제를 실제로 재조회·검증한 뒤 성공 응답을 돌려준
     // 시점(runAiInterpretation 성공 콜백)에서만 호출한다 — 결제 실패/취소/중단 시에는
@@ -77,6 +112,18 @@ window.SajuAnalytics = (function(){
         value: opts.value || 0,
         currency: 'KRW',
       });
+      nvTrans({ type: 'purchase', id: String(paymentId).slice(0, 60), value: String(opts.value || 0) });
+    },
+    // 가입(첫 로그인) 직후 1회: 계정을 만든 지 10분 안이고 이 계정으로 아직 보내지 않았을 때만.
+    signUp: function(user){
+      try{
+        if(!user || !user.id || !user.created_at) return;
+        if(Date.now() - Date.parse(user.created_at) > 10 * 60 * 1000) return;
+        var key = 'sajuNaverSignUp_' + user.id;
+        if(localStorage.getItem(key)) return;
+        localStorage.setItem(key, '1');
+        nvTrans({ type: 'sign_up' });
+      } catch(e){}
     },
   };
 })();
@@ -11179,6 +11226,7 @@ async function initAuth(){
   if(currentSession){ currentProfile = await loadProfile(currentSession.user.id); }
   if(currentProfile && currentProfile.is_admin) setNoTrack(true);
   updateAccountBtn();
+  if(currentSession && window.SajuAnalytics) window.SajuAnalytics.signUp(currentSession.user);
   logFunnelEvent('visit');
   if(currentSession && pendingCouponRelease){ const pr = pendingCouponRelease; pendingCouponRelease = null; await couponApi('release', pr); }
   if(currentSession) refreshCoupon(true);   // 첫 로그인(가입)이면 쿠폰이 지급되고 안내가 뜬다
@@ -11187,6 +11235,7 @@ async function initAuth(){
     currentProfile = currentSession ? await loadProfile(currentSession.user.id) : null;
     if(currentProfile && currentProfile.is_admin) setNoTrack(true);
     updateAccountBtn();
+    if(currentSession && window.SajuAnalytics) window.SajuAnalytics.signUp(currentSession.user);
     if(currentSession){ refreshCoupon(true); } else { myCoupon = null; couponClaimedFor = null; }
     refreshAskWallet(true); // 로그인/로그아웃이 바뀌면 이용권 잔액을 다시 가져온다(비회원 코드는 계정으로 합쳐진다)
     if($('#loginModal') && !$('#loginModal').hidden){ renderLoginModal(); }
