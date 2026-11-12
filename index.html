@@ -1111,6 +1111,13 @@ window.SajuAnalytics = (function(){
   .modal-title{ font-family:"Noto Serif KR"; font-weight:900; font-size:16px; }
   .modal-desc{ font-size:12px; color:var(--ink-soft); line-height:1.6; margin:10px 0 14px; }
   .modal-price{ font-family:"Noto Serif KR"; font-weight:900; font-size:22px; text-align:center; margin-bottom:14px; }
+  .price-was{ text-decoration:line-through; opacity:.5; font-size:.62em; font-weight:700; margin-right:8px; }
+  .coupon-line{ display:inline-block; margin-top:8px; padding:5px 11px; border-radius:999px; background:rgba(224,164,80,.14); border:1px solid rgba(224,164,80,.45); color:var(--gold, #e0a450); font-family:"Noto Sans KR"; font-size:12px; font-weight:700; }
+  .coupon-welcome-emoji{ font-size:40px; text-align:center; margin-bottom:6px; }
+  .coupon-ticket{ margin:14px 0 6px; padding:16px; border-radius:14px; text-align:center; background:linear-gradient(135deg, rgba(224,164,80,.20), rgba(178,59,46,.18)); border:1px dashed rgba(224,164,80,.6); }
+  .coupon-ticket .amt{ font-family:"Noto Serif KR"; font-weight:900; font-size:30px; }
+  .coupon-ticket .sub{ font-size:12px; color:var(--ink-soft); margin-top:6px; line-height:1.6; }
+  .coupon-menu-chip{ margin:0 0 12px; padding:10px 12px; border-radius:12px; font-size:12.5px; line-height:1.5; background:rgba(224,164,80,.12); border:1px solid rgba(224,164,80,.4); }
   .modal-cancel{
     width:100%; margin-top:10px; padding:12px 0; background:none; border:none;
     color:var(--ink-faint); font-size:12.5px; cursor:pointer;
@@ -2513,6 +2520,18 @@ window.SajuAnalytics = (function(){
 </div>
 <div id="loginModal" class="modal-overlay" hidden>
   <div class="modal-card" id="loginModalCard"></div>
+</div>
+<div id="couponWelcomeModal" class="modal-overlay" hidden>
+  <div class="modal-card">
+    <div class="coupon-welcome-emoji">🎉</div>
+    <div class="modal-title" style="text-align:center;">가입이 완료됐어요</div>
+    <div class="coupon-ticket">
+      <div class="amt" id="couponWelcomeAmt">3,000원 쿠폰</div>
+      <div class="sub" id="couponWelcomeSub"></div>
+    </div>
+    <p class="modal-desc" style="text-align:center;">리포트를 결제할 때 자동으로 적용돼요.</p>
+    <button class="submit-btn" id="couponWelcomeOk">확인</button>
+  </div>
 </div>
 <div id="exitConfirmModal" class="modal-overlay" hidden>
   <div class="modal-card">
@@ -6154,6 +6173,9 @@ let pendingRestoreCategory = null;
 // 이미 끝난 상태로 돌아오는 것이라 카테고리 외에 부가입력(연애상태/신분/상대방/반려동물)과
 // paymentId까지 함께 복원해야 곧장 AI 해석 호출로 이어갈 수 있다.
 let pendingRestorePaymentId = null;
+let pendingCouponRelease = null;     // 결제창에서 취소하고 돌아왔을 때 풀어 줄 쿠폰 예약
+let pendingRestoreCouponId = null;   // 2026-11-12: 모바일 결제 복귀 때 이어 쓸 가입 쿠폰 ID
+let pendingRestoreCouponDiscount = 0;
 let pendingRestoreLoveStatus = null;
 let pendingRestoreJobStatus = null;
 let pendingRestorePartnerData = null;
@@ -6981,6 +7003,8 @@ $('#submitBtn').addEventListener('click', ()=>{
     $('#backBtn').hidden = false;
     const restoreGroup = pendingRestoreGroup, restoreCategory = pendingRestoreCategory;
     const restorePaymentId = pendingRestorePaymentId;
+    const restoreCouponId = pendingRestoreCouponId, restoreCouponDiscount = pendingRestoreCouponDiscount;
+    pendingRestoreCouponId = null; pendingRestoreCouponDiscount = 0;
     const restoreLoveStatus = pendingRestoreLoveStatus, restoreJobStatus = pendingRestoreJobStatus;
     const restorePartnerData = pendingRestorePartnerData, restorePetData = pendingRestorePetData;
     const restoreContentUnlocked = pendingRestoreContentUnlocked;
@@ -7026,6 +7050,7 @@ $('#submitBtn').addEventListener('click', ()=>{
         if(restoreAsk.pack) AI_CATEGORY_META.ask = { price: fmtWon(ASK_PACK_INFO[restoreAsk.pack].price), desc: `질문 이용권 ${restoreAsk.pack}회` };
       }
       pendingPaymentId = restorePaymentId;
+      pendingCouponId = restoreCouponId; pendingCouponDiscount = restoreCouponDiscount;
       aiUnlocked = true;
       // 2026-09-20: 모바일 결제 리디렉션 복귀 = 방금 결제가 완료된 상태로 돌아온 것이므로,
       // 무료 스크롤의 블러 락도 함께 해제한다(아래 applyContentLockState() + saveResultSnapshot()에서
@@ -7256,6 +7281,13 @@ function showAiStep(stepId){
     aiStepPushedState = true;
   }
 }
+function renderAiPriceCard(){
+  const meta = AI_CATEGORY_META[selectedAiCategory] || AI_CATEGORY_META.comprehensive;
+  const c = couponFor(selectedAiCategory);
+  $('#aiPriceAmt').innerHTML = c ? priceHtml(selectedAiCategory) : escapeHtml(meta.price);
+  $('#aiPriceDesc').innerHTML = escapeHtml(meta.desc + (selectedAiCategory === 'lifetime' ? ' 🎁 구매하면 질문권 2회(3,900원 상당)를 선물로 드려요.' : ''))
+    + (c ? '<br><span class="coupon-line">🎟 가입 쿠폰 −' + c.amount.toLocaleString('ko-KR') + '원 적용 · ' + fmtCouponDate(c.expiresAt) + '까지</span>' : '');
+}
 function goToAiPayStep(){
   // 질문형 상담은 질문 없이 결제 단계로 들어오면 안 된다(로그인 복귀 등으로 질문이 비어 있을 수 있음) —
   // 결제 후에 서버가 질문 없음으로 거절하는 일이 없도록 결제 전에 막는다.
@@ -7274,13 +7306,12 @@ function goToAiPayStep(){
     runAiInterpretation();
     return;
   }
-  $('#aiPriceAmt').textContent = meta.price;
-  $('#aiPriceDesc').textContent = meta.desc + (selectedAiCategory === 'lifetime' ? ' 🎁 구매하면 질문권 2회(3,900원 상당)를 선물로 드려요.' : '');
+  renderAiPriceCard();
   // Meta Pixel: 심층풀이 상품을 선택하고 실제 결제 단계(가격·결제하기 버튼 화면)로 진입한
   // 시점 (2026-09-23). 모든 카테고리·모든 진입 경로(바로결제/연애상태·신분 선택 후/궁합
   // 상대방 입력 후/로그인 리다이렉트 복원)가 전부 이 함수 하나를 거치므로 한 곳에서만 호출한다.
   if(window.SajuAnalytics){
-    const checkoutValue = parseInt((meta.price || '').replace(/[^0-9]/g, ''), 10) || 0;
+    const checkoutValue = payAmountFor(selectedAiCategory) || parseInt((meta.price || '').replace(/[^0-9]/g, ''), 10) || 0;
     window.SajuAnalytics.initiateCheckout({
       content_name: AI_CATEGORY_DISPLAY_NAME[selectedAiCategory] || meta.desc || '',
       value: checkoutValue,
@@ -7651,6 +7682,7 @@ function buildAiPayload(){
   // 검증할 수 있다(2026-08-30 KG이니시스 테스트 연동). 없으면 서버가 요청을 거부한다.
   if(pendingPaymentId){
     payload.paymentId = pendingPaymentId;
+    if(pendingCouponId) payload.couponId = pendingCouponId;   // 서버가 예약된 쿠폰인지 확인한 뒤 깎인 금액을 인정한다
   }
   payload.visitorId = VISITOR_ID;
   // V3 STEP 1.1 + STEP 2 — 구조화 판단 레이어(saju_core/ziwei_core)를 payload에 추가로 실어보낸다.
@@ -7696,7 +7728,7 @@ function buildAiPayload(){
 function openPayModal(){
   logPayEvent('pay_modal_open');
   const meta = AI_CATEGORY_META[selectedAiCategory] || AI_CATEGORY_META.comprehensive;
-  $('#modalPrice').textContent = meta.price;
+  if(selectedAiCategory === 'ask') $('#modalPrice').textContent = meta.price; else $('#modalPrice').innerHTML = priceHtml(selectedAiCategory);
   if(selectedAiCategory === 'ask' && selectedAskPack){
     $('#payModalDesc').textContent = currentSession
       ? `결제하면 계정에 질문 ${selectedAskPack}회가 충전돼요. 어느 기기에서든 쓸 수 있어요. (유효기간 1년)`
@@ -8559,12 +8591,31 @@ $('#mockPayBtn').addEventListener('click', async ()=>{
     return;
   }
   const meta = AI_CATEGORY_META[selectedAiCategory] || AI_CATEGORY_META.comprehensive;
-  const amount = parseInt((meta.price || '').replace(/[^0-9]/g, ''), 10) || 0;
+  let amount = parseInt((meta.price || '').replace(/[^0-9]/g, ''), 10) || 0;
   const paymentId = 'pay_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
   const payBtnEl = $('#mockPayBtn');
   payBtnEl.disabled = true;
   const prevBtnText = payBtnEl.textContent;
   payBtnEl.textContent = '결제창 여는 중...';
+  // 가입 쿠폰: 쓸 수 있으면 결제창을 열기 전에 서버가 쿠폰을 이 결제번호로 예약하고 깎인 금액을 정해 준다.
+  // 예약에 실패하면(이미 썼거나 기간이 지남) 정가로 결제하지 않고 멈춰서 손님이 금액을 다시 확인하게 한다.
+  let couponReserved = null;
+  const couponToUse = couponFor(selectedAiCategory);
+  if(couponToUse){
+    const rr = await couponApi('reserve', { couponId: couponToUse.id, product: selectedAiCategory, paymentId });
+    if(!rr.ok || !rr.data || rr.data.kind !== 'coupon_reserved'){
+      logPayEvent('pay_fail'); logPayFailureReason('coupon_unavailable', false);
+      alert('쿠폰을 적용하지 못했어요. 이미 사용했거나 기간이 지난 쿠폰일 수 있어요. 금액을 다시 확인해주세요.');
+      await refreshCoupon(false);
+      closePayModal(); renderAiPriceCard();
+      payBtnEl.disabled = false; payBtnEl.textContent = prevBtnText;
+      return;
+    }
+    couponReserved = { id: rr.data.couponId, discount: rr.data.discount };
+    amount = rr.data.amount;
+    pendingCouponId = couponReserved.id; pendingCouponDiscount = couponReserved.discount;
+  }
+  const releaseCoupon = ()=>{ if(couponReserved){ couponApi('release', { couponId: couponReserved.id, paymentId }); couponReserved = null; pendingCouponId = null; pendingCouponDiscount = 0; } };
   // 2026-08-30(모바일 리디렉션 대응): 아래 REDIRECTION 방식에서는 실제로 페이지 전체가
   // 결제사 페이지로 이동했다가 돌아올 수 있다. 이동 직전 지금까지의 입력·선택 상태를 저장해두고,
   // 이 함수가 (페이지 이동 없이) 끝까지 실행되면 finally에서 곧바로 지운다 — 그래서 이 스냅샷이
@@ -8602,6 +8653,7 @@ $('#mockPayBtn').addEventListener('click', async ()=>{
     // 대신 페이지가 다시 로드되면서 restorePaymentResumeSnapshotIfAny()가 이어받는다.)
     if(response && response.code){
       logPayFailure(response, false);
+      releaseCoupon();
       alert('결제가 완료되지 않았어요. (' + (response.message || response.code) + ')');
       payBtnEl.disabled = false;
       payBtnEl.textContent = prevBtnText;
@@ -8618,11 +8670,14 @@ $('#mockPayBtn').addEventListener('click', async ()=>{
     await runAiInterpretation();
   } catch(err){
     logPayEvent('pay_fail'); logPayFailureReason('exception', false);
+    releaseCoupon();
     alert('결제 진행 중 오류가 발생했어요. (' + err.message + ')');
   } finally {
     payBtnEl.disabled = false;
     payBtnEl.textContent = prevBtnText;
     pendingPaymentId = null; // 다음 결제를 위해 초기화(성공 시에는 이미 buildAiPayload에 실려 나간 뒤)
+    pendingCouponId = null; pendingCouponDiscount = 0;
+    refreshCoupon(false);   // 쿠폰을 썼다면 사용 완료로, 안 썼다면 그대로 반영
     clearPaymentResumeSnapshot(); // 페이지 이동 없이 여기까지 왔다는 뜻이므로 스냅샷은 필요 없음
   }
 });
@@ -8782,7 +8837,7 @@ async function runAiInterpretation(){
     // 필요 없다. paymentId 기준 중복 방지는 SajuAnalytics.purchase() 내부에서 처리한다.
     if(window.SajuAnalytics && payload.paymentId){
       const purchaseMeta = AI_CATEGORY_META[payload.category] || AI_CATEGORY_META.comprehensive;
-      const purchaseValue = parseInt((purchaseMeta.price || '').replace(/[^0-9]/g, ''), 10) || 0;
+      const purchaseValue = Math.max(0, (parseInt((purchaseMeta.price || '').replace(/[^0-9]/g, ''), 10) || 0) - (payload.couponId ? (pendingCouponDiscount || 3000) : 0));
       window.SajuAnalytics.purchase({ paymentId: payload.paymentId, value: purchaseValue });
     }
     if(payload.paymentId) logPayEvent('pay_success');   // 서버가 포트원에 재조회해 확인한 뒤에만 여기에 온다
@@ -9557,6 +9612,77 @@ function logFunnelEvent(eventType){
 const PORTONE_STORE_ID = 'store-ab474ff3-11c5-4963-9a60-7fbc67ada5f4';
 const PORTONE_CHANNEL_KEY = 'channel-key-f913b305-cbfb-4419-b631-b73e5cc25e4d';
 let pendingPaymentId = null; // 결제 성공 후 발급된 paymentId. buildAiPayload()가 서버 검증용으로 함께 보낸다.
+let pendingCouponId = null;  // 2026-11-12: 이 결제에 쓴(서버가 예약해 준) 가입 쿠폰 ID. buildAiPayload()가 함께 보낸다.
+let pendingCouponDiscount = 0;
+
+/* =========================================================
+   가입 쿠폰 (2026-11-12) — 카카오 첫 로그인(=가입) 시 3,000원 쿠폰 1장, 4,900원 이상 리포트에만.
+   금액은 서버가 정한다: 결제창을 열기 전에 서버에 쿠폰을 이 결제번호로 "예약"하고, 서버가 알려 준 금액으로만 결제한다.
+   ========================================================= */
+const COUPON_CATEGORIES = ['comprehensive','love','compatibility','newyear','wealth','career','lifetime'];
+let myCoupon = null;            // 서버가 알려 준 내 쿠폰(없으면 null)
+let couponClaimedFor = null;    // 이미 지급 확인을 마친 계정 id(같은 로드에서 두 번 부르지 않게)
+let couponConfigCache = null;   // 로그인 전 안내문구용 { enabled, amount, ... }
+function couponApi(mode, extra){
+  if(!currentSession || !currentSession.access_token) return Promise.resolve({ ok:false, data:null });
+  return fetch('/api/interpret', { method:'POST', headers:{ 'Content-Type':'application/json' },
+    body: JSON.stringify(Object.assign({ category:'coupon', couponMode: mode, access_token: currentSession.access_token }, extra || {})) })
+    .then(async (r)=>({ ok: r.ok, status: r.status, data: await r.json().catch(()=>null) }))
+    .catch(()=>({ ok:false, data:null }));
+}
+function fmtCouponDate(iso){ const d = new Date(iso); return (d.getMonth()+1) + '월 ' + d.getDate() + '일'; }
+function categoryPrice(cat){ const m = AI_CATEGORY_META[cat]; return m ? (parseInt((m.price || '').replace(/[^0-9]/g, ''), 10) || 0) : 0; }
+// 지금 이 상품에 쓸 수 있는 쿠폰이면 그 쿠폰, 아니면 null
+function couponFor(cat){
+  const c = myCoupon;
+  if(!c || c.status !== 'unused' || !currentSession) return null;
+  if(currentProfile && currentProfile.is_admin) return null;
+  if(!COUPON_CATEGORIES.includes(cat)) return null;
+  if(Date.parse(c.expiresAt) <= Date.now()) return null;
+  const price = categoryPrice(cat);
+  if(!price || price < c.minPrice || price - c.amount < 1) return null;
+  return c;
+}
+function payAmountFor(cat){ const price = categoryPrice(cat); const c = couponFor(cat); return c ? price - c.amount : price; }
+function priceHtml(cat){
+  const price = categoryPrice(cat); const c = couponFor(cat);
+  const f = (n)=>n.toLocaleString('ko-KR') + '원';
+  return c ? '<span class="price-was">' + f(price) + '</span>' + f(price - c.amount) : f(price);
+}
+async function refreshCoupon(claim){
+  if(!currentSession || (currentProfile && currentProfile.is_admin)){ myCoupon = null; return; }
+  const uid = currentSession.user && currentSession.user.id;
+  if(claim && couponClaimedFor === uid) claim = false;
+  const r = await couponApi(claim ? 'claim' : 'status');
+  if(!r.ok || !r.data){ return; }
+  if(claim) couponClaimedFor = uid;
+  myCoupon = r.data.coupon || null;
+  if(r.data.newlyGranted && myCoupon) showCouponWelcome();
+  if(typeof updateCouponUi === 'function') updateCouponUi();
+}
+function showCouponWelcome(){
+  if(!myCoupon) return;
+  $('#couponWelcomeAmt').textContent = myCoupon.amount.toLocaleString('ko-KR') + '원 쿠폰';
+  $('#couponWelcomeSub').textContent = fmtCouponDate(myCoupon.expiresAt) + '까지 · ' + myCoupon.minPrice.toLocaleString('ko-KR') + '원 이상 리포트에 쓸 수 있어요';
+  $('#couponWelcomeModal').hidden = false;
+  logFunnelEvent('coupon_welcome');
+}
+$('#couponWelcomeOk').addEventListener('click', ()=>{ $('#couponWelcomeModal').hidden = true; });
+// 결제 화면(가격 카드·결제 확인창)에 쿠폰 적용 상태를 반영한다
+function updateCouponUi(){
+  try{
+    if($('#aiStepPay') && !$('#aiStepPay').hidden && selectedAiCategory){ renderAiPriceCard(); }
+    if($('#payModal') && !$('#payModal').hidden && selectedAiCategory && selectedAiCategory !== 'ask'){ $('#modalPrice').innerHTML = priceHtml(selectedAiCategory); }
+    if($('#loginModal') && !$('#loginModal').hidden){ renderLoginModal(); }
+  }catch(e){}
+}
+function loadCouponConfig(){
+  if(couponConfigCache !== null) return;
+  couponConfigCache = { enabled:false, loading:true };
+  fetch('/api/interpret', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ category:'coupon', couponMode:'config' }) })
+    .then(r=>r.json()).then(d=>{ couponConfigCache = (d && d.kind === 'coupon_config') ? d : { enabled:false }; if($('#loginModal') && !$('#loginModal').hidden && !currentSession) renderLoginModal(); })
+    .catch(()=>{ couponConfigCache = { enabled:false }; });
+}
 
 // 사용자가 입력한 문자열(닉네임 등)을 innerHTML에 꽂아넣을 때 HTML/스크립트로 해석되지 않도록 이스케이프.
 function escapeHtml(str){
@@ -10672,7 +10798,15 @@ $('#inquiryForm').addEventListener('submit', async (e)=>{
 function openLoginModal(){ renderLoginModal(); $('#loginModal').hidden = false; }
 function closeLoginModal(){ $('#loginModal').hidden = true; }
 
+function couponMenuChipHtml(){
+  const c = myCoupon;
+  if(!c) return '';
+  if(c.status === 'unused' && Date.parse(c.expiresAt) > Date.now()) return '<div class="coupon-menu-chip">🎟 가입 쿠폰 <b>' + c.amount.toLocaleString('ko-KR') + '원</b> · ' + fmtCouponDate(c.expiresAt) + '까지 · ' + c.minPrice.toLocaleString('ko-KR') + '원 이상 리포트에 자동 적용</div>';
+  if(c.status === 'used') return '<div class="coupon-menu-chip">🎟 가입 쿠폰을 사용했어요</div>';
+  return '<div class="coupon-menu-chip">🎟 가입 쿠폰 기간이 지났어요</div>';
+}
 function renderLoginModal(){
+  if(!currentSession) loadCouponConfig();
   const card = $('#loginModalCard');
   if(currentSession){
     const meta = currentSession.user.user_metadata || {};
@@ -10686,6 +10820,7 @@ function renderLoginModal(){
           '<div class="account-sub">카카오 계정으로 로그인 중</div>' +
         '</div>' +
       '</div>' +
+      couponMenuChipHtml() +
       '<button class="menu-btn" id="historyMenuBtn">📋 내 결제내역</button>' +
       '<button class="menu-btn" id="inquiryMenuBtn">📮 문의하기</button>' +
       (isAdmin ? '<button class="menu-btn" id="adminMenuBtn">🛠 관리자 페이지</button>' : '') +
@@ -10709,6 +10844,7 @@ function renderLoginModal(){
       '<div class="modal-title">간편하게 시작하기</div>' +
       '<p class="modal-desc">카카오 계정으로 3초 만에 시작하고, 결제한 관측 결과를 언제든 다시 열어볼 수 있어요.</p>' +
       '<div class="login-perklist">' +
+        ((couponConfigCache && couponConfigCache.enabled) ? ('<div class="p"><span class="ck">🎟</span><span><b>첫 가입 ' + couponConfigCache.amount.toLocaleString('ko-KR') + '원 쿠폰</b> — ' + couponConfigCache.minPrice.toLocaleString('ko-KR') + '원 이상 리포트에 쓸 수 있어요 (가입 후 ' + couponConfigCache.days + '일)</span></div>') : '') +
         '<div class="p"><span class="ck">✓</span>결제한 사주 풀이, 15일간 다시보기 + PDF 저장</div>' +
         '<div class="p"><span class="ck">✓</span>친구 초대 리워드 (준비 중)</div>' +
       '</div>' +
@@ -10824,6 +10960,8 @@ function savePaymentResumeSnapshot(paymentId){
       askQuestion: selectedAiCategory === 'ask' ? askQuestionText : '',
       askPreviewText: selectedAiCategory === 'ask' ? askPreviewText : '',
       paymentId: paymentId,
+      couponId: pendingCouponId || null,
+      couponDiscount: pendingCouponDiscount || 0,
     };
     localStorage.setItem(PAYMENT_SNAPSHOT_KEY, JSON.stringify(snapshot));
   } catch(err){ /* 저장 실패해도 결제 자체는 계속 진행 — 모바일 리디렉션 복원만 안 될 뿐 */ }
@@ -10839,7 +10977,7 @@ function restorePaymentResumeSnapshotIfAny(){
   let snap;
   try{ snap = JSON.parse(raw); } catch(err){ return; }
   if(!snap || !snap.paymentId || (!snap.solarDate && !snap.lunarYear)) return; // 복원할 실제 입력/결제 정보가 없으면 조용히 종료
-  try{ const rc = new URLSearchParams(location.search).get('code'); if(rc) logPayFailure({ code: rc }, false); }catch(e){}   // 모바일 결제창에서 취소·실패하고 돌아온 경우
+  try{ const rc = new URLSearchParams(location.search).get('code'); if(rc){ logPayFailure({ code: rc }, false); if(snap.couponId) pendingCouponRelease = { couponId: String(snap.couponId), paymentId: String(snap.paymentId) }; } }catch(e){}   // 모바일 결제창에서 취소·실패하고 돌아온 경우(예약해 둔 쿠폰은 로그인 확인 뒤 풀어 준다)
   $('#inpName').value = snap.name || '';
   if(snap.calType === 'lunar'){
     const lunarBtn = $('#inpCalSeg button[data-val="lunar"]');
@@ -10874,6 +11012,8 @@ function restorePaymentResumeSnapshotIfAny(){
   pendingRestoreGroup = 'ai';
   pendingRestoreCategory = snap.aiCategory || null;
   pendingRestorePaymentId = snap.paymentId;
+  pendingRestoreCouponId = (typeof snap.couponId === 'string' && /^[0-9a-f-]{36}$/i.test(snap.couponId)) ? snap.couponId : null;
+  pendingRestoreCouponDiscount = parseInt(snap.couponDiscount, 10) || 0;
   pendingRestoreLoveStatus = snap.loveStatus || null;
   pendingRestoreJobStatus = snap.jobStatus || null;
   pendingRestorePartnerData = snap.partnerData || null;
@@ -11002,11 +11142,14 @@ async function initAuth(){
   if(currentProfile && currentProfile.is_admin) setNoTrack(true);
   updateAccountBtn();
   logFunnelEvent('visit');
+  if(currentSession && pendingCouponRelease){ const pr = pendingCouponRelease; pendingCouponRelease = null; await couponApi('release', pr); }
+  if(currentSession) refreshCoupon(true);   // 첫 로그인(가입)이면 쿠폰이 지급되고 안내가 뜬다
   sb.auth.onAuthStateChange(async (event, session)=>{
     currentSession = session || null;
     currentProfile = currentSession ? await loadProfile(currentSession.user.id) : null;
     if(currentProfile && currentProfile.is_admin) setNoTrack(true);
     updateAccountBtn();
+    if(currentSession){ refreshCoupon(true); } else { myCoupon = null; couponClaimedFor = null; }
     refreshAskWallet(true); // 로그인/로그아웃이 바뀌면 이용권 잔액을 다시 가져온다(비회원 코드는 계정으로 합쳐진다)
     if($('#loginModal') && !$('#loginModal').hidden){ renderLoginModal(); }
     if(event === 'SIGNED_IN'){ closeLoginModal(); }
