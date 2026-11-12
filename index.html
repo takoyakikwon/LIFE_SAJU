@@ -1289,6 +1289,15 @@ window.SajuAnalytics = (function(){
   .qalog-ans[open] summary::before{ content:'▾ '; }
   .qalog-ans-body{ margin-top:5px; padding:9px 10px; border-left:2px solid var(--line); background:rgba(255,255,255,.03); font-size:12px; line-height:1.7; white-space:pre-wrap; word-break:break-all; color:var(--ink-soft); }
   .qalog-noans{ font-size:10.5px; color:var(--ink-faint); margin:0 0 6px; }
+  .mem-item{ border:1.5px solid var(--line); border-radius:var(--radius-sm); background:var(--paper-card); padding:10px 12px; }
+  .mem-top{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+  .mem-name{ font-size:13px; font-weight:700; word-break:break-all; }
+  .mem-meta{ display:flex; flex-wrap:wrap; gap:4px 10px; margin-top:4px; font-size:11px; color:var(--ink-faint); }
+  .mem-badge{ padding:1px 7px; border-radius:20px; font-size:9.5px; font-weight:700; background:rgba(244,196,99,.16); color:#f4c463; margin-left:6px; }
+  .mem-badge.buy{ background:rgba(52,211,153,.16); color:#34d399; }
+  .mem-daily{ display:flex; align-items:flex-end; gap:3px; height:54px; margin:2px 0 4px; }
+  .mem-daily i{ flex:1; background:var(--gold); border-radius:2px 2px 0 0; min-height:2px; opacity:.85; }
+  .mem-daily-l{ display:flex; justify-content:space-between; font-size:9.5px; color:var(--ink-faint); margin-bottom:10px; }
   .qalog-badge{ padding:1px 7px; border-radius:20px; font-size:9.5px; font-weight:700; }
   .qalog-badge.free{ background:rgba(244,196,99,.16); color:#f4c463; }
   .qalog-badge.paid{ background:rgba(52,211,153,.16); color:#34d399; }
@@ -2659,6 +2668,23 @@ window.SajuAnalytics = (function(){
     <div class="history-list" id="qaLogList"></div>
     <p class="modal-desc" style="margin-top:6px;">답변까지 만든 질문과 AI 답변이 기록돼요(관리자 테스트·위기/운명단정 질문 제외). 90일 뒤 자동 삭제되고, 이메일·전화번호 모양의 숫자는 가려져요. 질문에 개인적인 내용이 있을 수 있으니 화면 공유·캡처에 주의하세요.</p>
     <button class="modal-cancel" id="qaLogModalCancel">닫기</button>
+  </div>
+</div>
+<div id="memberModal" class="modal-overlay" hidden>
+  <div class="modal-card modal-card-wide">
+    <div class="modal-title">회원 관리 — 가입 · 접속 · 구매 · 쿠폰</div>
+    <div class="admin-summary" id="memberSummary"></div>
+    <div id="memberExtra"></div>
+    <div class="qalog-filters">
+      <input type="search" id="memberSearch" placeholder="닉네임 또는 회원 번호 검색" aria-label="닉네임 또는 회원 번호 검색">
+      <select id="memberSort" aria-label="정렬" style="padding:7px 8px;border:1.5px solid var(--line);border-radius:var(--radius-sm);background:var(--paper-card);color:var(--ink);font-size:12px;">
+        <option value="joined">가입 최근순</option><option value="last_login">최근 접속순</option><option value="paid_amount">결제액 많은순</option><option value="paid_count">결제 횟수순</option>
+      </select>
+    </div>
+    <div class="history-list" id="memberList"></div>
+    <button type="button" class="admin-csv-btn" id="memberMoreBtn" hidden style="margin:8px auto 0;display:block;">더 보기</button>
+    <p class="modal-desc" style="margin-top:6px;">카카오 로그인으로 받은 닉네임만 보여요. 이메일·전화번호·카카오 번호·출생 정보는 이 화면에 없어요. 구매는 결제 완료·환불 안 된 실결제 기준(관리자 무료 열람·이용권 사용·시험 결제 제외)이고, 관리자 계정은 위 숫자에서 빠져요. 개인정보가 포함되니 화면 공유·캡처에 주의하세요.</p>
+    <button class="modal-cancel" id="memberModalCancel">닫기</button>
   </div>
 </div>
 <div id="inviteAdModal" class="modal-overlay" hidden>
@@ -10489,6 +10515,76 @@ $$('#qaLogKindTabs button').forEach(btn=>{
   });
 });
 $('#qaLogSearch').addEventListener('input', renderQaLog);
+
+// 2026-11-12: 회원 관리(관리자 전용). 브라우저는 회원 표를 직접 읽지 못하고, 관리자만 통과하는 admin_member_overview RPC 로만 조회한다.
+// 닉네임·가입일·최근 접속·구매·쿠폰 상태만 받는다(이메일·카카오 번호 없음). SQL: docs/admin_members.sql
+const MEMBER_PAGE = 100;
+let memberLimit = MEMBER_PAGE, memberSeq = 0;
+const MEMBER_COUPON_LABEL = { none:'쿠폰 없음', available:'쿠폰 사용 가능', reserved:'쿠폰 결제 중', used:'쿠폰 사용함', expired:'쿠폰 기간 지남' };
+function memberFmtKst(iso){
+  if(!iso) return '-';
+  const d = new Date(new Date(iso).getTime() + 9*3600*1000), p = n=>String(n).padStart(2,'0');
+  return `${d.getUTCMonth()+1}/${d.getUTCDate()} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`;
+}
+function memberAgo(iso){
+  if(!iso) return '-';
+  const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if(m < 1) return '방금'; if(m < 60) return m + '분 전'; if(m < 1440) return Math.floor(m/60) + '시간 전';
+  return Math.floor(m/1440) + '일 전';
+}
+function renderMembers(d){
+  const s = d.summary || {};
+  const stat = (n,l)=>`<div class="stat" style="flex:1 1 22%; min-width:70px;"><div class="n">${n}</div><div class="l">${l}</div></div>`;
+  const sumEl = $('#memberSummary'); sumEl.style.flexWrap = 'wrap';
+  const rate = s.total ? Math.round((s.buyers||0) / s.total * 100) : 0;
+  sumEl.innerHTML = stat((s.total||0)+'명','총 회원') + stat((s.new_today||0)+'명','오늘 가입') + stat((s.new_7d||0)+'명','7일 가입') + stat((s.new_30d||0)+'명','30일 가입')
+    + stat((s.active_7d||0)+'명','7일 내 접속') + stat((s.buyers||0)+'명 ('+rate+'%)','구매 회원') + stat((s.paid_orders||0)+'건','결제 건수') + stat(formatKRW(s.revenue||0),'누적 결제액');
+  const c = s.coupon || {}, days = s.daily_new || [], max = Math.max(1, ...days.map(x=>x.n||0));
+  $('#memberExtra').innerHTML =
+    `<div class="admin-section-title">가입 쿠폰 현황</div>` +
+    `<div class="admin-summary" style="flex-wrap:wrap;">${stat(c.issued||0,'발급') + stat(c.available||0,'사용 가능') + stat(c.reserved||0,'결제 중') + stat(c.used||0,'사용함') + stat(c.expired||0,'기간 지남')}</div>` +
+    `<div class="admin-section-title">최근 14일 신규 가입</div>` +
+    `<div class="mem-daily">${days.map(x=>`<i title="${escapeHtml(x.day)} ${x.n}명" style="height:${Math.max(4, Math.round((x.n||0)/max*100))}%"></i>`).join('')}</div>` +
+    `<div class="mem-daily-l"><span>${escapeHtml((days[0]||{}).day||'').slice(5)}</span><span>${escapeHtml((days[days.length-1]||{}).day||'').slice(5)}</span></div>`;
+  const list = d.members || [];
+  $('#memberList').innerHTML = list.length ? list.map(m=>
+    `<div class="mem-item"><div class="mem-top"><div class="mem-name">${escapeHtml(m.name||'')}` +
+      (m.is_admin ? '<span class="mem-badge">관리자</span>' : '') + (m.paid_count>0 ? '<span class="mem-badge buy">구매</span>' : '') + `</div>` +
+      `<div class="mem-meta" style="margin:0;"><span>${escapeHtml(m.ref||'')}</span></div></div>` +
+      `<div class="mem-meta"><span>가입 ${escapeHtml(memberFmtKst(m.joined_at))}</span><span>접속 ${escapeHtml(memberFmtKst(m.last_login_at))} (${escapeHtml(memberAgo(m.last_login_at))})</span>` +
+      `<span>${m.paid_count>0 ? '결제 '+m.paid_count+'건 · '+formatKRW(m.paid_amount) : '결제 없음'}</span><span>${escapeHtml(MEMBER_COUPON_LABEL[m.coupon]||m.coupon||'')}</span></div></div>`
+  ).join('') : '<div class="history-empty">조건에 맞는 회원이 없어요</div>';
+  const total = Number(d.total_filtered)||0;
+  const more = $('#memberMoreBtn'); more.hidden = !(total > list.length);
+  more.textContent = `더 보기 (${list.length} / ${total})`;
+}
+async function refreshMembers(){
+  const listEl = $('#memberList');
+  if(!sb) return;
+  const mySeq = ++memberSeq;
+  if(!listEl.innerHTML) listEl.innerHTML = '<div class="history-empty">불러오는 중...</div>';
+  const { data, error } = await sb.rpc('admin_member_overview', { p_q: String($('#memberSearch').value||'').trim() || null, p_sort: $('#memberSort').value, p_limit: memberLimit, p_offset: 0 });
+  if(mySeq !== memberSeq) return;
+  if(error){
+    listEl.innerHTML = '<div class="history-empty">불러오지 못했어요 (' + escapeHtml(error.message) + ')<br>회원 조회용 SQL(docs/admin_members.sql)을 아직 실행하지 않았다면 먼저 실행해 주세요.</div>';
+    $('#memberSummary').innerHTML = ''; $('#memberExtra').innerHTML = ''; $('#memberMoreBtn').hidden = true;
+    return;
+  }
+  if(!data){ listEl.innerHTML = '<div class="history-empty">관리자 권한이 없어요</div>'; return; }
+  renderMembers(data);
+}
+function openMemberModal(){
+  $('#memberModal').hidden = false;
+  if(!sb || !currentSession){ $('#memberList').innerHTML = '<div class="history-empty">로그인이 필요해요.</div>'; return; }
+  memberLimit = MEMBER_PAGE; $('#memberSearch').value = ''; $('#memberSort').value = 'joined'; $('#memberList').innerHTML = '';
+  refreshMembers();
+}
+function closeMemberModal(){ $('#memberModal').hidden = true; }
+$('#memberModalCancel').addEventListener('click', closeMemberModal);
+$('#memberSort').addEventListener('change', ()=>{ memberLimit = MEMBER_PAGE; refreshMembers(); });
+let memberSearchTimer = null;
+$('#memberSearch').addEventListener('input', ()=>{ clearTimeout(memberSearchTimer); memberSearchTimer = setTimeout(()=>{ memberLimit = MEMBER_PAGE; refreshMembers(); }, 300); });
+$('#memberMoreBtn').addEventListener('click', ()=>{ memberLimit += MEMBER_PAGE; refreshMembers(); });
 async function refreshFunnelSteps(startISO, endISO){
   const el = $('#funnelStepsSummary');
   if(!el || !sb) return;
@@ -10912,6 +11008,7 @@ function renderLoginModal(){
       (isAdmin ? '<button class="menu-btn" id="adMenuBtn">📈 광고 분석</button>' : '') +
       (isAdmin ? '<button class="menu-btn" id="qaLogMenuBtn">💬 질문 기록</button>' : '') +
       (isAdmin ? '<button class="menu-btn" id="inviteAdMenuBtn">🎁 친구 초대 현황</button>' : '') +
+      (isAdmin ? '<button class="menu-btn" id="memberMenuBtn">👥 회원 관리</button>' : '') +
       '<button class="logout-btn" id="logoutBtn">로그아웃</button>' +
       '<button class="modal-cancel" id="loginModalCancel">닫기</button>';
     $('#historyMenuBtn').addEventListener('click', ()=>{ closeLoginModal(); openHistoryModal(); });
@@ -10920,6 +11017,7 @@ function renderLoginModal(){
     if(isAdmin){ $('#adMenuBtn').addEventListener('click', ()=>{ closeLoginModal(); openAdModal(); }); }
     if(isAdmin){ $('#qaLogMenuBtn').addEventListener('click', ()=>{ closeLoginModal(); openQaLogModal(); }); }
     if(isAdmin){ $('#inviteAdMenuBtn').addEventListener('click', ()=>{ closeLoginModal(); openInviteAdModal(); }); }
+    if(isAdmin){ $('#memberMenuBtn').addEventListener('click', ()=>{ closeLoginModal(); openMemberModal(); }); }
     $('#logoutBtn').addEventListener('click', async ()=>{
       if(sb){ await sb.auth.signOut(); }
       closeLoginModal();
