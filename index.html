@@ -11,8 +11,7 @@ n.queue=[];t=b.createElement(e);t.async=!0;
 t.src=v;s=b.getElementsByTagName(e)[0];
 s.parentNode.insertBefore(t,s)}(window, document,'script',
 'https://connect.facebook.net/en_US/fbevents.js');
-fbq('init', '1580294783832483');
-fbq('track', 'PageView');
+try{ if(localStorage.getItem('sajuNoTrack_v1') !== '1'){ fbq('init', '1580294783832483'); fbq('track', 'PageView'); } }catch(e){ fbq('init', '1580294783832483'); fbq('track', 'PageView'); }
 </script>
 <noscript><img height="1" width="1" style="display:none"
 src="https://www.facebook.com/tr?id=1580294783832483&ev=PageView&noscript=1"
@@ -30,6 +29,7 @@ window.SajuAnalytics = (function(){
   function safeFbq(){
     try{
       if(/\.vercel\.app$/i.test(location.hostname)) return; // 미리보기 주소의 테스트는 광고 전환에 섞지 않는다
+      if(localStorage.getItem('sajuNoTrack_v1') === '1') return; // 2026-11-12: 관리자·본인 기기는 광고 전환에도 섞지 않는다
       if(typeof fbq === 'function') fbq.apply(null, arguments);
     } catch(e){ /* Pixel 오류가 앱 동작에 영향을 주면 안 됨 */ }
   }
@@ -9426,6 +9426,24 @@ function getVisitorId(){
   }
 }
 const VISITOR_ID = getVisitorId();
+// 2026-11-12: 관리자·본인 기기는 통계에서 제외한다. 이 기기에 표시(sajuNoTrack_v1)가 있으면 퍼널 이벤트(방문·단계·결제 단계)와
+// Meta Pixel 을 보내지 않는다. 관리자 계정이 로그인하면 자동으로 표시가 남고, 로그인 전에도 주소 끝에 ?notrack=1 을 붙여
+// 열면 켜지고 ?notrack=0 이면 꺼진다(개인정보 없이 이 브라우저에만 저장).
+const NO_TRACK_KEY = 'sajuNoTrack_v1';
+function isNoTrack(){
+  try{ if(localStorage.getItem(NO_TRACK_KEY) === '1') return true; }catch(e){}
+  try{ if(currentProfile && currentProfile.is_admin) return true; }catch(e){}
+  return false;
+}
+function setNoTrack(on){
+  try{ if(on) localStorage.setItem(NO_TRACK_KEY, '1'); else localStorage.removeItem(NO_TRACK_KEY); }catch(e){}
+}
+(function(){
+  try{
+    const v = new URLSearchParams(location.search).get('notrack');
+    if(v === '1') setNoTrack(true); else if(v === '0') setNoTrack(false);
+  }catch(e){}
+})();
 // 2026-10-04: 광고 유입 출처 추적. 광고 링크의 utm_source/utm_medium/utm_campaign/utm_content와
 // 레퍼러 도메인을 "처음 들어온 광고" 기준(first-touch)으로 기기에 기억해 두고, 이후 모든
 // funnel_events 행에 함께 남긴다. 같은 visitor_id로 결제(purchases)와 이어지므로 광고별
@@ -9507,7 +9525,7 @@ function logPayFailure(response, tal){
 function logPayFailureReason(reason, tal){ logPayEvent((tal ? 'tal_' : '') + 'payfail_' + String(reason).replace(/[^A-Za-z0-9_]/g, '').slice(0, 30)); }
 function payCodeEvent(code, prefix){ return (prefix || 'pay_') + (String(code || '') === 'PAY_PROCESS_CANCELED' ? 'cancel' : 'fail'); }
 function logFunnelEvent(eventType){
-  if(!sb || IS_PREVIEW_HOST) return;
+  if(!sb || IS_PREVIEW_HOST || isNoTrack()) return;
   try{
     const base = {
       event_type: eventType,
@@ -10981,11 +10999,13 @@ async function initAuth(){
   const { data } = await sb.auth.getSession();
   currentSession = data.session || null;
   if(currentSession){ currentProfile = await loadProfile(currentSession.user.id); }
+  if(currentProfile && currentProfile.is_admin) setNoTrack(true);
   updateAccountBtn();
   logFunnelEvent('visit');
   sb.auth.onAuthStateChange(async (event, session)=>{
     currentSession = session || null;
     currentProfile = currentSession ? await loadProfile(currentSession.user.id) : null;
+    if(currentProfile && currentProfile.is_admin) setNoTrack(true);
     updateAccountBtn();
     refreshAskWallet(true); // 로그인/로그아웃이 바뀌면 이용권 잔액을 다시 가져온다(비회원 코드는 계정으로 합쳐진다)
     if($('#loginModal') && !$('#loginModal').hidden){ renderLoginModal(); }
