@@ -9658,12 +9658,12 @@ function logPayFailure(response, tal){
   const ev = payCodeEvent(response && response.code, pre + 'pay_');
   logPayEvent(ev);
   if(!/fail$/.test(ev)) return;
-  const clean = (v, n)=>String(v == null ? '' : v).replace(/[^A-Za-z0-9_]/g, '').slice(0, n);
-  const c = clean(response && response.code, 30) || 'NOCODE';
+  const clean = (v, n)=>String(v == null ? '' : v).replace(/[^A-Za-z0-9_]/g, '').toLowerCase().slice(0, n);   // 2026-11-18: DB 이벤트 이름 규칙이 소문자만 허용해서, 대문자 사유 코드가 통째로 거부되던 것을 소문자로 바꿔 저장
+  const c = clean(response && response.code, 30) || 'nocode';
   const pg = clean(response && response.pgCode, 20);
   logPayEvent(pre + 'payfail_' + c + (pg ? '_' + pg : ''));
 }
-function logPayFailureReason(reason, tal){ logPayEvent((tal ? 'tal_' : '') + 'payfail_' + String(reason).replace(/[^A-Za-z0-9_]/g, '').slice(0, 30)); }
+function logPayFailureReason(reason, tal){ logPayEvent((tal ? 'tal_' : '') + 'payfail_' + String(reason).replace(/[^A-Za-z0-9_]/g, '').toLowerCase().slice(0, 30)); }
 function payCodeEvent(code, prefix){ return (prefix || 'pay_') + (String(code || '') === 'PAY_PROCESS_CANCELED' ? 'cancel' : 'fail'); }
 function logFunnelEvent(eventType){
   if(!sb || IS_PREVIEW_HOST || isNoTrack()) return;
@@ -11160,7 +11160,7 @@ function restorePaymentResumeSnapshotIfAny(){
   let snap;
   try{ snap = JSON.parse(raw); } catch(err){ return; }
   if(!snap || !snap.paymentId || (!snap.solarDate && !snap.lunarYear)) return; // 복원할 실제 입력/결제 정보가 없으면 조용히 종료
-  try{ const rc = new URLSearchParams(location.search).get('code'); if(rc){ logPayFailure({ code: rc }, false); if(snap.couponId) pendingCouponRelease = { couponId: String(snap.couponId), paymentId: String(snap.paymentId) }; } }catch(e){}   // 모바일 결제창에서 취소·실패하고 돌아온 경우(예약해 둔 쿠폰은 로그인 확인 뒤 풀어 준다)
+  try{ const rc = new URLSearchParams(location.search).get('code'); if(rc){ logPayFailure({ code: rc }, false); if(snap.couponId) pendingCouponRelease = { couponId: String(snap.couponId), paymentId: String(snap.paymentId) }; } else if(!new URLSearchParams(location.search).get('paymentId')){ logPayEvent('pay_cancel'); } }catch(e){}   // 결제 안내 없이 그냥 돌아온 경우(카드사 화면에서 뒤로가기·닫기)도 취소로 센다   // 모바일 결제창에서 취소·실패하고 돌아온 경우(예약해 둔 쿠폰은 로그인 확인 뒤 풀어 준다)
   $('#inpName').value = snap.name || '';
   if(snap.calType === 'lunar'){
     const lunarBtn = $('#inpCalSeg button[data-val="lunar"]');
