@@ -9661,7 +9661,16 @@ function logPayFailure(response, tal){
   const clean = (v, n)=>String(v == null ? '' : v).replace(/[^A-Za-z0-9_]/g, '').toLowerCase().slice(0, n);   // 2026-11-18: DB 이벤트 이름 규칙이 소문자만 허용해서, 대문자 사유 코드가 통째로 거부되던 것을 소문자로 바꿔 저장
   const c = clean(response && response.code, 30) || 'nocode';
   const pg = clean(response && response.pgCode, 20);
-  logPayEvent(pre + 'payfail_' + c + (pg ? '_' + pg : ''));
+  // 2026-11-20: PG 안내 문구(response.message)를 한글 그대로는 못 저장하므로(이벤트 이름은 영소문자·숫자·_ 만 허용) 대표 사유 단어로 줄여 뒤에 붙인다. 개인정보는 담지 않는다.
+  const cat = payMsgCategory(response && response.message);
+  logPayEvent((pre + 'payfail_' + c + (pg ? '_' + pg : '') + (cat ? '_' + cat : '')).slice(0, 64).replace(/_+$/, ''));
+}
+function payMsgCategory(msg){
+  const m = String(msg == null ? '' : msg);
+  if(!m) return '';
+  const R = [[/한도/, 'limit'], [/잔액|잔고/, 'balance'], [/비밀번호|비번/, 'pw'], [/유효기간|만료/, 'expiry'], [/분실|도난|정지|사용\s*불가|이용\s*불가/, 'blocked'], [/해외/, 'overseas'], [/할부/, 'installment'], [/인증|본인|ARS|OTP/i, 'auth'], [/시간.{0,4}초과|타임\s*아웃|timeout/i, 'timeout'], [/취소|중단|닫/, 'closed'], [/카드\s*번호/, 'cardno'], [/점검|장애|시스템|오류|error/i, 'sys'], [/거절|거부|승인|불가|실패/, 'declined']];
+  for(let i = 0; i < R.length; i++){ if(R[i][0].test(m)) return R[i][1]; }
+  return 'other';
 }
 function logPayFailureReason(reason, tal){ logPayEvent((tal ? 'tal_' : '') + 'payfail_' + String(reason).replace(/[^A-Za-z0-9_]/g, '').toLowerCase().slice(0, 30)); }
 function payCodeEvent(code, prefix){ return (prefix || 'pay_') + (String(code || '') === 'PAY_PROCESS_CANCELED' ? 'cancel' : 'fail'); }
