@@ -3232,7 +3232,7 @@ module.exports = async (req, res) => {
       } catch (e) { console.error('lifetime ask bonus failed:', e); }
     }
 
-    if (modelOverride) extra.adminDebug = { model, firstLen: dbg.firstLen, firstUsage: dbg.firstUsage, serviceTier: dbg.tier, rounds: continuationRounds, finalLen: finalText.length, ms: Date.now() - dbgT0 };
+    if (modelOverride || (isAdmin && payload.category === 'newyear' && payload.debug_model === true)) extra.adminDebug = { model, firstLen: dbg.firstLen, firstUsage: dbg.firstUsage, serviceTier: dbg.tier, rounds: continuationRounds, finalLen: finalText.length, ms: Date.now() - dbgT0 };
     res.status(200).json(Object.assign({ interpretation: finalText }, extra));
   } catch (err) {
     console.error('interpret.js error:', err);
