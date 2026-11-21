@@ -1607,7 +1607,9 @@ async function callOpenAIOnce(apiKey, messages, maxTokens, model) {
   // GPT-5 계열(gpt-5.4-mini 등)은 max_tokens 파라미터를 거부하고 max_completion_tokens를
   // 요구한다(2026-08-26 실측 확인 — max_tokens로 보내면 400 invalid_request_error /
   // unsupported_parameter). 모델명이 gpt-5로 시작하면 새 파라미터명을 쓴다.
-  const tokenParamKey = /^(gpt-5|gpt-6|o\d)/.test(model) ? 'max_completion_tokens' : 'max_tokens';
+  // 관리자 시험용: model 문자열에 '|' 로 service_tier·reasoning_effort 를 붙일 수 있다(예: gpt-6-luna|fast|none). 일반 호출은 모델명만 들어온다.
+  const modelParts = String(model).split('|'); const modelName = modelParts[0]; const tierOpt = modelParts[1] || ''; const effortOpt = modelParts[2] || '';
+  const tokenParamKey = /^(gpt-5|gpt-6|o\d)/.test(modelName) ? 'max_completion_tokens' : 'max_tokens';
   const openaiRes = await fetch(OPENAI_API_URL, {
     method: 'POST',
     headers: {
@@ -1617,7 +1619,7 @@ async function callOpenAIOnce(apiKey, messages, maxTokens, model) {
     // temperature를 기본값(1.0)보다 살짝 낮춰(0.8) 저확률·엉뚱한 토큰이 뽑힐 여지를 줄인다.
     // 문체의 다양성을 크게 해치지 않으면서, 위 sanitizeAiText와 함께 이중 안전장치 역할.
     // gpt-5.5·gpt-6 계열은 temperature 기본값(1)만 허용한다(0.8을 보내면 400 unsupported_value). 이런 모델은 temperature 를 아예 보내지 않는다.
-    body: JSON.stringify(Object.assign({ model, [tokenParamKey]: maxTokens, messages }, /^(gpt-5\.5|gpt-6|o\d)/.test(model) ? {} : { temperature: 0.8 })),
+    body: JSON.stringify(Object.assign({ model: modelName, [tokenParamKey]: maxTokens, messages }, /^(gpt-5\.5|gpt-6|o\d)/.test(modelName) ? {} : { temperature: 0.8 }, tierOpt ? { service_tier: tierOpt } : {}, effortOpt ? { reasoning_effort: effortOpt } : {})),
   });
   if (!openaiRes.ok) {
     const errText = await openaiRes.text();
@@ -1627,7 +1629,7 @@ async function callOpenAIOnce(apiKey, messages, maxTokens, model) {
   const data = await openaiRes.json();
   const rawText = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '').trim();
   const text = sanitizeAiText(rawText);
-  return { ok: true, text, usage: data.usage || null };
+  return { ok: true, text, usage: data.usage || null, serviceTier: data.service_tier || null };
 }
 
 // 재시도할 가치가 있는 오류인지 판단: 429(rate limit)나 5xx(서버 쪽 일시적 오류), 그리고
@@ -2921,7 +2923,7 @@ module.exports = async (req, res) => {
   let model = MODEL_BY_CATEGORY[payload.category] || DEFAULT_MODEL;
   // 2026-11-21 관리자 전용 모델 시험: 검증된 관리자 계정이 신년운세를 요청할 때만 payload.model_override 로 모델을 바꿔 볼 수 있다.
   // 일반 이용자·비로그인 요청에는 아무 영향이 없고, 응답에 adminDebug(분량·이어쓰기 횟수·소요 시간)가 함께 내려간다.
-  const modelOverride = (isAdmin && payload.category === 'newyear' && typeof payload.model_override === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{1,40}$/.test(payload.model_override)) ? payload.model_override : null;
+  const modelOverride = (isAdmin && payload.category === 'newyear' && typeof payload.model_override === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{1,40}(\|[a-z0-9_]{1,12}){0,2}$/.test(payload.model_override)) ? payload.model_override : null;
   if (modelOverride) model = modelOverride;
   const dbgT0 = Date.now();
   const dbg = { firstLen: null, firstUsage: null };
@@ -3032,7 +3034,7 @@ module.exports = async (req, res) => {
     }
 
     let text = first.text;
-    dbg.firstLen = text.length; dbg.firstUsage = first.usage || null;
+    dbg.firstLen = text.length; dbg.firstUsage = first.usage || null; dbg.tier = first.serviceTier || null;
 
     // 이어쓰기: 카테고리별 최소 분량에 못 미치면 후속 호출을 보내 이어 붙인다. 카테고리별로
     // 최대 이어쓰기 횟수가 다를 수 있으므로(대부분 1회, 평생운 프리미엄은 3회) 반복문으로 처리한다.
@@ -3230,7 +3232,7 @@ module.exports = async (req, res) => {
       } catch (e) { console.error('lifetime ask bonus failed:', e); }
     }
 
-    if (modelOverride) extra.adminDebug = { model, firstLen: dbg.firstLen, firstUsage: dbg.firstUsage, rounds: continuationRounds, finalLen: finalText.length, ms: Date.now() - dbgT0 };
+    if (modelOverride) extra.adminDebug = { model, firstLen: dbg.firstLen, firstUsage: dbg.firstUsage, serviceTier: dbg.tier, rounds: continuationRounds, finalLen: finalText.length, ms: Date.now() - dbgT0 };
     res.status(200).json(Object.assign({ interpretation: finalText }, extra));
   } catch (err) {
     console.error('interpret.js error:', err);
