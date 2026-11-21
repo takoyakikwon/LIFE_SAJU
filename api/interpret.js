@@ -16,7 +16,9 @@ function talismanLib() { return _talismanLib || (_talismanLib = require('./_tali
 // 바꿀 수 있게 카테고리별 오버라이드를 둔다.
 // 예: Vercel 환경변수에 OPENAI_MODEL_NEWYEAR=gpt-4o 를 추가하면 신년운세만 그 모델을 씀
 // (다른 카테고리는 그대로 OPENAI_MODEL 또는 기본값 gpt-5.4-mini 유지).
-const DEFAULT_MODEL = process.env.OPENAI_MODEL || 'gpt-5.4-mini';
+// 2026-11-21: Vercel 환경변수 OPENAI_MODEL(2026-08-19 등록, gpt-4o-mini)이 코드 기본값을 덮어써 실제 운영이 gpt-4o-mini로 돌고 있었다(신년운세 찫 답 1,6xx자 사고의 원인).
+// 이제 기본 모델은 OPENAI_MODEL_DEFAULT(미설정이면 gpt-5.4-mini)로만 바꾼다. 이전 OPENAI_MODEL 변수는 더 이상 읽지 않는다(Vercel에서 지워도 됨).
+const DEFAULT_MODEL = process.env.OPENAI_MODEL_DEFAULT || 'gpt-5.4-mini';
 const MODEL_BY_CATEGORY = {
   comprehensive: process.env.OPENAI_MODEL_COMPREHENSIVE || DEFAULT_MODEL,
   love: process.env.OPENAI_MODEL_LOVE || DEFAULT_MODEL,
