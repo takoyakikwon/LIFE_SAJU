@@ -1616,7 +1616,8 @@ async function callOpenAIOnce(apiKey, messages, maxTokens, model) {
     },
     // temperature를 기본값(1.0)보다 살짝 낮춰(0.8) 저확률·엉뚱한 토큰이 뽑힐 여지를 줄인다.
     // 문체의 다양성을 크게 해치지 않으면서, 위 sanitizeAiText와 함께 이중 안전장치 역할.
-    body: JSON.stringify({ model, [tokenParamKey]: maxTokens, temperature: 0.8, messages }),
+    // gpt-5.5·gpt-6 계열은 temperature 기본값(1)만 허용한다(0.8을 보내면 400 unsupported_value). 이런 모델은 temperature 를 아예 보내지 않는다.
+    body: JSON.stringify(Object.assign({ model, [tokenParamKey]: maxTokens, messages }, /^(gpt-5\.5|gpt-6|o\d)/.test(model) ? {} : { temperature: 0.8 })),
   });
   if (!openaiRes.ok) {
     const errText = await openaiRes.text();
