@@ -1607,7 +1607,7 @@ async function callOpenAIOnce(apiKey, messages, maxTokens, model) {
   // GPT-5 계열(gpt-5.4-mini 등)은 max_tokens 파라미터를 거부하고 max_completion_tokens를
   // 요구한다(2026-08-26 실측 확인 — max_tokens로 보내면 400 invalid_request_error /
   // unsupported_parameter). 모델명이 gpt-5로 시작하면 새 파라미터명을 쓴다.
-  const tokenParamKey = /^gpt-5/.test(model) ? 'max_completion_tokens' : 'max_tokens';
+  const tokenParamKey = /^(gpt-5|gpt-6|o\d)/.test(model) ? 'max_completion_tokens' : 'max_tokens';
   const openaiRes = await fetch(OPENAI_API_URL, {
     method: 'POST',
     headers: {
@@ -1621,7 +1621,7 @@ async function callOpenAIOnce(apiKey, messages, maxTokens, model) {
   if (!openaiRes.ok) {
     const errText = await openaiRes.text();
     console.error('OpenAI API error:', openaiRes.status, errText);
-    return { ok: false, status: openaiRes.status };
+    return { ok: false, status: openaiRes.status, error: String(errText || '').slice(0, 300) };
   }
   const data = await openaiRes.json();
   const rawText = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '').trim();
@@ -2917,7 +2917,13 @@ module.exports = async (req, res) => {
   }
 
   const maxTokens = MAX_TOKENS_BY_CATEGORY[payload.category] || 4000;
-  const model = MODEL_BY_CATEGORY[payload.category] || DEFAULT_MODEL;
+  let model = MODEL_BY_CATEGORY[payload.category] || DEFAULT_MODEL;
+  // 2026-11-21 관리자 전용 모델 시험: 검증된 관리자 계정이 신년운세를 요청할 때만 payload.model_override 로 모델을 바꿔 볼 수 있다.
+  // 일반 이용자·비로그인 요청에는 아무 영향이 없고, 응답에 adminDebug(분량·이어쓰기 횟수·소요 시간)가 함께 내려간다.
+  const modelOverride = (isAdmin && payload.category === 'newyear' && typeof payload.model_override === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{1,40}$/.test(payload.model_override)) ? payload.model_override : null;
+  if (modelOverride) model = modelOverride;
+  const dbgT0 = Date.now();
+  const dbg = { firstLen: null, firstUsage: null };
   const amount = CATEGORY_AMOUNT_KRW[payload.category] || CATEGORY_AMOUNT_KRW.comprehensive;
   // 관리자 무료 열람 기록용 금액. 실제 매출 통계(결제 요약 합계 등)를 왜곡하지 않도록
   // 0원으로 남긴다 — 아래 두 recordPurchase 호출부에서 amount 대신 이 값을 쓴다.
@@ -3020,11 +3026,12 @@ module.exports = async (req, res) => {
         console.error('failed-purchase 기록 중 오류(원래 502 응답에는 영향 없음):', recordErr);
       }
       if (walletUse) await walletRefundOne(walletUse.walletId); // AI 실패 — 차감한 질문 1회를 돌려준다
-      res.status(502).json({ error: `AI 서버 응답 오류 (${first.status})` });
+      res.status(502).json(Object.assign({ error: `AI 서버 응답 오류 (${first.status})` }, modelOverride ? { adminDebug: { model, status: first.status, detail: first.error || null } } : {}));
       return;
     }
 
     let text = first.text;
+    dbg.firstLen = text.length; dbg.firstUsage = first.usage || null;
 
     // 이어쓰기: 카테고리별 최소 분량에 못 미치면 후속 호출을 보내 이어 붙인다. 카테고리별로
     // 최대 이어쓰기 횟수가 다를 수 있으므로(대부분 1회, 평생운 프리미엄은 3회) 반복문으로 처리한다.
@@ -3222,6 +3229,7 @@ module.exports = async (req, res) => {
       } catch (e) { console.error('lifetime ask bonus failed:', e); }
     }
 
+    if (modelOverride) extra.adminDebug = { model, firstLen: dbg.firstLen, firstUsage: dbg.firstUsage, rounds: continuationRounds, finalLen: finalText.length, ms: Date.now() - dbgT0 };
     res.status(200).json(Object.assign({ interpretation: finalText }, extra));
   } catch (err) {
     console.error('interpret.js error:', err);
