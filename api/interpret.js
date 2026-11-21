@@ -1263,6 +1263,56 @@ const MAX_CONTINUATION_ROUNDS_BY_CATEGORY = {
 };
 const DEFAULT_MAX_CONTINUATION_ROUNDS = 1;
 
+// 2026-11-21 신년운세 이어쓰기 중복 수정 — 실제 결제 결과에서 첫 답이 짧아 이어쓰기가 2번 돌았는데,
+// 두 번 다 "직장→재물→대인관계→건강→마무리"를 한 바퀴씩 다시 돌아 같은 해석이 반복되어 나왔다.
+// (1) 이어쓰기 회차마다 서로 다른 "새 방향"을 주고, 앞 내용의 총론 반복·한 바퀴 더 돌기를 명시적으로 금지한다.
+// (2) 새 내용은 맨 끝이 아니라 마지막 큰 제목(행동 제안) 바로 앞에 끼워 넣어 행동 제안이 항상 끝에 남게 한다.
+// (3) 문장이 거의 그대로 겹치는 문단은 서버에서 버린다(말만 바꾼 재서술은 프롬프트로 막는다).
+const NEWYEAR_CONTINUATION_ANGLES = [
+  '[이번 이어쓰기의 방향: 시기별 구체화] 앞에서는 상반기/하반기 정도로만 말했습니다. 이번에는 올해를 분기 또는 월 단위로 더 잘게 나눠, 어느 시기에 움직이면 좋고 어느 시기에는 한 템포 쉬어야 하는지, 왜 그런지를 사주 근거(오행·십성·대운과 세운의 관계)와 함께 써 주세요. 직업·돈·관계·건강 각각의 총론은 이미 썼으니 다시 쓰지 말고, "언제"에 관한 새로운 정보만 쓰세요.',
+  '[이번 이어쓰기의 방향: 실제 선택 장면] 앞에서 말한 총론을 되풀이하지 말고, 이 사람이 올해 실제로 마주칠 법한 선택 장면(예: 이직이나 직무 제안, 큰 지출이나 계약, 관계에서 거리를 정해야 하는 순간, 몸이 보내는 신호) 중 2~3개를 골라 "이럴 때는 이렇게 판단하라"는 기준과 피해야 할 실수를 구체적으로 써 주세요. 앞 문단에서 이미 쓴 문장, 예시, 조언을 다시 쓰면 안 됩니다.',
+];
+function buildNewyearContinuationPrompt(round) {
+  const angle = NEWYEAR_CONTINUATION_ANGLES[Math.min(round, NEWYEAR_CONTINUATION_ANGLES.length - 1)];
+  return [
+    '방금 작성한 신년운세 리포트가 목표 분량에 못 미칩니다. 아래 규칙을 지켜 "새로운 내용만" 이어서 작성하세요.',
+    '',
+    angle,
+    '',
+    '- 이미 쓴 내용을 요약하거나 반복하거나 말만 바꿔 다시 쓰지 마세요. 앞에서 한 말(상반기 기회·하반기 안정, 돈은 신중하게, 가까운 사람과 소통, 운동·수면 관리 같은 일반론)을 다시 꺼내지 마세요.',
+    '- "직장 → 재물 → 대인관계 → 건강"처럼 앞 섹션 순서를 한 바퀴 더 도는 구성을 쓰지 마세요.',
+    '- 새로운 큰 제목이나 소제목, [[V3_SECTION]] 마커를 만들지 말고 본문 문단만 쓰세요.',
+    '- 총평·마무리·정리 문단을 쓰지 마세요. 마지막 행동 제안 섹션은 이 뒤에 따로 이어집니다.',
+    '- 근거 없는 일반론 대신, 이 사람의 사주 데이터에서 나온 구체적 근거를 문장에 담으세요.',
+    '- "이어서 말씀드리면", "추가로" 같은 메타 표현 없이 바로 본문으로 시작하고, 마크다운 문법은 쓰지 마세요.',
+  ].join('\n');
+}
+// 마지막 [[V3_SECTION]] 큰 제목(행동 제안) 앞까지를 head, 그 제목부터 끝까지를 tail로 나눈다.
+function splitBeforeLastV3Section(t) {
+  const i = t.lastIndexOf('[[V3_SECTION]]');
+  if (i <= 0) return { head: t, tail: '' };
+  return { head: t.slice(0, i).replace(/\s+$/, ''), tail: t.slice(i).replace(/^\s+/, '') };
+}
+// 이어쓴 글에서 이미 있는 문장과 거의 그대로 겹치는 문단을 버린다(글자 2-gram 포함 비율 0.8 이상인 문장이 60% 이상이면 문단 제거).
+function dedupeAppendedParagraphs(existing, appended) {
+  const norm = (s) => String(s).replace(/[\s\p{P}\p{S}]+/gu, '');
+  const grams = (s) => { const n = norm(s); const set = new Set(); for (let i = 0; i < n.length - 1; i++) set.add(n.slice(i, i + 2)); return set; };
+  const cover = (a, b) => { if (!a.size) return 0; let c = 0; a.forEach((x) => { if (b.has(x)) c++; }); return c / a.size; };
+  const sents = (s) => String(s).split(/[.!?。]\s+|\n+/).map((x) => x.trim()).filter((x) => norm(x).length >= 15);
+  const seen = sents(existing).map(grams);
+  const kept = [];
+  for (const para of String(appended).split(/\n{2,}/)) {
+    const ss = sents(para);
+    if (!ss.length) { if (para.trim()) kept.push(para.trim()); continue; }
+    let dup = 0;
+    for (const s of ss) { const g = grams(s); if (seen.some((o) => cover(g, o) >= 0.8)) dup++; }
+    if (dup / ss.length >= 0.6) continue;
+    kept.push(para.trim());
+    ss.forEach((s) => seen.push(grams(s)));
+  }
+  return kept.join('\n\n').trim();
+}
+
 const CONTINUATION_PROMPT = `방금 작성한 리포트가 목표 분량에 못 미칩니다. 아래 규칙을 지켜서 이어지는 내용만 추가로 작성하세요.
 
 - 지금까지 쓴 내용을 그대로 반복하지 마세요.
@@ -3028,11 +3078,18 @@ module.exports = async (req, res) => {
           const parts = splitAtFinalSection(text, finalTitle);
           head = parts.head; tail = parts.tail;
         }
+        // 신년운세(V3): 이어쓴 내용은 마지막 큰 제목(행동 제안) 앞에 끼워 넣는다.
+        const nySplice = !spliceMode && payload.category === 'newyear' && narrativeV3Ready && countV3SectionMarkers(text) >= 2;
+        if (nySplice) {
+          const parts = splitBeforeLastV3Section(text);
+          head = parts.head; tail = parts.tail;
+        }
         let continuationPrompt = payload.category === 'lifetime'
           ? (narrativeV3Ready
               ? (CONTINUATION_PROMPT_LIFETIME_V3 + buildLifetimeV3ContinuationStatusNote(head))
               : CONTINUATION_PROMPT_LIFETIME)
           : CONTINUATION_PROMPT;
+        if (payload.category === 'newyear' && narrativeV3Ready) continuationPrompt = buildNewyearContinuationPrompt(continuationRounds);
         if (spliceMode) continuationPrompt += CONTINUATION_BEFORE_FINAL_NOTE(finalTitle);
         const cont = await callOpenAI(apiKey, [
           { role: 'system', content: SYSTEM_PROMPT },
@@ -3059,9 +3116,14 @@ module.exports = async (req, res) => {
               appended = appended.split('[[V3_SECTION]]').join('');
             }
           }
+          if (payload.category === 'newyear' && narrativeV3Ready) {
+            // 이어쓴 글은 새 큰 제목을 만들지 않는다(마커 줄 제거) + 이미 있는 문장과 거의 같은 문단은 버린다.
+            appended = appended.replace(/\[\[V3_SECTION\]\][^\n]*\n?/g, '');
+            appended = dedupeAppendedParagraphs(text, appended);
+          }
           appended = appended.trim();
           if (!appended) break;
-          text = spliceMode ? (head + '\n\n' + appended + '\n\n' + tail) : (text + '\n\n' + appended);
+          text = (spliceMode || nySplice) ? (head + '\n\n' + appended + '\n\n' + tail) : (text + '\n\n' + appended);
         } else {
           break;
         }
